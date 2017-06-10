@@ -1,0 +1,11 @@
+bin/caecilia.pl
+Changes
+lib/Caecilia.pm
+lib/Caecilia/Editor.pm
+lib/Caecilia/Preview.pm
+Makefile.PL
+MANIFEST
+README
+share/menubar.ui
+share/toolbar.ui
+t/App-PlAbcEdit.t

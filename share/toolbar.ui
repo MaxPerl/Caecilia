@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+	<object class="GtkToolbar" id="toolbar">
+		<property name="visible">True</property>
+		<property name="can-focus">False</property>
+		<property name="hexpand">True</property>
+		<child>
+			<object class="GtkToolButton" id="new_button">
+				<property name="visible">True</property>
+				<property name="can-focus">False</property>
+				<property name="is_important">True</property>
+				<property name="action_name">win.new</property>
+				<property name="label" translatable="yes">New</property>
+				<property name="use_underline">True</property>
+				<property name="stock_id">gtk-new</property>
+			</object>
+			<packing>
+				<property name="expand">False</property>
+				<property name="homogeneous">True</property>
+			</packing>
+		</child>
+		<child>
+			<object class="GtkToolButton" id="save_button">
+				<property name="visible">True</property>
+				<property name="can-focus">False</property>
+				<property name="is_important">True</property>
+				<property name="action_name">win.save</property>
+				<property name="label" translatable="yes">Save</property>
+				<property name="use_underline">True</property>
+				<property name="stock_id">gtk-save</property>
+			</object>
+			<packing>
+				<property name="expand">False</property>
+				<property name="homogeneous">True</property>
+			</packing>
+		</child>
+		<child>
+			<object class="GtkToolButton" id="save_as_button">
+				<property name="visible">True</property>
+				<property name="can-focus">False</property>
+				<property name="is_important">True</property>
+				<property name="action_name">win.save_as</property>
+				<property name="label" translatable="yes">Save As</property>
+				<property name="use_underline">True</property>
+				<property name="stock_id">gtk-save-as</property>
+			</object>
+			<packing>
+				<property name="expand">False</property>
+				<property name="homogeneous">True</property>
+			</packing>
+		</child>
+		<child>
+			<object class="GtkToolButton" id="open_button">
+				<property name="visible">True</property>
+				<property name="can-focus">False</property>
+				<property name="is_important">True</property>
+				<property name="action_name">win.open</property>
+				<property name="label" translatable="yes">Open</property>
+				<property name="use_underline">True</property>
+				<property name="stock_id">gtk-open</property>
+			</object>
+			<packing>
+				<property name="expand">False</property>
+				<property name="homogeneous">True</property>
+			</packing>
+		</child>
+		<child>
+			<object class="GtkToolButton" id="preview_button">
+				<property name="visible">True</property>
+				<property name="can-focus">False</property>
+				<property name="is_important">True</property>
+				<property name="action_name">win.preview</property>
+				<property name="label" translatable="yes">Preview</property>
+				<property name="use_underline">True</property>
+				<property name="stock_id">gtk-print-preview</property>
+			</object>
+			<packing>
+				<property name="expand">False</property>
+				<property name="homogeneous">True</property>
+			</packing>
+		</child>
+		<child>
+			<object class="GtkToolButton" id="zoom_in_button">
+				<property name="visible">True</property>
+				<property name="can-focus">False</property>
+				<property name="is_important">True</property>
+				<property name="action_name">win.zoom_in</property>
+				<property name="label" translatable="yes">Zoom in</property>
+				<property name="use_underline">True</property>
+				<property name="stock_id">gtk-zoom-in</property>
+			</object>
+			<packing>
+				<property name="expand">False</property>
+				<property name="homogeneous">True</property>
+			</packing>
+		</child>
+		<child>
+			<object class="GtkToolButton" id="zoom_out_button">
+				<property name="visible">True</property>
+				<property name="can-focus">False</property>
+				<property name="is_important">True</property>
+				<property name="action_name">win.zoom_out</property>
+				<property name="label" translatable="yes">Zoom out</property>
+				<property name="use_underline">True</property>
+				<property name="stock_id">gtk-zoom-out</property>
+			</object>
+			<packing>
+				<property name="expand">False</property>
+				<property name="homogeneous">True</property>
+			</packing>
+		</child>
+		<child>
+			<object class="GtkToolButton" id="previous_page">
+				<property name="visible">True</property>
+				<property name="can-focus">False</property>
+				<property name="is_important">True</property>
+				<property name="action_name">win.previous_page</property>
+				<property name="label" translatable="yes">Previous Page</property>
+				<property name="use_underline">True</property>
+				<property name="stock_id">gtk-go-back</property>
+			</object>
+			<packing>
+				<property name="expand">False</property>
+				<property name="homogeneous">True</property>
+			</packing>
+		</child>
+		<child>
+			<object class="GtkToolButton" id="next_page">
+				<property name="visible">True</property>
+				<property name="can-focus">False</property>
+				<property name="is_important">True</property>
+				<property name="action_name">win.next_page</property>
+				<property name="label" translatable="yes">Next Page</property>
+				<property name="use_underline">True</property>
+				<property name="stock_id">gtk-go-forward</property>
+			</object>
+			<packing>
+				<property name="expand">False</property>
+				<property name="homogeneous">True</property>
+			</packing>
+		</child>
+	</object>
+</interface>
