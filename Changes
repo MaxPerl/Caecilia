@@ -1,5 +1,10 @@
 Revision history for Perl extension App::PlAbcEdit.
 
+0.03  Su  Jun  11 12:43:00 2017
+	- Improvements with Preview:
+		-> Next/Previos page does count $self->page only, if next/previous page exists
+		-> Before creating a new preview the old preview files are deleted
+	- Minor Bugfix in Makefile.PL
 0.02  Sa  Jun  10 19:31:00 2017
 	- First released version of Caecilia - still much too do!
 0.01  Thu Jun  8 07:31:55 2017

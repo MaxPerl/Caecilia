@@ -137,7 +137,7 @@ sub next_page {
 	my ($self) = @_;
 	
 	my $old_page = $self->page();
-	return $self->page($old_page+1);
+	return $self->page($old_page+1) unless ($old_page >= $self->number_of_pages());
 	
 }
 
@@ -145,8 +145,18 @@ sub previous_page {
 	my ($self) = @_;
 	
 	my $old_page = $self->page();
-	return $self->page($old_page-1);
+	return $self->page($old_page-1) unless ($old_page <= 1);
 	
+}
+
+sub number_of_pages {
+	my ($self, $new_number_of_pages) = @_;	
+	
+	my $old_number_of_pages = $self->{number_of_pages};
+	
+	$self->{number_of_pages} = $new_number_of_pages if (defined $new_number_of_pages);
+	
+	return $old_number_of_pages;
 }
 
 1;

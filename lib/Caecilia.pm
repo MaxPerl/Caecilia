@@ -35,7 +35,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 
 # Preloaded methods go here.
@@ -303,14 +303,24 @@ sub preview_cb {
 	my $preview = $parameters->[1];
 	my $text = $editor->get_text();
 	my $dir = $parameters->[2];
-	print "DIR $dir \n";
+	
+	# delete old created files	
+	my @filelist = <"$dir/preview*">;
+	foreach my $file (@filelist) {
+		unlink $file;
+	}
+	
+	# create new files for preview	
 	open my $fh, ">:encoding(utf8)", "$dir/preview.abc";
 	print $fh "$text";
-	close $fh; 
+	close $fh;
 	
 	system("abcm2ps -q -O $dir/preview.abc -c -v $dir/preview.abc");
 	
 	$preview->render_preview("$dir/preview");
+	@filelist = <"$dir/preview*.svg">;
+	my $number_of_pages = @filelist;
+	$preview->number_of_pages($number_of_pages);
 }
 
 sub zoom_in_cb {

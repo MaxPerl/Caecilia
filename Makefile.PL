@@ -12,7 +12,7 @@ WriteMakefile(
 			  'Gtk3::SourceView' => 0,
 			  'File::ShareDir' => 0 }, # e.g., Module::Name => 1.1
     BUILD_REQUIRES    => {'ExtUtils::MakeMaker' => 0,
-			  'File::ShareDir::Install'},
+			  'File::ShareDir::Install' => 0},
     ABSTRACT_FROM     => 'lib/Caecilia.pm', # retrieve abstract from module
     EXE_FILES	      => ['bin/caecilia.pl'],
     AUTHOR            => 'Maximilian Lika <maximilian@(none)>',
