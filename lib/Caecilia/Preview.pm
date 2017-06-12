@@ -60,12 +60,11 @@ sub build_preview_object {
 	$scrolled_window->set_vexpand(TRUE);
 	
 	my $image = Gtk3::Image->new();
-	my $scale_factor = 1.0;
 	
 	# Save the scrolled window
 	$self->{image} = $image;
 	$self->{view} = $scrolled_window;
-	$self->{scale_factor} = 1.0;
+	$self->{scale_factor} = 1.6;
 	$self->{filename} = "";
 	
 	# Build the Preview
@@ -77,30 +76,26 @@ sub build_preview_object {
 
 sub load_image {
 	my ($self, $file, $scale_factor) = @_;
-	my $pixbuf = Gtk3::Gdk::Pixbuf->new_from_file($file);
-	my $width = $pixbuf->get_width();
-	my $height = $pixbuf->get_height();
+	my ($width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);	
 	my $scale_width = $width * $scale_factor;
 	my $scale_height = $height * $scale_factor;
-	my $scaled = $pixbuf->scale_simple($scale_width,$scale_height,'hyper');
+	my $pixbuf = Gtk3::Gdk::Pixbuf->new_from_file_at_scale($file, $scale_width,$scale_height, TRUE);
 	my $image = $self->{image};
 	$image->set_from_pixbuf($pixbuf);
-	return $scaled;
+	return $pixbuf;
 }
 
 sub zoom_in {
 	my $self = shift;
 	$self->{scale_factor} = $self->{scale_factor} + 0.1;
-	my $pixbuf = $self->load_image($self->{filename}, $self->{scale_factor});
-	$self->{image}->set_from_pixbuf($pixbuf);
+	$self->load_image($self->{filename}, $self->{scale_factor});
 	return $self->{scale_factor};
 }
 
 sub zoom_out {
 	my $self = shift;
 	$self->{scale_factor} = $self->{scale_factor} - 0.1;
-	my $pixbuf = $self->load_image($self->{filename}, $self->{scale_factor});
-	$self->{image}->set_from_pixbuf($pixbuf);
+	$self->load_image($self->{filename}, $self->{scale_factor});
 	return $self->{scale_factor}
 }
 

@@ -1,5 +1,8 @@
 Revision history for Perl extension App::PlAbcEdit.
 
+0.04  Su  Jun  11 15:51:00 2017
+	- Improvements with Preview:
+		-> Scale/Zoom the Preview/preview.svg without loss of quality
 0.03  Su  Jun  11 12:43:00 2017
 	- Improvements with Preview:
 		-> Next/Previos page does count $self->page only, if next/previous page exists
