@@ -35,7 +35,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 
 # Preloaded methods go here.
@@ -46,16 +46,18 @@ sub new {
 	
 	# Create the tmp dir
 	my $tmpdir = File::Temp->newdir();
-	#print "DIR $tmpdir \n";
+	my $sharedir = dist_dir('Caecilia');	
 	
 	# variable for filename
 	my $filename = "";
 	
 	# Create the windows
 	$window = bless Gtk3::ApplicationWindow->new($app);
-	$window->set_title('Caecilia - A editor for the ABC notation language');
-	$window->set_default_size(800,450);
+	$window->set_title('Caecilia - An editor for the ABC notation language');
+	$window->set_default_size(900,600);
 	$window->set_border_width(5);
+	my $icon = Gtk3::Gdk::Pixbuf->new_from_file("$sharedir/caecilia-icon.png");
+	$window->set_icon($icon);
 	
 	# Create the grid that contains all elements
 	my $grid = Gtk3::Grid->new();
@@ -70,7 +72,6 @@ sub new {
 	$paned->pack2($preview->{view},TRUE,TRUE);
 	
 	# Create the toolbar with GtkBuilder and the toolbar.ui file
-	my $sharedir = dist_dir('Caecilia');	
 	my $toolbar_ui_file = "$sharedir/toolbar.ui";
 	# For development
 	#my $toolbar_ui_file = "../share/toolbar.ui";
@@ -91,39 +92,39 @@ sub new {
 	
 	# Create the Windows actions
 	my $new_action = Glib::IO::SimpleAction->new('new', undef);
-	$new_action->signal_connect('activate'=>\&new_cb, [$window, $editor, \$filename]);
+	$new_action->signal_connect('activate'=> sub {$window->new_cb(shift, $editor, \$filename);});
 	$window->add_action($new_action);
 	
 	my $save_action = Glib::IO::SimpleAction->new('save', undef);
-	$save_action->signal_connect('activate'=>\&save_cb, [$window, $editor, \$filename]);
+	$save_action->signal_connect('activate'=> sub {$window->save_cb(shift, $editor, \$filename);});
 	$window->add_action($save_action);
 	
 	my $save_as_action = Glib::IO::SimpleAction->new('save_as', undef);
-	$save_as_action->signal_connect('activate'=>\&save_as_cb, [$window, $editor, \$filename]);
+	$save_as_action->signal_connect('activate'=> sub {$window->save_as_cb(shift, $editor, \$filename);});
 	$window->add_action($save_as_action);
 	
 	my $open_action = Glib::IO::SimpleAction->new('open', undef);
-	$open_action->signal_connect('activate'=>\&open_cb, [$window, $editor, \$filename]);
+	$open_action->signal_connect('activate'=> sub {$window->open_cb(shift, $editor, \$filename);});
 	$window->add_action($open_action);
 	
 	my $preview_action = Glib::IO::SimpleAction->new('preview', undef);
-	$preview_action->signal_connect('activate'=>\&preview_cb, [$editor, $preview, $tmpdir]);
+	$preview_action->signal_connect('activate'=>sub {$window->preview_cb(shift,$editor, $preview, $tmpdir);});
 	$window->add_action($preview_action);
 	
 	my $zoom_in_action = Glib::IO::SimpleAction->new('zoom_in', undef);
-	$zoom_in_action->signal_connect('activate'=>\&zoom_in_cb, $preview);
+	$zoom_in_action->signal_connect('activate'=> sub {$window->zoom_in_cb(shift, $preview);});
 	$window->add_action($zoom_in_action);
 	
 	my $zoom_out_action = Glib::IO::SimpleAction->new('zoom_out', undef);
-	$zoom_out_action->signal_connect('activate'=>\&zoom_out_cb, $preview);
+	$zoom_out_action->signal_connect('activate'=> sub {$window->zoom_out_cb(shift, $preview);});
 	$window->add_action($zoom_out_action);
 	
 	my $next_page_action = Glib::IO::SimpleAction->new('next_page', undef);
-	$next_page_action->signal_connect('activate'=>\&next_page_cb, [$window, $preview, \$filename]);
+	$next_page_action->signal_connect('activate'=> sub {$window->next_page_cb(shift, $preview, $tmpdir);});
 	$window->add_action($next_page_action);
 	
 	my $previous_page_action = Glib::IO::SimpleAction->new('previous_page', undef);
-	$previous_page_action->signal_connect('activate'=>\&previous_page_cb, [$window, $preview, \$filename]);
+	$previous_page_action->signal_connect('activate'=> sub {$window->previous_page_cb(shift, $preview, $tmpdir);});
 	$window->add_action($previous_page_action);
 	
 	# Attach content to the grid
@@ -136,13 +137,10 @@ sub new {
 }
 
 sub new_cb {
-	my ($self, undef, $args) = @_;
-	#my $window = $args->[0];
-	my $editor = $args->[1];
-	my $filename_ref = $args->[2];
+	my ($self, $action, $editor, $filename_ref) = @_;
 	
 	if ($editor->changed_status()) {
-		warn_unsaved($self, 'new', $args)
+		$self->warn_unsaved('new', $editor, $filename_ref);
 	}
 	else {
 		$editor->set_text("");
@@ -153,9 +151,8 @@ sub new_cb {
 
 # callback function for SAVE
 sub save_cb {
-	my ($self, undef, $args) = @_;
-	my $editor = $args->[1];
-	my $filename = ${$args->[2]};
+	my ($self, $action, $editor, $filename_ref) = @_;
+	my $filename = $$filename_ref;
 	
 	# if $filenames[$n] is not already there
 	if ($filename) {
@@ -170,15 +167,12 @@ sub save_cb {
 	}
 	else {
 		# use save_as_callback
-		save_as_cb($self,undef, $args);
+		$self->save_as_cb($action, $editor, $filename_ref);
 	}
 }
 
 sub save_as_cb {
-	my ($self, undef, $args) = @_;
-	my $window = $args->[0];
-	my $editor = $args->[1];
-	my $filename_ref = $args->[2];
+	my ($window, $action, $editor, $filename_ref) = @_;
 	
 	# create a filechooserdialog to save:
 	# the arguments are: title of the window, parent_window, action,
@@ -200,7 +194,7 @@ sub save_as_cb {
 	}
 
 	# connect the dialog to the callback function save_response_cb
-	$save_dialog->signal_connect("response" => \&save_response_cb, $editor);
+	$save_dialog->signal_connect("response" => \&save_response_cb, [$editor,$filename_ref]);
 
 	# show the dialog
 	$save_dialog->show();
@@ -210,19 +204,20 @@ sub save_as_cb {
 # (= saving the file!)
 sub save_response_cb {
 	my ($dialog, $response_id, $args) = @_;
-	my $save_dialog = $dialog;
-	my $editor = $args;
+	my $editor = $args->[0];
+	my $filename_ref = $args->[1];
 	
 	# if response id is "ACCEPTED" (the button "Open" has been clicked)
 	if ($response_id eq "accept") {
 		# Erhalte den Filename
-		my $filename = $save_dialog->get_filename();
+		my $filename = $dialog->get_filename();
 		# get the bcontent of the buffer, without hidden characters
 		my $content = $editor->get_text();
 		open my $fh, ">:encoding(utf8)", $filename;
 		print $fh "$content";
 		close $fh;
 		$editor->changed_status(0);
+		$$filename_ref=$filename;
 		$dialog->destroy();
 		}
 	# if response id is "CANCEL" (the button "Cancel" has been clicked)
@@ -232,13 +227,10 @@ sub save_response_cb {
 }
 
 sub open_cb {
-	my ($self, undef, $args) = @_;
-	my $window = $args->[0];
-	my $editor = $args->[1];
-	my $filename_ref = $args->[2];
+	my ($window, $action, $editor, $filename_ref) = @_;
 	
 	if ($editor->changed_status()) {
-		$window->warn_unsaved('open', $args)
+		$window->warn_unsaved('new', $editor, $filename_ref);
 	}
 	else {
 		# create a filechooserdialog to open:
@@ -267,7 +259,6 @@ sub open_cb {
 	
 # callback function for the resonse of the open_dialog
 sub open_response_cb {
-
 	my ($dialog, $response_id, $args) = @_;
 	my $open_dialog = $dialog;
 	
@@ -298,11 +289,8 @@ sub open_response_cb {
 	}
 
 sub preview_cb {
-	my ($self, undef,$parameters) = @_;
-	my $editor = $parameters->[0];
-	my $preview = $parameters->[1];
+	my ($self, $action,$editor, $preview, $dir) = @_;
 	my $text = $editor->get_text();
-	my $dir = $parameters->[2];
 	
 	# delete old created files	
 	my @filelist = <"$dir/preview*">;
@@ -324,43 +312,36 @@ sub preview_cb {
 }
 
 sub zoom_in_cb {
-	my ($self, undef,$preview) = @_;
+	my ($self, $action,$preview) = @_;
 	return $preview->zoom_in();
 }
 
 sub zoom_out_cb {
-	my ($self, undef,$preview) = @_;
+	my ($self, $action,$preview) = @_;
 	return $preview->zoom_out();
 }
 
 sub next_page_cb {
-	my ($self, undef, $args) = @_;
-	
-	my $preview = $args->[1];
+	my ($self, $action, $preview, $tmpdir) = @_;
 	$preview->next_page();
-	my $filename = ${$args->[2]};
-	$preview->render_preview($filename);
+	$preview->render_preview("$tmpdir/preview");
 }
 
 sub previous_page_cb {
-	my ($self, undef, $args) = @_;
-	
-	my $preview = $args->[1];
+	my ($self, $action, $preview, $tmpdir) = @_;
 	$preview->previous_page();
-	my $filename = ${$args->[2]};
-	$preview->render_preview($filename);
+	$preview->render_preview("$tmpdir/preview");
 }
 
 sub warn_unsaved {
-	my ($self, $from, $args) = @_;
-	my $window = $args->[0];
+	my ($window, $from, $editor, $filename_ref) = @_;
 	if ($from eq 'open') {
 		my $messagedialog = Gtk3::MessageDialog->new($window,
 												'modal',
 												'warning',
 												'ok_cancel',
 												'You have unsaved content that will be lost by opening another file. Open anyway?');
-		$messagedialog->signal_connect('response' => \&warn_unsaved_response, [$from, $args]);
+		$messagedialog->signal_connect('response' => \&warn_unsaved_response, [$window,$from, $editor, $filename_ref]);
 		$messagedialog->show();
 	}
 	elsif ($from eq 'new') {
@@ -369,23 +350,17 @@ sub warn_unsaved {
 												'warning',
 												'ok_cancel',
 												'You have unsaved content that will be lost by creating a new file. Create a new file anyway?');
-		$messagedialog->signal_connect('response' => \&warn_unsaved_response, [$from, $args]);
+		$messagedialog->signal_connect('response' => \&warn_unsaved_response, [$from,$window, $editor, $filename_ref]);
 		$messagedialog->show();
 	}
 }
 
 sub warn_unsaved_response	{
 	my ($self, $response_id, $args) = @_;
-	# Ok this is a little bad programming style ;-)
-	# $args is an array ref that consists of
-	# $from = 'open' or 'new' (=from where the function is called)
-	# $args_ref = a second array ref that consists the args that was originally passed to the open_cb / save_cb
-	# method
 	my $from = $args->[0];
-	my $args_ref =$args->[1];
-	my $window = $args_ref->[0];
-	my $editor = $args_ref->[1];
-	
+	my $window = $args->[1];
+	my $editor = $args->[2];
+	my $filename_ref = $args->[3];
 	# We need to change the changed_status 
 	$editor->changed_status(0);
 	
@@ -395,8 +370,8 @@ sub warn_unsaved_response	{
 		# Note that open_cb is a callback function that was originally called by a Glib::IO::Simple::Action
 		# object. there is the second argument the SimpleAction parameter (here undef)
 		# okay this code is not really understandable without explantation. Sorry ;-) 
-		open_cb($self, undef, $args_ref) if ($from eq 'open');
-		new_cb($self, undef, $args_ref) if ($from eq 'new');
+		open_cb($window, undef, $editor, $filename_ref) if ($from eq 'open');
+		new_cb($window, undef, $editor, $filename_ref) if ($from eq 'new');
 	}
 	else {
 		$self->destroy;

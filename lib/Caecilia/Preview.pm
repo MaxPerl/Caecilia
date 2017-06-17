@@ -7,6 +7,7 @@ use warnings;
 use utf8;
 use Gtk3;
 use Glib('TRUE','FALSE');
+use File::ShareDir 'dist_dir';
 
 require Exporter;
 
@@ -65,10 +66,13 @@ sub build_preview_object {
 	$self->{image} = $image;
 	$self->{view} = $scrolled_window;
 	$self->{scale_factor} = 1.6;
-	$self->{filename} = "";
+	
+	# Show the Logo at the beginning; oh how nice ;-)
+	my $sharedir = dist_dir('Caecilia');	
+	$self->{filename} = "$sharedir/caecilia-logo.png";
 	
 	# Build the Preview
-	#my $pixbuf = $self->load_image($self->{filename}, $scale_factor);
+	$self->load_image($self->{filename}, 0.5);
 	$scrolled_window->add_with_viewport($image);
 	
 	return ;

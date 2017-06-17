@@ -42,7 +42,7 @@ sub _init {
 	
 	# Actions of the menu
 	my $quit_action = Glib::IO::SimpleAction->new('quit', undef);
-	$quit_action->signal_connect('activate'=>\&quit_cb);
+	$quit_action->signal_connect('activate'=> sub {$app->quit()});
 	$app->add_action($quit_action);
 	
 }

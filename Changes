@@ -1,5 +1,12 @@
 Revision history for Perl extension App::PlAbcEdit.
 
+0.05  Fr Jun  16 22:39:00 107
+	- Add Icon and show Logo in the Preview at the beginning
+	- Several Bugfixes regarding Preview: 
+		-> If a new file is saved, save the filename in $filename_ref, so that a later save call does not open save as dialog
+		-> Pass to Preview::render_preview() the right filename at next_page_cb/previous_page_cb
+	- Code cleaning in Caecilia.PM
+	- Bugfix in Caecilia.PM (ApplicationMenu->Quit does work now, too)
 0.04  Su  Jun  11 15:51:00 2017
 	- Improvements with Preview:
 		-> Scale/Zoom the Preview/preview.svg without loss of quality
