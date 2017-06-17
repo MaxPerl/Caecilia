@@ -6,6 +6,8 @@ lib/Caecilia/Preview.pm
 Makefile.PL
 MANIFEST
 README
+share/caecilia-icon.png
+share/caecilia-logo.png
 share/menubar.ui
 share/toolbar.ui
 t/App-PlAbcEdit.t
