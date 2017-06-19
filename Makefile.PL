@@ -10,6 +10,7 @@ WriteMakefile(
     PREREQ_PM         => {'Test'        =>  0,
 			  'Gtk3'	=> 0,
 			  'Gtk3::SourceView' => 0,
+			  'GooCanvas2' => 0,
 			  'File::ShareDir' => 0 }, # e.g., Module::Name => 1.1
     BUILD_REQUIRES    => {'ExtUtils::MakeMaker' => 0,
 			  'File::ShareDir::Install' => 0},
