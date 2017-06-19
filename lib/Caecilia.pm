@@ -194,7 +194,11 @@ sub save_as_cb {
 	}
 
 	# connect the dialog to the callback function save_response_cb
-	$save_dialog->signal_connect("response" => \&save_response_cb, [$editor,$filename_ref]);
+	#$save_dialog->signal_connect("response" => \&save_response_cb, [$editor,$filename_ref]);
+
+        $save_dialog->signal_connect("response" => sub {
+            return save_response_cb(shift, shift, $editor, $filename_ref);
+        });
 
 	# show the dialog
 	$save_dialog->show();
@@ -203,9 +207,7 @@ sub save_as_cb {
 # Callback Function for the response of the save-as and save dialog 
 # (= saving the file!)
 sub save_response_cb {
-	my ($dialog, $response_id, $args) = @_;
-	my $editor = $args->[0];
-	my $filename_ref = $args->[1];
+	my ($dialog, $response_id, $editor, $filename_ref ) = @_;
 	
 	# if response id is "ACCEPTED" (the button "Open" has been clicked)
 	if ($response_id eq "accept") {
