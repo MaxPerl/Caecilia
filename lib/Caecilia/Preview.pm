@@ -7,6 +7,7 @@ use warnings;
 use utf8;
 use Gtk3;
 use Glib('TRUE','FALSE');
+use GooCanvas2;
 use File::ShareDir 'dist_dir';
 
 require Exporter;
@@ -60,33 +61,68 @@ sub build_preview_object {
 	$scrolled_window->set_hexpand(TRUE);
 	$scrolled_window->set_vexpand(TRUE);
 	
-	my $image = Gtk3::Image->new();
+	my $canvas = GooCanvas2::Canvas->new();
+	$canvas->set('automatic-bounds' => TRUE);
 	
 	# Save the scrolled window
-	$self->{image} = $image;
+	$self->{canvas} = $canvas;
 	$self->{view} = $scrolled_window;
-	$self->{scale_factor} = 1.6;
+	$self->{scale_factor} = 1.2;
 	
 	# Show the Logo at the beginning; oh how nice ;-)
 	my $sharedir = dist_dir('Caecilia');	
 	$self->{filename} = "$sharedir/caecilia-logo.png";
 	
 	# Build the Preview
-	$self->load_image($self->{filename}, 0.5);
-	$scrolled_window->add_with_viewport($image);
+	$self->load_image($self->{filename}, 0.5, 'no_parse');
+	$scrolled_window->add_with_viewport($canvas);
 	
 	return ;
 }
 
 sub load_image {
-	my ($self, $file, $scale_factor) = @_;
-	my ($width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);	
-	my $scale_width = $width * $scale_factor;
-	my $scale_height = $height * $scale_factor;
-	my $pixbuf = Gtk3::Gdk::Pixbuf->new_from_file_at_scale($file, $scale_width,$scale_height, TRUE);
-	my $image = $self->{image};
-	$image->set_from_pixbuf($pixbuf);
-	return $pixbuf;
+	my ($self, $file, $scale_factor, $no_parse) = @_;
+	
+	my $canvas = $self->{canvas};
+	my $root = $canvas->get_root_item();
+	
+	# First cleanup Canvas
+	my $n_children = $root->get_n_children();
+	for (my $i = 0; $i < $n_children; $i++) {
+		$root->remove_child(0);
+	} 
+	
+	# First render the svg
+	my ($width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);
+	my $image = Gtk3::Gdk::Pixbuf->new_from_file($file);
+	my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
+					'pixbuf' => $image,
+					'x' => 0,
+					'y' => 0);
+	$image_item->scale($scale_factor, $scale_factor);
+					
+	# Now render the ABC links and link it to the Editor (TODO)
+	my $editor = $self->{editor};
+	 
+	unless ($no_parse) {
+		my @notes = parse_abc($file);
+		foreach my $note (@notes) {
+		# Add a few simple items
+		my $rect_item = GooCanvas2::CanvasRect->new('parent' => $root,
+						'x' => $note->{'x'},
+						'y' => $note->{'y'},
+						'width' => $note->{'width'},
+						'height' => $note->{'height'},
+						'fill-color' => 'rgba(43,173,251,0)',
+						'stroke-color' => 'transparent');
+		$rect_item->scale($scale_factor, $scale_factor);
+		$rect_item->signal_connect('button_press_event' => sub {$editor->jump_to($note->{row}, $note->{col});});
+		$rect_item->signal_connect('enter_notify_event' => \&on_rect_enter);
+		$rect_item->signal_connect('leave_notify_event' => \&on_rect_leave);
+		}
+	}	
+	$canvas->update();
+	return $image;
 }
 
 sub zoom_in {
@@ -156,6 +192,42 @@ sub number_of_pages {
 	$self->{number_of_pages} = $new_number_of_pages if (defined $new_number_of_pages);
 	
 	return $old_number_of_pages;
+}
+
+# Parse ABC
+sub parse_abc {
+	my ($file) = @_;
+	my @notes;
+	open my $fh, "<", $file;
+	while (my $line = <$fh>) {
+		if ($line =~ m!<abc .* row="(.*)" col="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)"/>!) {
+			my %note = (
+					'row' => $1,
+					'col' => $2,
+					'x' => $3,
+					'y' => $4,
+					'width' => $5,
+					'height' => $6
+					);
+			push @notes, \%note;
+		}
+	}
+	close $fh;
+	return @notes;
+}
+
+# Click to a note feature
+
+sub on_rect_enter {
+	my $item = shift;
+	$item->set('fill-color' => 'rgba(43,173,251,0.5)');
+	return 1;
+}
+
+sub on_rect_leave {
+	my $item = shift;
+	$item->set('fill-color' => 'rgba(43,173,251,0)');
+	return 1;
 }
 
 1;

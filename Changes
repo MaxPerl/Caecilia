@@ -1,6 +1,9 @@
 Revision history for Perl extension App::PlAbcEdit.
 
-0.05  Fr Jun  16 22:39:00 107
+0.06  Mo Jun  19 08:13:00 2017
+	- Add basic support of selecting notes by clicking on them
+	- Merge Bugfix https://github.com/MaxPerl/Caecilia/pull/1
+0.05  Fr Jun  16 22:39:00 2017
 	- Add Icon and show Logo in the Preview at the beginning
 	- Several Bugfixes regarding Preview: 
 		-> If a new file is saved, save the filename in $filename_ref, so that a later save call does not open save as dialog

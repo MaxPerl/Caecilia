@@ -64,6 +64,7 @@ sub new {
 	my $textview = Gtk3::SourceView::View->new();
 	# displays the buffer
 	$textview->set_buffer($buffer);
+	$textview->set_cursor_visible(TRUE);
 	$textview->set_highlight_current_line(TRUE);
 	$textview->set_show_line_numbers(TRUE);
 	$textview->set_wrap_mode("word");
@@ -77,6 +78,7 @@ sub new {
 	# Set some variables
 	$editor_object->{view} = $scrolled_window;
 	$editor_object->{buffer} = $buffer;
+	$editor_object->{textview} =  $textview;
 
 	return $editor_object;
 }
@@ -104,6 +106,7 @@ sub set_text {
 	#	all text is inserted
 	my $length = length(Encode::encode_utf8($content));
 	$buffer->set_text($content,$length);
+	
 	return 1;
 }
 
@@ -124,6 +127,19 @@ sub changed_status {
 	$self->{changed_status} = $new_status if (defined $new_status);
 	
 	return $old_status;
+}
+
+sub jump_to {
+	my ($self, $row, $col) = @_;
+	my $buffer = $self->{buffer};
+	# Place cursor to found note
+	my $iter = $buffer->get_iter_at_line_offset($row-1,$col);
+	$buffer->place_cursor($iter);
+	
+	# Scroll to cursor
+	my $textview = $self->{textview};
+	my $x = $textview->scroll_to_iter($iter, 0.0,TRUE, 0.0, 0.4);
+	return 1
 }
 
 1;

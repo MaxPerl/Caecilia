@@ -35,7 +35,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 
 # Preloaded methods go here.
@@ -67,7 +67,7 @@ sub new {
 	my $paned = Gtk3::Paned->new('horizontal');
 	#$paned->set_position(500);
 	my $editor = Caecilia::Editor->new();
-	my $preview = Caecilia::Preview->new();
+	my $preview = Caecilia::Preview->new('editor' => $editor);
 	$paned->pack1($editor->{view}, TRUE, TRUE);
 	$paned->pack2($preview->{view},TRUE,TRUE);
 	
@@ -194,7 +194,9 @@ sub save_as_cb {
 	}
 
 	# connect the dialog to the callback function save_response_cb
-	$save_dialog->signal_connect("response" => \&save_response_cb, [$editor,$filename_ref]);
+	$save_dialog->signal_connect("response" => sub {
+		return save_response_cb(shift, shift, $editor, $filename_ref);
+        });
 
 	# show the dialog
 	$save_dialog->show();
@@ -203,9 +205,7 @@ sub save_as_cb {
 # Callback Function for the response of the save-as and save dialog 
 # (= saving the file!)
 sub save_response_cb {
-	my ($dialog, $response_id, $args) = @_;
-	my $editor = $args->[0];
-	my $filename_ref = $args->[1];
+	my ($dialog, $response_id, $editor, $filename_ref) = @_;
 	
 	# if response id is "ACCEPTED" (the button "Open" has been clicked)
 	if ($response_id eq "accept") {
@@ -303,7 +303,7 @@ sub preview_cb {
 	print $fh "$text";
 	close $fh;
 	
-	system("abcm2ps -q -O $dir/preview.abc -c -v $dir/preview.abc");
+	system("abcm2ps -q -A -O $dir/preview.abc -c -v $dir/preview.abc");
 	
 	$preview->render_preview("$dir/preview");
 	@filelist = <"$dir/preview*.svg">;
