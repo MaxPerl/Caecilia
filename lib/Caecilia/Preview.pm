@@ -63,6 +63,7 @@ sub build_preview_object {
 	
 	my $canvas = GooCanvas2::Canvas->new();
 	$canvas->set('automatic-bounds' => TRUE);
+	$canvas->signal_connect('size-allocate' => sub {$self->on_size_allocate(@_)});
 	
 	# Save the scrolled window
 	$self->{canvas} = $canvas;
@@ -74,7 +75,7 @@ sub build_preview_object {
 	$self->{filename} = "$sharedir/caecilia-logo.png";
 	
 	# Build the Preview
-	$self->load_image($self->{filename}, 0.5, 'no_parse');
+	$self->load_image($self->{filename}, 1.0, 'center');
 	$scrolled_window->add_with_viewport($canvas);
 	
 	return ;
@@ -92,19 +93,30 @@ sub load_image {
 		$root->remove_child(0);
 	} 
 	
-	# First render the svg
-	my ($width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);
 	my $image = Gtk3::Gdk::Pixbuf->new_from_file($file);
-	my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
-					'pixbuf' => $image,
-					'x' => 0,
-					'y' => 0);
-	$image_item->scale($scale_factor, $scale_factor);
-					
-	# Now render the ABC links and link it to the Editor (TODO)
-	my $editor = $self->{editor};
 	 
-	unless ($no_parse) {
+	# At the beginning load the Caecilia Logo
+	if ($no_parse eq 'center') {
+		my ($width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);
+		my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
+						'pixbuf' => $image,
+						'x' => 20,
+						'y' => 100,
+						'scale-to-fit' => TRUE);
+		
+		# We need to save the image_item to keep the Logo in center
+		# if Canvas is resized
+		$self->{canvas_logo_item} = $image_item;
+	}
+	else {
+		# First render the svg
+		my ($width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);
+		my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
+						'pixbuf' => $image,);
+		$image_item->scale($scale_factor, $scale_factor);
+					
+		# Now render the ABC links and link it to the Editor (TODO)
+		my $editor = $self->{editor};
 		my @notes = parse_abc($file);
 		foreach my $note (@notes) {
 		# Add a few simple items
@@ -228,6 +240,22 @@ sub on_rect_leave {
 	my $item = shift;
 	$item->set('fill-color' => 'rgba(43,173,251,0)');
 	return 1;
+}
+
+# With the following function, we want keep the Caecilia Logo,
+# which is loaded at the beginning, in center, if Canvas is resized
+# okay, this is a little bit dirty :-)
+sub on_size_allocate {
+	my ($preview_object, $canvas, $allocation) = @_;
+	my $logo_item = $preview_object->{canvas_logo_item};
+	if ($logo_item) {
+		my $can_height = $allocation->{height};
+		my $can_width = $allocation->{width};
+		my $width = $can_width-40;
+		my $height = $width * 3/4;
+		$logo_item->set('width' => $width, 'height' => $height);
+	}
+	$canvas->update();
 }
 
 1;

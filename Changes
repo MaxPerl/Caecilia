@@ -1,7 +1,11 @@
 Revision history for Perl extension App::PlAbcEdit.
 
+0.07  Mo Jun  19 23:53:00 2017
+	- Add basic syntax highlighting
+	- Center the Caecilia Logo and keep centered if window/canvas is resized
 0.06  Mo Jun  19 08:13:00 2017
 	- Add basic support of selecting notes by clicking on them
+	- Add GooCanvas2 to the PREREQ-Perl Modules
 	- Merge Bugfix https://github.com/MaxPerl/Caecilia/pull/1
 0.05  Fr Jun  16 22:39:00 2017
 	- Add Icon and show Logo in the Preview at the beginning

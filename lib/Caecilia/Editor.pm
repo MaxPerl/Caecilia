@@ -8,6 +8,7 @@ use utf8;
 use Gtk3;
 use Glib('TRUE','FALSE');
 use Gtk3::SourceView;
+use File::ShareDir 'dist_dir';
 
 require Exporter;
 
@@ -39,6 +40,9 @@ sub new {
 	my $editor_object = {};
 	bless $editor_object;
 	
+	# Sharedir
+	my $sharedir = dist_dir('Caecilia');
+	
 	# a scrolled window for the textview
 	my $scrolled_window = Gtk3::ScrolledWindow->new();
 	$scrolled_window->set_policy("automatic", "automatic");
@@ -48,13 +52,22 @@ sub new {
 	$scrolled_window->set_hexpand(TRUE);
 	$scrolled_window->set_vexpand(TRUE);
 	
+	# Init LanguageManager
 	my $lm = Gtk3::SourceView::LanguageManager->new();
+	my @search_path = $lm->get_search_path();
+	unshift @search_path, $sharedir;
+	$lm->set_search_path(\@search_path);
+	
+	# Get Caecilia Layout Scheme
+	my $sm = Gtk3::SourceView::StyleSchemeManager->new();
+	$sm->set_search_path([$sharedir]);
+	my $scheme = $sm->get_scheme('caecilia');
 	
 	# Syntax Hervorhebung im Buffer aktivierten
-	#my $lang = $lm->get_language("abc");
-	#my $buffer = Gtk3::SourceView::Buffer->new_with_language($lang);
-	my $buffer = Gtk3::SourceView::Buffer->new();
-	#$buffer->set_highlight_syntax(TRUE);
+	my $lang = $lm->get_language("abc");
+	my $buffer = Gtk3::SourceView::Buffer->new_with_language($lang);
+	$buffer->set_style_scheme($scheme);
+	$buffer->set_highlight_syntax(TRUE);
 	
 	# Save the change status property
 	$editor_object->changed_status(0);
@@ -64,14 +77,9 @@ sub new {
 	my $textview = Gtk3::SourceView::View->new();
 	# displays the buffer
 	$textview->set_buffer($buffer);
-	$textview->set_cursor_visible(TRUE);
 	$textview->set_highlight_current_line(TRUE);
 	$textview->set_show_line_numbers(TRUE);
 	$textview->set_wrap_mode("word");
-	$textview->set_auto_indent(TRUE);
-	$textview->set_indent_on_tab(TRUE);
-	my @flags=("tab");
-	$textview->set_draw_spaces(\@flags);
 	
 	$scrolled_window->add($textview);
 	
