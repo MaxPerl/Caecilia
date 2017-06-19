@@ -96,7 +96,7 @@ sub load_image {
 	my $image = Gtk3::Gdk::Pixbuf->new_from_file($file);
 	 
 	# At the beginning load the Caecilia Logo
-	if ($no_parse eq 'center') {
+	if ($no_parse) {
 		my ($width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);
 		my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
 						'pixbuf' => $image,
@@ -248,7 +248,7 @@ sub on_rect_leave {
 sub on_size_allocate {
 	my ($preview_object, $canvas, $allocation) = @_;
 	my $logo_item = $preview_object->{canvas_logo_item};
-	if ($logo_item) {
+	if (defined $logo_item) {
 		my $can_height = $allocation->{height};
 		my $can_width = $allocation->{width};
 		my $width = $can_width-40;
