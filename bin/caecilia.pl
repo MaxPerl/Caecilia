@@ -154,7 +154,7 @@ sub about_cb {
 	# we fill in the aboutdialog
 	$aboutdialog->set_program_name('Caecilia');
 	$aboutdialog->set_version('0.08');
-	$aboutdialog->set_comments("A simple but useful utf8 Texteditor written \n in Perl using Gtk3::SourceView");
+	$aboutdialog->set_comments("A yet simple Editor for the ABC notation format\n written with perl/Gtk3");
 	$aboutdialog->set_copyright(
 		"Copyright \xa9 2016 Maximilian Lika");
 	# important: set_authors and set_documenters need an array ref!
