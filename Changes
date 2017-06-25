@@ -1,5 +1,14 @@
 Revision history for Perl extension App::PlAbcEdit.
 
+0.08  
+	- Disable highlighting of bracket matches
+	- After clicking to a note in Preview, ensure that the cursor blinks
+	- Bugfix: Don't change the change status if the user selects Cancel in the warn_usaved_files dialog
+	- Add AboutDialog
+	- Adjust Font Size to 12 (better for the eyes ;-) )
+	- Add Error dialog if abcm2ps doesn't run successfully 
+	- Add menubar (inclusive toggle items for editor options)
+	- Add Settings dialog ( at the moment only path to abcm2ps can be set; but more will come)
 0.07  Mo Jun  19 23:53:00 2017
 	- Add basic syntax highlighting
 	- Center the Caecilia Logo and keep centered if window/canvas is resized

@@ -81,6 +81,11 @@ sub new {
 	$textview->set_show_line_numbers(TRUE);
 	$textview->set_wrap_mode("word");
 	
+	# Adjust the font size
+	my $fontdesc = Pango::FontDescription->new();
+	$fontdesc->set_size(12*Pango::SCALE);
+	$textview->modify_font($fontdesc);
+	
 	$scrolled_window->add($textview);
 	
 	# Set some variables
@@ -144,9 +149,14 @@ sub jump_to {
 	my $iter = $buffer->get_iter_at_line_offset($row-1,$col);
 	$buffer->place_cursor($iter);
 	
-	# Scroll to cursor
+	# reset blinking of cursor
 	my $textview = $self->{textview};
+	$textview->reset_cursor_blink();
+	
+	# Scroll to cursor
 	my $x = $textview->scroll_to_iter($iter, 0.0,TRUE, 0.0, 0.4);
+	
+
 	return 1
 }
 

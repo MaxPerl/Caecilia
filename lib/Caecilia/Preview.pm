@@ -97,7 +97,7 @@ sub load_image {
 	 
 	# At the beginning load the Caecilia Logo
 	if ($no_parse) {
-		my ($width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);
+		
 		my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
 						'pixbuf' => $image,
 						'x' => 20,

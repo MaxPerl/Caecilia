@@ -13,8 +13,6 @@
   <style name="current-line"                background="#EEF6FF"/>
   <style name="line-numbers"                foreground="black" background="#d6d2d0"/>
   <style name="right-margin"                foreground="black" background="black"/>
-  <style name="bracket-match"               foreground="white" background="grey"/>
-  <style name="bracket-mismatch"            background="red"/>
   <style name="draw-spaces"                 foreground="#d3d7cf"/>
   <style name="background-pattern"          background="#f3f3f3"/>
 

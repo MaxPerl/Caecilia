@@ -35,7 +35,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 
 # Preloaded methods go here.
@@ -126,6 +126,18 @@ sub new {
 	my $previous_page_action = Glib::IO::SimpleAction->new('previous_page', undef);
 	$previous_page_action->signal_connect('activate'=> sub {$window->previous_page_cb(shift, $preview, $tmpdir);});
 	$window->add_action($previous_page_action);
+	
+	my $syntax_action = Glib::IO::SimpleAction->new_stateful('syntax',undef, Glib::Variant->new_boolean(TRUE));
+	$syntax_action->signal_connect('activate'=> sub {$window->toggle_view_cb(shift,shift, $editor);});
+	$window->add_action($syntax_action);
+	
+	my $current_line_action = Glib::IO::SimpleAction->new_stateful('current_line',undef, Glib::Variant->new_boolean(TRUE));
+	$current_line_action->signal_connect('activate'=> sub {$window->toggle_view_cb(shift,shift, $editor);});
+	$window->add_action($current_line_action);
+	
+	my $line_numbers_action = Glib::IO::SimpleAction->new_stateful('line_numbers',undef, Glib::Variant->new_boolean(TRUE));
+	$line_numbers_action->signal_connect('activate'=> sub {$window->toggle_view_cb(shift,shift, $editor);});
+	$window->add_action($line_numbers_action);
 	
 	# Attach content to the grid
 	$grid->attach($toolbar, 0,0,1,1);
@@ -303,12 +315,31 @@ sub preview_cb {
 	print $fh "$text";
 	close $fh;
 	
-	system("abcm2ps -q -A -O $dir/preview.abc -c -v $dir/preview.abc");
-	
-	$preview->render_preview("$dir/preview");
-	@filelist = <"$dir/preview*.svg">;
-	my $number_of_pages = @filelist;
-	$preview->number_of_pages($number_of_pages);
+	if ($Caecilia::Settings::ABCM2PS_AUTOLINEBREAK) {
+		system("$Caecilia::Settings::ABCM2PS_PATH -q -A -O $dir/preview.abc -c -v $dir/preview.abc");
+	}
+	else {
+		system("$Caecilia::Settings::ABCM2PS_PATH -q -A -O $dir/preview.abc -v $dir/preview.abc");
+	}
+	if ($?) {
+		# if generating preview doesn't work, show an error dialog
+		my $dialog = Gtk3::Dialog->new();
+		$dialog->set_title('Error');
+		$dialog->set_transient_for($self);
+		$dialog->set_modal('TRUE');
+		$dialog->add_button('Ok','ok');
+		$dialog->signal_connect('response' => sub {shift->destroy();});
+		my $content_area = $dialog->get_content_area();
+		my $label= Gtk3::Label->new("Could not run abcm2ps successfully\nExit-Code: $?");
+		$content_area->add($label);
+		$dialog->show_all();
+	}
+	else {
+		$preview->render_preview("$dir/preview");
+		@filelist = <"$dir/preview*.svg">;
+		my $number_of_pages = @filelist;
+		$preview->number_of_pages($number_of_pages);
+	}
 }
 
 sub zoom_in_cb {
@@ -331,6 +362,31 @@ sub previous_page_cb {
 	my ($self, $action, $preview, $tmpdir) = @_;
 	$preview->previous_page();
 	$preview->render_preview("$tmpdir/preview");
+}
+
+sub toggle_view_cb {
+	my ($window, $action, $parameter, $editor) = @_;
+	my $action_name = $action->get_name();
+	my $state = $action->get_state();
+	my $boolean = $state->get_boolean();
+	if ($boolean) {
+	# You unchecked syntax highlighting
+	my $buffer = $editor->{buffer};
+	my $textview = $editor->{textview};
+	$buffer->set_highlight_syntax(FALSE) if ($action_name eq "syntax");
+	$textview->set_highlight_current_line(FALSE) if ($action_name eq "current_line");
+	$textview->set_show_line_numbers(FALSE) if ($action_name eq "line_numbers");
+	$action->set_state(Glib::Variant->new_boolean(FALSE));
+	}
+	else {
+	# you checked syntax highlighting
+	my $buffer = $editor->{buffer};
+	my $textview = $editor->{textview};
+	$buffer->set_highlight_syntax(TRUE) if ($action_name eq "syntax");
+	$textview->set_highlight_current_line(TRUE) if ($action_name eq "current_line");
+	$textview->set_show_line_numbers(TRUE) if ($action_name eq "line_numbers");
+	$action->set_state(Glib::Variant->new_boolean(TRUE));
+	}
 }
 
 sub warn_unsaved {
@@ -361,10 +417,10 @@ sub warn_unsaved_response	{
 	my $window = $args->[1];
 	my $editor = $args->[2];
 	my $filename_ref = $args->[3];
-	# We need to change the changed_status 
-	$editor->changed_status(0);
 	
 	if ($response_id eq 'ok') {		
+		# We need to change the changed_status 
+		$editor->changed_status(0);
 		$self->destroy;
 		
 		# Note that open_cb is a callback function that was originally called by a Glib::IO::Simple::Action
