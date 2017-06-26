@@ -11,3 +11,14 @@ make
 su
 make install
 ```
+
+You will need the following libraries and perl modules:
+
+* Gtk3
+* GooCanvas2
+* GtkSource
+* perl-Gtk3
+* perl-Gtk3-SourceView
+* perl-GooCanvas2
+* perl-ShareDir
+* perl-ShareDir-Install
