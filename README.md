@@ -16,7 +16,7 @@ Therefore you need the following libraries and perl modules:
 
 * Gtk3
 * GooCanvas2
-* GtkSource
+* GtkSourceView 3
 * perl-Gtk3
 * perl-Gtk3-SourceView
 * perl-GooCanvas2
