@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
 
-use lib ('../lib');
-
 # Binding for the Gio API
 BEGIN {
 	use Glib::Object::Introspection;
@@ -45,8 +43,9 @@ sub _init {
 	$app->set_app_menu($menu);
 	
 	# Create the MenuBar
+	my $sharedir = dist_dir('Caecilia');
 	my $builder = Gtk3::Builder->new();
-	$builder->add_from_file('/home/maximilian/Dokumente/perl/Caecilia/share/menubar.ui') or die 'Could not find menubar.ui';
+	$builder->add_from_file("$sharedir/menubar.ui") or die 'Could not find menubar.ui';
 	
 	my $menubar = $builder->get_object('menubar');
 	$app->set_menubar($menubar);
