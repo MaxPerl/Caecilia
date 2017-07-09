@@ -10,6 +10,7 @@ use Glib('TRUE','FALSE');
 
 use Caecilia::Editor;
 use Caecilia::Preview;
+use Caecilia::Renderer;
 
 use File::Temp;
 use File::ShareDir 'dist_dir';
@@ -35,7 +36,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.08';
+our $VERSION = '0.08_01';
 
 
 # Preloaded methods go here.
@@ -70,6 +71,9 @@ sub new {
 	my $preview = Caecilia::Preview->new('editor' => $editor);
 	$paned->pack1($editor->{view}, TRUE, TRUE);
 	$paned->pack2($preview->{view},TRUE,TRUE);
+	
+	# Create the renderer
+	my $renderer = Caecilia::Renderer->new();
 	
 	# Create the toolbar with GtkBuilder and the toolbar.ui file
 	my $toolbar_ui_file = "$sharedir/toolbar.ui";
@@ -111,6 +115,10 @@ sub new {
 	$preview_action->signal_connect('activate'=>sub {$window->preview_cb(shift,$editor, $preview, $tmpdir);});
 	$window->add_action($preview_action);
 	
+	my $render_action = Glib::IO::SimpleAction->new('render', undef);
+	$render_action->signal_connect('activate'=>sub {$renderer->render_dialog($window, $editor, $tmpdir, \$filename);});
+	$window->add_action($render_action);
+	
 	my $zoom_in_action = Glib::IO::SimpleAction->new('zoom_in', undef);
 	$zoom_in_action->signal_connect('activate'=> sub {$window->zoom_in_cb(shift, $preview);});
 	$window->add_action($zoom_in_action);
@@ -139,12 +147,18 @@ sub new {
 	$line_numbers_action->signal_connect('activate'=> sub {$window->toggle_view_cb(shift,shift, $editor);});
 	$window->add_action($line_numbers_action);
 	
+	my $quit_action = Glib::IO::SimpleAction->new('quit', undef);
+	$quit_action->signal_connect('activate'=> sub {$window->quit_cb(shift, $editor, \$filename);});
+	$window->add_action($quit_action);
+	
 	# Attach content to the grid
 	$grid->attach($toolbar, 0,0,1,1);
 	$grid->attach($paned, 0,1,1,1);
 	$grid->show_all();
 	
 	$window->add($grid);
+	$window->signal_connect('delete_event' => sub {$window->quit_cb(undef, $editor, \$filename);
+												Gtk3::EVENT_STOP;});
 	return $window;
 }
 
@@ -242,7 +256,7 @@ sub open_cb {
 	my ($window, $action, $editor, $filename_ref) = @_;
 	
 	if ($editor->changed_status()) {
-		$window->warn_unsaved('new', $editor, $filename_ref);
+		$window->warn_unsaved('open', $editor, $filename_ref);
 	}
 	else {
 		# create a filechooserdialog to open:
@@ -310,33 +324,12 @@ sub preview_cb {
 		unlink $file;
 	}
 	
-	# create new files for preview	
-	open my $fh, ">:encoding(utf8)", "$dir/preview.abc";
-	print $fh "$text";
-	close $fh;
+	Caecilia::Renderer::render(outfile => "$dir/preview", outformat => 3, editor => $editor, tmpdir => $dir, window => $self, mode => 'preview');
 	
-	if ($Caecilia::Settings::ABCM2PS_AUTOLINEBREAK) {
-		system("$Caecilia::Settings::ABCM2PS_PATH -q -A -O $dir/preview.abc -c -v $dir/preview.abc");
-	}
-	else {
-		system("$Caecilia::Settings::ABCM2PS_PATH -q -A -O $dir/preview.abc -v $dir/preview.abc");
-	}
-	if ($?) {
-		# if generating preview doesn't work, show an error dialog
-		my $dialog = Gtk3::Dialog->new();
-		$dialog->set_title('Error');
-		$dialog->set_transient_for($self);
-		$dialog->set_modal('TRUE');
-		$dialog->add_button('Ok','ok');
-		$dialog->signal_connect('response' => sub {shift->destroy();});
-		my $content_area = $dialog->get_content_area();
-		my $label= Gtk3::Label->new("Could not run abcm2ps successfully\nExit-Code: $?");
-		$content_area->add($label);
-		$dialog->show_all();
-	}
-	else {
+	
+	if (-e "$dir/preview001.svg") {
 		$preview->render_preview("$dir/preview");
-		@filelist = <"$dir/preview*.svg">;
+		my @filelist = <"$dir/preview*.svg">;
 		my $number_of_pages = @filelist;
 		$preview->number_of_pages($number_of_pages);
 	}
@@ -389,6 +382,17 @@ sub toggle_view_cb {
 	}
 }
 
+sub quit_cb {
+	my ($self, $action, $editor, $filename_ref) = @_;
+	
+	if ($editor->changed_status()) {
+		$self->warn_unsaved('quit', $editor, $filename_ref);
+	}
+	else {
+		$self->destroy();
+	}
+}
+
 sub warn_unsaved {
 	my ($window, $from, $editor, $filename_ref) = @_;
 	if ($from eq 'open') {
@@ -397,7 +401,7 @@ sub warn_unsaved {
 												'warning',
 												'ok_cancel',
 												'You have unsaved content that will be lost by opening another file. Open anyway?');
-		$messagedialog->signal_connect('response' => \&warn_unsaved_response, [$window,$from, $editor, $filename_ref]);
+		$messagedialog->signal_connect('response' => \&warn_unsaved_response, [$from,$window, $editor, $filename_ref]);
 		$messagedialog->show();
 	}
 	elsif ($from eq 'new') {
@@ -406,6 +410,15 @@ sub warn_unsaved {
 												'warning',
 												'ok_cancel',
 												'You have unsaved content that will be lost by creating a new file. Create a new file anyway?');
+		$messagedialog->signal_connect('response' => \&warn_unsaved_response, [$from,$window, $editor, $filename_ref]);
+		$messagedialog->show();
+	}
+	elsif ($from eq 'quit') {
+		my $messagedialog = Gtk3::MessageDialog->new($window,
+												'modal',
+												'warning',
+												'ok_cancel',
+												'You have unsaved content that will be lost by closing Caecilia. Close anyway?');
 		$messagedialog->signal_connect('response' => \&warn_unsaved_response, [$from,$window, $editor, $filename_ref]);
 		$messagedialog->show();
 	}
@@ -428,6 +441,7 @@ sub warn_unsaved_response	{
 		# okay this code is not really understandable without explantation. Sorry ;-) 
 		open_cb($window, undef, $editor, $filename_ref) if ($from eq 'open');
 		new_cb($window, undef, $editor, $filename_ref) if ($from eq 'new');
+		quit_cb($window, undef, $editor, $filename_ref) if ($from eq 'quit');
 	}
 	else {
 		$self->destroy;

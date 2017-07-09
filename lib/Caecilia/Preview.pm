@@ -56,12 +56,10 @@ sub build_preview_object {
 	my $scrolled_window = Gtk3::ScrolledWindow->new();
 	$scrolled_window->set_policy("automatic", "automatic");
 	$scrolled_window->set_border_width(5);
-	# use the set_hexpand and set_vexpand from Gtk3::Widget on the
-	# ScrolledWindow to expand it!
-	$scrolled_window->set_hexpand(TRUE);
-	$scrolled_window->set_vexpand(TRUE);
+	$scrolled_window->set_shadow_type('in');
 	
 	my $canvas = GooCanvas2::Canvas->new();
+	#$canvas->set_size_request(900,1000);
 	$canvas->set('automatic-bounds' => TRUE);
 	$canvas->signal_connect('size-allocate' => sub {$self->on_size_allocate(@_)});
 	
@@ -76,7 +74,7 @@ sub build_preview_object {
 	
 	# Build the Preview
 	$self->load_image($self->{filename}, 1.0, 'center');
-	$scrolled_window->add_with_viewport($canvas);
+	$scrolled_window->add($canvas);
 	
 	return ;
 }
@@ -110,10 +108,11 @@ sub load_image {
 	}
 	else {
 		# First render the svg
-		my ($width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);
+		my ($format, $width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);
 		my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
 						'pixbuf' => $image,);
 		$image_item->scale($scale_factor, $scale_factor);
+		$canvas->set_size_request($width*$scale_factor, $height*$scale_factor);
 					
 		# Now render the ABC links and link it to the Editor (TODO)
 		my $editor = $self->{editor};

@@ -39,7 +39,7 @@ sub _init {
 	my $menu = Glib::IO::Menu->new();
 	$menu->append('Settings', 'app.settings');
 	$menu->append('About', 'app.about');
-	$menu->append('Quit', 'app.quit');
+	$menu->append('Quit', 'win.quit');
 	$app->set_app_menu($menu);
 	
 	# Create the MenuBar
@@ -50,17 +50,12 @@ sub _init {
 	my $menubar = $builder->get_object('menubar');
 	$app->set_menubar($menubar);
 	
-	# Actions of the menu
-	my $quit_action = Glib::IO::SimpleAction->new('quit', undef);
-	$quit_action->signal_connect('activate'=> sub {$app->quit()});
-	$app->add_action($quit_action);
-	
 	my $about_action = Glib::IO::SimpleAction->new('about', undef);
 	$about_action->signal_connect('activate'=> \&about_cb, $app);
 	$app->add_action($about_action);
 	
 	my $settings_action = Glib::IO::SimpleAction->new('settings', undef);
-	$settings_action->signal_connect('activate'=> \&settings_cb, $app);
+	$settings_action->signal_connect('activate'=> sub {my $window= $app->get_active_window(); Caecilia::Settings::settings_cb($window);});
 	$app->add_action($settings_action);
 	
 	###############
@@ -74,7 +69,6 @@ sub _init {
 sub _build_ui {
 	my ($app) = @_;
 	my $window = Caecilia->new($app);
-	$window->signal_connect('delete_event' => sub {$app->quit()});
 	$window->show_all();
 }
 
@@ -83,60 +77,12 @@ sub open_cb {
 }
 sub _cleanup {
 	my ($app) = @_;
+	print "Terminating ...\n";
 }
 
 ##############################
 # call back function for the APP Actions
 ###############################
-sub settings_cb {
-	my ($action, $parameter,$app) = @_;
-	# a Gtk3::AboutDialog
-	my $dialog = Gtk3::Dialog->new();
-	$dialog->set_transient_for($app->get_active_window());
-	
-	my $content_area = $dialog->get_content_area();
-	my $grid = Gtk3::Grid->new();
-	$grid->set_column_spacing(20);
-	my $label = Gtk3::Label->new("Path to abcm2ps");
-	my $abcpath_entry = Gtk3::Entry->new();
-	$abcpath_entry->set_text("$Caecilia::Settings::ABCM2PS_PATH");
-	
-	my $autolinebreak = Gtk3::CheckButton->new();
-	$autolinebreak->set_label("Auto line break");
-	if ($Caecilia::Settings::ABCM2PS_AUTOLINEBREAK) {
-		$autolinebreak->set_active(TRUE);
-	}
-	
-	$dialog->add_button('Apply', 'apply');
-	$dialog->add_button('Cancel', 'cancel');
-	$dialog->signal_connect('response' => \&settings_response, [$abcpath_entry, $autolinebreak]);
-
-	# Attach the widgets to the grid
-	$grid->attach($label, 0,0,1,1);
-	$grid->attach($abcpath_entry, 1, 0, 1, 1);
-	$grid->attach($autolinebreak, 0,1,2,2);
-	
-	$content_area->add($grid);
-	
-	$dialog->show_all();
-}
-
-sub settings_response {
-	my ($dialog, $response, $entries_ref) = @_;
-	my $abcm2ps_entry = $entries_ref->[0];
-	my $autolinebreak = $entries_ref->[1];
-	
-	if ($response eq "apply") {
-		$Caecilia::Settings::ABCM2PS_PATH = $abcm2ps_entry->get_text();
-		$Caecilia::Settings::ABCM2PS_AUTOLINEBREAK = $autolinebreak->get_active;
-		Caecilia::Settings->write_config();
-		$dialog->destroy();
-	}
-	else {
-		$dialog->destroy();
-	}
-}
-
 sub about_cb {
 	my ($action, $parameter,$app) = @_;
 	# a Gtk3::AboutDialog
@@ -152,7 +98,7 @@ sub about_cb {
 
 	# we fill in the aboutdialog
 	$aboutdialog->set_program_name('Caecilia');
-	$aboutdialog->set_version('0.08');
+	$aboutdialog->set_version($Caecilia::VERSION);
 	$aboutdialog->set_comments("A yet simple Editor for the ABC notation format\n written with perl/Gtk3");
 	$aboutdialog->set_copyright(
 		"Copyright \xa9 2016 Maximilian Lika");

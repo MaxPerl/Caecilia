@@ -22,7 +22,7 @@
 				</item>
 				<item>
 					<attribute name="label" translatable="yes">_Quit</attribute>
-					<attribute name="action">app.quit</attribute>
+					<attribute name="action">win.quit</attribute>
 				</item>
 			</section>
 		</submenu>
@@ -32,6 +32,10 @@
 				<item>
 					<attribute name="label">Settings</attribute>
 					<attribute name="action">app.settings</attribute>
+				</item>
+				<item>
+					<attribute name="label">Render</attribute>
+					<attribute name="action">win.render</attribute>
 				</item>
 			</section>
 		</submenu>

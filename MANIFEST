@@ -3,6 +3,7 @@ Changes
 lib/Caecilia.pm
 lib/Caecilia/Editor.pm
 lib/Caecilia/Preview.pm
+lib/Caecilia/Renderer.pm
 lib/Caecilia/Settings.pm
 Makefile.PL
 MANIFEST
