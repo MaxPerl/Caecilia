@@ -181,14 +181,16 @@ sub settings_response {
 		
 		if (grep/insensitive/, @{$breaknbars_spin->get_state_flags()}) {
 			undef $Caecilia::Settings::ABCM2PS_BREAKNBARS
-		} else { 
+		} 
+		else { 
 			$Caecilia::Settings::ABCM2PS_BREAKNBARS = $breaknbars_spin->get_value_as_int
 		}
 		
 		if (grep /insensitive/, @{$scale_spin->get_state_flags()}) {
 			undef $Caecilia::Settings::ABCM2PS_SCALEFACTOR
 		} else {
-			$Caecilia::Settings::ABCM2PS_SCALEFACTOR = $scale_spin->get_value
+			$Caecilia::Settings::ABCM2PS_SCALEFACTOR = $scale_spin->get_value; 
+			$Caecilia::Settings::ABCM2PS_SCALEFACTOR =~ s/,/./;
 		}
 		
 		if (grep /insensitive/, @{$staffwidth_entry->get_state_flags()} ) { 
@@ -206,7 +208,13 @@ sub settings_response {
 		if (grep /insensitive/, @{$staffseparation_entry->get_state_flags()}) { undef $Caecilia::Settings::ABCM2PS_STAFFSEPARATION }
 		elsif ($staffseparation_entry->get_text()) {$Caecilia::Settings::ABCM2PS_STAFFSEPARATION = $staffseparation_entry->get_text() }
 		
-		if (grep /insensitive/, @{$shrink_spin->get_state_flags()}) {undef $Caecilia::Settings::ABCM2PS_MAXSHRINK} else { $Caecilia::Settings::ABCM2PS_MAXSHRINK = $shrink_spin->get_value}
+		if (grep /insensitive/, @{$shrink_spin->get_state_flags()}) {
+			undef $Caecilia::Settings::ABCM2PS_MAXSHRINK
+		} 
+		else { 
+			$Caecilia::Settings::ABCM2PS_MAXSHRINK = $shrink_spin->get_value;
+			$Caecilia::Settings::ABCM2PS_MAXSHRINK =~ s/,/./;
+		}
 		 
 		$Caecilia::Settings::ABCM2PS_LANDSCAPE = $landscape->get_active();
 		

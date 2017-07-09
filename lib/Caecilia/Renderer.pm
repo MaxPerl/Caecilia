@@ -66,7 +66,7 @@ sub render {
 	push @cmd, "-I$Caecilia::Settings::ABCM2PS_INDENTFIRSTLINE" if ($Caecilia::Settings::ABCM2PS_INDENTFIRSTLINE);
 	push @cmd, "-x" if ($Caecilia::Settings::ABCM2PS_XREFNUMBERS);
 	push @cmd, "-M" if ($Caecilia::Settings::ABCM2PS_NOLYRICS);
-	push @cmd, "N$Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE " if ($Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE);
+	push @cmd, "-N$Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE " if ($Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE);
 	push @cmd, "-l" if ($Caecilia::Settings::ABCM2PS_ONETUNEPERPAGE);
 	push @cmd, "-G" if ($Caecilia::Settings::ABCM2PS_NOSLURINGRACE);
 	push @cmd, "-b$opts{firstmeasure}" if ($opts{firstmeasure});
