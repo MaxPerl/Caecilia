@@ -1,12 +1,13 @@
 Revision history for Perl extension App::PlAbcEdit.
 
-0.09 Sun Jul 9 19:20:00 2017
+0.09 Sun Jul 15 08:35:00 2017
 	- Show the warn_unsaved dialog, even if user exits the application with unsaved content
 	- Add options for abcm2ps in the Settings GUI
 	- Add render dialog and Renderer-Module/Object
 	- Bugfix: Open imediately FileChooser Dialog if the user after open clicks "okay" in the warn_unsaved dialog 
 	- Adjust automatically the version in the AboutDialog after updating Caecilia 
 	- Bugfix: Fix Scroll problems in Preview (Scrolling is now done via ScrolledWindow)
+	- Add STDERR output to the error dialog if errors occurs while rendering ABC
 0.08  
 	- Disable highlighting of bracket matches
 	- After clicking to a note in Preview, ensure that the cursor blinks

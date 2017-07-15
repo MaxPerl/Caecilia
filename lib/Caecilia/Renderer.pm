@@ -96,18 +96,45 @@ sub render {
 	push @cmd, "-O$opts{outfile}";
 	
 	print "CMD @cmd \n";
+	# Wir wollen STDERR AUSGABE in Datei umleiten, s. Perl Kochbuch Rezept 7.10
+	# Kopie von STDERR erzeugen
+	open(OLDERR, ">&STDERR");
+	# STDERR umleiten
+	open(STDERR, ">$dir/error.log");
+	# Programm ausführen
 	system(@cmd);
+	# umgeleitetes (!) Dateihandle schließen
+	close(STDERR);
+	# STDERR wiederherstellen
+	open (STDERR, ">&OLDERR");
+	# undichte Stellen durch Schließen der unabhängigen Kopie schließen
+	close(OLDERR);
 	if ($?) {
 		# if generating preview doesn't work, show an error dialog
 		my $dialog = Gtk3::Dialog->new();
 		$dialog->set_title('Error');
+		$dialog->set_default_size(400,200);
 		$dialog->set_transient_for($opts{window});
 		$dialog->set_modal('TRUE');
 		$dialog->add_button('Ok','ok');
 		$dialog->signal_connect('response' => sub {shift->destroy();});
 		my $content_area = $dialog->get_content_area();
-		my $label= Gtk3::Label->new("Could not run abcm2ps successfully\nExit-Code: $?");
-		$content_area->add($label);
+		my $hbox = Gtk3::Box->new('vertical',10);
+		my $scrolled = Gtk3::ScrolledWindow->new();
+		# Get the error message
+		open my $fh, "<", "$dir/error.log";
+		my $error_message ='';
+		while(my $line = <$fh>) {
+			$error_message .= $line
+		}
+		my $label= Gtk3::Label->new("Errors occured while running abcm2ps:");
+		my $errormessage = Gtk3::Label->new("$error_message");
+		$scrolled->add_with_viewport($errormessage);
+		$scrolled->set_shadow_type("in");
+		$hbox->pack_start($label, FALSE, FALSE, 5);
+		$hbox->pack_start($scrolled, TRUE, TRUE, 5);
+		
+		$content_area->pack_start($hbox, TRUE, TRUE, 10);
 		$dialog->show_all();
 	}
 }
