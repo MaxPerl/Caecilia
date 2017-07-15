@@ -1,6 +1,9 @@
 Revision history for Perl extension App::PlAbcEdit.
 
-0.09 Sun Jul 15 08:35:00 2017
+0.10 Sat Jul 15 11:15:00 2017
+	- Add abcm2ps options -F (formatfile), -D (directory for *.fmt) and -j (number measures every n bars)
+	- Use core module IPC::open3 for capturing STDERR of the abm2ps command for use in the error dialog
+0.09 Sat Jul 15 08:35:00 2017
 	- Show the warn_unsaved dialog, even if user exits the application with unsaved content
 	- Add options for abcm2ps in the Settings GUI
 	- Add render dialog and Renderer-Module/Object

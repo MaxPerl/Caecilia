@@ -36,7 +36,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 
 # Preloaded methods go here.
@@ -324,7 +324,6 @@ sub preview_cb {
 		unlink $file;
 	}
 	
-	print "LANDSCAPE $Caecilia::Settings::ABCM2PS_LANDSCAPE \n";
 	Caecilia::Renderer::render(outfile => "$dir/preview", outformat => 3, editor => $editor, tmpdir => $dir, window => $self, mode => 'preview');
 	
 	

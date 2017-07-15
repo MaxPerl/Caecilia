@@ -10,6 +10,7 @@ use Glib('TRUE','FALSE');
 use File::ShareDir 'dist_dir';
 use Caecilia::Settings;
 use Cwd;
+use IPC::Open3;
 
 require Exporter;
 
@@ -52,7 +53,6 @@ sub render {
 	my $dir = $opts{tmpdir};
 	
 	my @cmd;
-	push @cmd, $Caecilia::Settings::ABCM2PS_PATH;
 	push @cmd, '-c' if ($Caecilia::Settings::ABCM2PS_AUTOLINEBREAK);
 	push @cmd, '-A' if ($opts{mode} eq 'preview');
 	push @cmd, "-B$Caecilia::Settings::ABCM2PS_BREAKNBARS" if ($Caecilia::Settings::ABCM2PS_BREAKNBARS);
@@ -62,6 +62,8 @@ sub render {
 	push @cmd, "-m$Caecilia::Settings::ABCM2PS_LEFTMARGIN" if ($Caecilia::Settings::ABCM2PS_LEFTMARGIN);
 	push @cmd, "-d$Caecilia::Settings::ABCM2PS_STAFFSEPARATION" if ($Caecilia::Settings::ABCM2PS_STAFFSEPARATION);
 	push @cmd, "-a$Caecilia::Settings::ABCM2PS_MAXSHRINK" if ($Caecilia::Settings::ABCM2PS_MAXSHRINK);
+	push @cmd, "-F$Caecilia::Settings::ABCM2PS_FORMATFILE" if ($Caecilia::Settings::ABCM2PS_FORMATFILE);
+	push @cmd, "-D$Caecilia::Settings::ABCM2PS_FORMATDIRECTORY" if ($Caecilia::Settings::ABCM2PS_FORMATDIRECTORY);
 	push @cmd, "-l" if ($Caecilia::Settings::ABCM2PS_LANDSCAPE);
 	push @cmd, "-I$Caecilia::Settings::ABCM2PS_INDENTFIRSTLINE" if ($Caecilia::Settings::ABCM2PS_INDENTFIRSTLINE);
 	push @cmd, "-x" if ($Caecilia::Settings::ABCM2PS_XREFNUMBERS);
@@ -69,6 +71,13 @@ sub render {
 	push @cmd, "-N$Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE " if ($Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE);
 	push @cmd, "-1" if ($Caecilia::Settings::ABCM2PS_ONETUNEPERPAGE);
 	push @cmd, "-G" if ($Caecilia::Settings::ABCM2PS_NOSLURINGRACE);
+	
+	if ($Caecilia::Settings::ABCM2PS_NUMBERNBARS && $Caecilia::Settings::ABCM2PS_NUMBERNBARSBOXED) {
+		push @cmd, ("-j".$Caecilia::Settings::ABCM2PS_NUMBERNBARS."b");
+	}
+	elsif ($Caecilia::Settings::ABCM2PS_NUMBERNBARS) {
+		push @cmd, "-j$Caecilia::Settings::ABCM2PS_NUMBERNBARS";
+	}
 	push @cmd, "-b$opts{firstmeasure}" if ($opts{firstmeasure});
 	push @cmd, "-f" if ($Caecilia::Settings::ABCM2PS_FLATBEAMS);
 	
@@ -95,20 +104,14 @@ sub render {
 	$opts{outfile} = $opts{outfile} . ".xhtml" if ($opts{outformat} eq "5");
 	push @cmd, "-O$opts{outfile}";
 	
-	print "CMD @cmd \n";
-	# Wir wollen STDERR AUSGABE in Datei umleiten, s. Perl Kochbuch Rezept 7.10
-	# Kopie von STDERR erzeugen
-	open(OLDERR, ">&STDERR");
-	# STDERR umleiten
-	open(STDERR, ">$dir/error.log");
-	# Programm ausführen
-	system(@cmd);
-	# umgeleitetes (!) Dateihandle schließen
-	close(STDERR);
-	# STDERR wiederherstellen
-	open (STDERR, ">&OLDERR");
-	# undichte Stellen durch Schließen der unabhängigen Kopie schließen
-	close(OLDERR);
+	my ($stdin,$stdout, $stderr);
+	my $pid = open3(\*IN, \*OUT, \*ERR, $Caecilia::Settings::ABCM2PS_PATH, @cmd); 
+	my $error_message ='';
+		while(my $line = <ERR>) {
+			$error_message .= $line
+		}
+	close IN; close OUT; close ERR;
+	waitpid($pid,0);
 	if ($?) {
 		# if generating preview doesn't work, show an error dialog
 		my $dialog = Gtk3::Dialog->new();
@@ -121,12 +124,6 @@ sub render {
 		my $content_area = $dialog->get_content_area();
 		my $hbox = Gtk3::Box->new('vertical',10);
 		my $scrolled = Gtk3::ScrolledWindow->new();
-		# Get the error message
-		open my $fh, "<", "$dir/error.log";
-		my $error_message ='';
-		while(my $line = <$fh>) {
-			$error_message .= $line
-		}
 		my $label= Gtk3::Label->new("Errors occured while running abcm2ps:");
 		my $errormessage = Gtk3::Label->new("$error_message");
 		$scrolled->add_with_viewport($errormessage);
