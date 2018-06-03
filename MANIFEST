@@ -7,7 +7,6 @@ lib/Caecilia/Renderer.pm
 lib/Caecilia/Settings.pm
 Makefile.PL
 MANIFEST
-README
 share/abc.lang
 share/caecilia-icon.png
 share/caecilia-logo.png
