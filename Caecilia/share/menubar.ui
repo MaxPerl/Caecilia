@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+	<menu id="menubar">
+		<submenu>
+			<attribute name="label" translatable="yes">_File</attribute>
+			<section>
+				<item>
+					<attribute name="label">New</attribute>
+					<attribute name="action">win.new</attribute>
+				</item>
+				<item>
+					<attribute name="label">Open</attribute>
+					<attribute name="action">win.open</attribute>
+				</item>
+				<item>
+					<attribute name="label">Save</attribute>
+					<attribute name="action">win.save</attribute>
+				</item>
+				<item>
+					<attribute name="label">Save As</attribute>
+					<attribute name="action">win.save_as</attribute>
+				</item>
+				<item>
+					<attribute name="label" translatable="yes">_Quit</attribute>
+					<attribute name="action">win.quit</attribute>
+				</item>
+			</section>
+		</submenu>
+		<submenu>
+			<attribute name="label">Edit</attribute>
+			<section>
+				<item>
+					<attribute name="label">Settings</attribute>
+					<attribute name="action">app.settings</attribute>
+				</item>
+				<item>
+					<attribute name="label">Render</attribute>
+					<attribute name="action">win.render</attribute>
+				</item>
+			</section>
+		</submenu>
+		<submenu>
+			<attribute name="label">View</attribute>
+			<section>
+				<item>
+					<attribute name="label">Syntax Highlighting</attribute>
+					<attribute name="action">win.syntax</attribute>
+				</item>
+				<item>
+					<attribute name="label">Highlight Current Line</attribute>
+					<attribute name="action">win.current_line</attribute>
+				</item>
+				<item>
+					<attribute name="label">Show Line Numbers</attribute>
+					<attribute name="action">win.line_numbers</attribute>
+				</item>
+			</section>
+		</submenu>
+		<submenu>
+			<attribute name="label">Help</attribute>
+			<section>
+				<item>
+					<attribute name="label">About</attribute>
+					<attribute name="action">app.about</attribute>
+				</item>
+			</section>
+		</submenu>
+	</menu>
+</interface>

@@ -1,0 +1,28 @@
+<style-scheme id="caecilia" _name="Caecilia" version="1.0">
+	<author>Maximilian Lika</author>
+	<_description>Color scheme used in the Caecilia ABC text editor</_description>
+	<color name="rosa"                      value="#fb99cb"/>
+	<color name="blue"                      value="#2badfb"/>
+	<color name="violett"			value="#cb319b"/>
+	<color name="grey"                        value="#999999"/>
+  	<color name="white"                       value="#FFFFFF"/>
+  	<color name="black"                       value="#000000"/>
+<!-- Global Settings -->
+  <style name="text"                        foreground="black" background="white"/>
+  <style name="selection"                   foreground="white" background="#43ace8"/>
+  <style name="current-line"                background="#EEF6FF"/>
+  <style name="line-numbers"                foreground="black" background="#d6d2d0"/>
+  <style name="right-margin"                foreground="black" background="black"/>
+  <style name="draw-spaces"                 foreground="#d3d7cf"/>
+  <style name="background-pattern"          background="#f3f3f3"/>
+
+  <!-- Search Matching -->
+  <style name="search-match"                background="yellow"/>
+
+  <style name="def:comment"                 foreground="rosa" italic="true" bold="false"/>
+  <style name="def:shebang"                  foreground="rosa" bold="true"/>
+  <style name="def:note"                    foreground="blue"/>
+  <style name="def:string"                  foreground="grey" italic="true"/>
+  <style name="def:heading0"                  bold="true"/>
+  <style name="def:keyword"                 foreground="violett" bold="true"/>
+</style-scheme>

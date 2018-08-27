@@ -1,0 +1,17 @@
+bin/caecilia.pl
+Changes
+lib/Caecilia.pm
+lib/Caecilia/Editor.pm
+lib/Caecilia/Preview.pm
+lib/Caecilia/Renderer.pm
+lib/Caecilia/Settings.pm
+Makefile.PL
+MANIFEST
+README
+share/abc.lang
+share/caecilia-icon.png
+share/caecilia-logo.png
+share/caecilia.xml
+share/menubar.ui
+share/toolbar.ui
+t/Caecilia.t
