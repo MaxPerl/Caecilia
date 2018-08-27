@@ -66,7 +66,7 @@ sub build_preview_object {
 	# Save the scrolled window
 	$self->{canvas} = $canvas;
 	$self->{view} = $scrolled_window;
-	$self->{scale_factor} = 1.2;
+	$self->{scale_factor} = 1;
 	
 	# Show the Logo at the beginning; oh how nice ;-)
 	my $sharedir = dist_dir('Caecilia');	
@@ -91,11 +91,11 @@ sub load_image {
 		$root->remove_child(0);
 	} 
 	
-	my $image = Gtk3::Gdk::Pixbuf->new_from_file($file);
+	my $image='';
 	 
 	# At the beginning load the Caecilia Logo
 	if ($no_parse) {
-		
+	    $image = Gtk3::Gdk::Pixbuf->new_from_file($file);	
 		my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
 						'pixbuf' => $image,
 						'x' => 20,
@@ -107,10 +107,13 @@ sub load_image {
 		$self->{canvas_logo_item} = $image_item;
 	}
 	else {
+	    
 		# First render the svg
 		my ($format, $width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);
+		$width = 816;$height = 1056;
+		$image = Gtk3::Gdk::Pixbuf->new_from_file_at_size($file, $width, $height);
 		my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
-						'pixbuf' => $image,);
+						'pixbuf' => $image,'height' => $height, 'width' => $width);
 		$image_item->scale($scale_factor, $scale_factor);
 		$canvas->set_size_request($width*$scale_factor, $height*$scale_factor);
 					

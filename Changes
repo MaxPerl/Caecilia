@@ -1,5 +1,7 @@
 Revision history for Perl extension App::PlAbcEdit.
 
+0.11 Sat Aug 16 07:00:00 2018
+    - Bugfix: Display the Preview in the right size (which is 8.5*11inc that means 816*1056px!)
 0.10 Sat Jul 15 11:15:00 2017
 	- Add abcm2ps options -F (formatfile), -D (directory for *.fmt) and -j (number measures every n bars)
 	- Use core module IPC::open3 for capturing STDERR of the abm2ps command for use in the error dialog
