@@ -16,9 +16,12 @@ share/breeze-icons/document-new.png
 share/breeze-icons/document-open.png
 share/breeze-icons/document-save-as.png
 share/breeze-icons/document-save.png
+share/breeze-icons/folder-blue.png
 share/breeze-icons/go-next.png
+share/breeze-icons/go-parent-folder.png
 share/breeze-icons/go-previous.png
 share/breeze-icons/preview.png
+share/breeze-icons/text-x-generic.png
 share/Breeze/breeze.tcl
 share/Breeze/Breeze/arrow-down-insens.png
 share/Breeze/Breeze/arrow-down-prelight.png
@@ -102,5 +105,4 @@ share/Breeze/Screenshot.png
 share/caecilia-logo.png
 share/ctextAdvanced/ctextAdvanced.tcl
 share/ctextAdvanced/pkgIndex.tcl
-share/dir.png
 t/Caecilia.t

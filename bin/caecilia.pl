@@ -53,7 +53,9 @@ our $mw = $int->ttk_mainwindow();
 $mw->geometry('960x600');
 $mw->title('Caecilia - An editor for the ABC notation language');
 
-$int->Eval("set ::tk::Priv(folderImage) [image create photo -file $share/dir.png]");
+$int->Eval("set ::tk::Priv(folderImage) [image create photo -file $share/breeze-icons/folder-blue.png]");
+$int->Eval("set ::tk::Priv(updirImage) [image create photo -file $share/breeze-icons/go-parent-folder.png]");
+$int->Eval("set ::tk::Priv(fileImage) [image create photo -file $share/breeze-icons/text-x-generic.png]");
 
 # Initialization
 Caecilia::Settings->init();
