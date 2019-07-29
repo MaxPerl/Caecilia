@@ -4,13 +4,9 @@ use 5.006000;
 use strict;
 use warnings;
 
-use utf8;
-use Gtk3;
-use Glib('TRUE','FALSE');
-use Gtk3::SourceView;
-use File::ShareDir 'dist_dir';
-
 require Exporter;
+
+use utf8;
 
 our @ISA = qw(Exporter);
 
@@ -31,134 +27,163 @@ our @EXPORT = qw(
 	
 );
 
-
-# Preloaded methods go here.
-
 sub new {
-	my ($class, %config) = shift;
-	
-	my $editor_object = {};
-	bless $editor_object;
-	
-	# Sharedir
-	my $sharedir = dist_dir('Caecilia');
-	
-	# a scrolled window for the textview
-	my $scrolled_window = Gtk3::ScrolledWindow->new();
-	$scrolled_window->set_policy("automatic", "automatic");
-	$scrolled_window->set_border_width(5);
-	# use the set_hexpand and set_vexpand from Gtk3::Widget on the
-	# ScrolledWindow to expand it!
-	$scrolled_window->set_hexpand(TRUE);
-	$scrolled_window->set_vexpand(TRUE);
-	
-	# Init LanguageManager
-	my $lm = Gtk3::SourceView::LanguageManager->new();
-	my @search_path = $lm->get_search_path();
-	unshift @search_path, $sharedir;
-	$lm->set_search_path(\@search_path);
-	
-	# Get Caecilia Layout Scheme
-	my $sm = Gtk3::SourceView::StyleSchemeManager->new();
-	$sm->set_search_path([$sharedir]);
-	my $scheme = $sm->get_scheme('caecilia');
-	
-	# Syntax Hervorhebung im Buffer aktivierten
-	my $lang = $lm->get_language("abc");
-	my $buffer = Gtk3::SourceView::Buffer->new_with_language($lang);
-	$buffer->set_style_scheme($scheme);
-	$buffer->set_highlight_syntax(TRUE);
-	
-	# Save the change status property
-	$editor_object->changed_status(0);
-	$buffer->signal_connect('changed'=>\&changed_text, $editor_object);
-	
-	# a textview
-	my $textview = Gtk3::SourceView::View->new();
-	# displays the buffer
-	$textview->set_buffer($buffer);
-	$textview->set_highlight_current_line(TRUE);
-	$textview->set_show_line_numbers(TRUE);
-	$textview->set_wrap_mode("word");
-	
-	# Adjust the font size
-	my $fontdesc = Pango::FontDescription->new();
-	$fontdesc->set_size(12*Pango::SCALE);
-	$textview->modify_font($fontdesc);
-	
-	$scrolled_window->add($textview);
-	
-	# Set some variables
-	$editor_object->{view} = $scrolled_window;
-	$editor_object->{buffer} = $buffer;
-	$editor_object->{textview} =  $textview;
+    my ($class, $f) = @_;
+    
+    my $obj = {};
+    bless $obj;
+    
+    my $editor = $f->ctext(-wrap => 'word', 
+        -bg => 'white',
+        -relief => 'flat',
+        -linemap => 1,
+        -borderwidth => 0,
+        -linemapfg => "black",  
+        #-linemap_select_fg => "black",
+        -linemap_select_bg => $main::style->lookup('.','-selectbackground'),
+        -linemap_select_fg => $main::style->lookup('.','-selectforeground'),
+        -font => "Helvetica 11 normal",
+        -selectforeground =>'white');
+    
+    my $linemap = $f->Canvas(
+    	-width => 40,
+    	-highlightthickness => 0,
+    	-background => 'white'
+    );
+    
+    my $s = $f->ttkScrollbar(-orient => 'vertical', -command => [$editor, 'yview'])
+        ->pack(-side => 'right',-fill => 'y');
+    $editor->configure(-yscrollcommand => [$s, 'set']);
+    #$linemap->pack(-side => 'left', -fill => 'y');
+    $editor->pack(-expand => 1, -fill => 'both');
+    
+    #$f->interp->Eval("trace add execution $editor leave [list ctextAdvanced::traceCallback $editor $linemap]");
+    #$f->interp->Eval("bind $editor <Configure> [list ctextAdvanced::traceCallback $editor $linemap]");
+    
+    $obj->{frame}= $f;
+    $obj->{editor} = $editor;
+    
+    # Add Syntax Highlighting
+    $obj->setup_highlight();
+    
+    # Disable highlight with sel
+    #$editor->bind("<<Selection>>" => sub {test_sel($obj)}); 
+    
+    # Prevent making the "notes" temporary blue
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor remark_prevent black {\\[r\:.+}");
+    
+    # Popup Menu
+    my $popup = $obj->popup_menu();
+    if ($editor->interp->Eval('tk windowingsystem') eq "aqua") {
+        $editor->bind("<2>", [sub {my($x,$y) = @_; $popup->interp->call("tk_popup",$popup,$x,$y)}, Tcl::Ev("%X", "%Y")]);
+        $editor->bind("<Control-1>", [sub {my($x,$y) = @_; $popup->interp->call("tk_popup",$popup,$x,$y)}, Tcl::Ev("%X", "%Y")]);
+    }
+    else
+    {
+        $editor->bind("<3>", [sub {my($x,$y) = @_; $popup->interp->call("tk_popup",$popup,$x,$y)}, Tcl::Ev("%X", "%Y")]);
+    }
 
-	return $editor_object;
+    return $obj;
 }
 
+sub setup_highlight {
+    my ($self) =@_;
+    my $editor = $self->{editor};
+    # Add Syntax Highlighting
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor note #2badfb {[_=^]?[abcdefgxzABCDEFG][0-9,']*}");
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor lyrics grey {^[wW]:.+}");
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor inlineheader {-foreground black -font \"Helvetica 11 bold\"} {\\[[a-zA-Z]:.*?\\]}");
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor header {-foreground black -font \"Helvetica 11 bold\"} {^[a-zA-Z]:.*}");
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor remark {-foreground black -font \"Helvetica 11 bold\"} {\\[r:.*\\]}");
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor layout #fb99cb {%%.+}");
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor comment #fb99cb {%.*}");
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor string grey {\".*?\"}");
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor keyword_prevent #cb319b {![a-z]+}");
+    $editor->interp->Eval("::ctextAdvanced::addHighlightClassForRegexp $editor keywords {-foreground #cb319b -font \"Helvetica 11 bold\"} {![a-z]+!}");
+    $editor->highlight('1.0', 'end');
+}
+
+sub tk {
+	my ($self) = shift;
+	return $self->{editor};
+}
+sub highlight {
+    my ($self) = @_;
+    my $editor = $self->{editor};
+    $editor->configure(-highlight => 1);
+    my $text = $self->get_text();
+    $self->set_text($text);
+}
+
+sub clear_highlight {
+    my ($self) = @_;
+    my $editor = $self->{editor};
+    $editor->configure(-highlight => 0);
+    my $text = $self->get_text();
+    $self->set_text($text);
+} 
+
+sub test_sel {
+    my ($self) = @_;
+    my $editor = $self->{editor};
+    if ($editor->tagRanges('sel')) {
+        $self->clear_highlight();
+        #$editor->tagConfigure("bold black",-foreground => 'white');
+    }
+    else {
+        #$self->highlight();
+        $editor->tagConfigure("bold black",-foreground => 'black');
+        $editor->configure(-foreground => 'white');
+    }
+}
+
+
+sub popup_menu {
+    my ($self) = @_;
+    my $editor = $self->{editor};
+    my $popup = $editor->Menu(-relief => 'flat',-cursor => 'left_ptr');
+    $popup->addCommand(-label => "Cut       ",-command => sub {$editor->cut}, -accelerator => "Ctrl+X");
+    $popup->addCommand(-label => "Copy      ",-command => sub {$editor->copy}, -accelerator => "Ctrl+C");
+    $popup->addCommand(-label => "Paste     ",-command => sub {$editor->paste},-accelerator => "Ctrl+V");
+    $popup->addCommand(-label => "Select all        ",-command => sub {$editor->tagAdd('sel','1.0','end')},-accelerator => "Ctrl+/");
+    
+    return $popup;
+}
+
+
 sub get_text {
-	my ($self) = @_;
-	my $buffer = $self->{buffer};
-	my ($start, $end) = $buffer->get_bounds();
-	my $content = $buffer->get_text($start, $end, FALSE);
-	return $content;
+    my ($self) = @_;
+    
+    my $editor = $self->{editor};
+    my $text = $editor->get('1.0','end');
+    return $text;
 }
 
 sub set_text {
-	my ($self, $content) = @_;
-	my $buffer = $self->{buffer};
-	# important: we need the length in byte!! Usually the perl function
-	# length deals in logical characters, not in physical bytes! For how
-	# many bytes a string encoded as UTF-8 would take up, we have to use
-	# length(Encode::encode_utf8($content) (for that we have to "use Encode"
-	# first [see more http://perldoc.perl.org/functions/length.html]
-	# Alternative solutions: 1) open with tag "<:encoding(utf8)"
-	# 2) For insert all the text set length in the $buffer->set_text method 
-	# 	to -1 (!text must be nul-terminated)
-	# 3) In Perl Gtk3 the length argument is optional! Without length 
-	#	all text is inserted
-	my $length = length(Encode::encode_utf8($content));
-	$buffer->set_text($content,$length);
-	
-	return 1;
+    my ($self, $text) = @_;
+    $text =~ s/\r\n/\n/g;
+    my $editor = $self->{editor};
+    $editor->delete('1.0', 'end');
+    $editor->insert('1.0', $text);
+    $editor->highlight('1.0', 'end');
+    # TK always (!) adds a new line at the end
+    $editor->delete('end-1c', 'end') if ($editor->get('end-1c', 'end') eq "\n");
 }
 
-# call bach function if TEXT IN A BUFFER CHANGED
-sub changed_text {
-	my $buffer = shift;
-	my $self = shift;
-	$self->changed_status(1);
+sub modified {
+	my ($self, $new_status) = @_;	
 	
-}
-
-sub changed_status {
-	my ($self, $new_status) = @_;
+	my $txt = $self->{editor};
+	my $old_status = $txt->edit('modified');
 	
-	
-	my $old_status = $self->{changed_status};
-	
-	$self->{changed_status} = $new_status if (defined $new_status);
+	$txt->edit('modified',$new_status) if (defined $new_status);
 	
 	return $old_status;
 }
 
-sub jump_to {
-	my ($self, $row, $col) = @_;
-	my $buffer = $self->{buffer};
-	# Place cursor to found note
-	my $iter = $buffer->get_iter_at_line_offset($row-1,$col);
-	$buffer->place_cursor($iter);
-	
-	# reset blinking of cursor
-	my $textview = $self->{textview};
-	$textview->reset_cursor_blink();
-	
-	# Scroll to cursor
-	my $x = $textview->scroll_to_iter($iter, 0.0,TRUE, 0.0, 0.4);
-	
+# Preloaded methods go here.
 
-	return 1
-}
+# Autoload methods go after =cut, and are processed by the autosplit program.
 
 1;
 __END__
@@ -200,14 +225,14 @@ If you have a web site set up for your module, mention it here.
 
 =head1 AUTHOR
 
-Maximilian Lika, E<lt>maximilian@(none)E<gt>
+Maximilian Lika, E<lt>maximilian@E<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2017 by Maximilian Lika
+Copyright (C) 2018 by Maximilian Lika
 
 This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.22.3 or,
+it under the same terms as Perl itself, either Perl version 5.26.1 or,
 at your option, any later version of Perl 5 you may have available.
 
 

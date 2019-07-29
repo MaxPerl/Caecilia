@@ -4,15 +4,14 @@ use 5.006000;
 use strict;
 use warnings;
 
-use utf8;
-use Gtk3;
-use Glib('TRUE','FALSE');
-use GooCanvas2;
-use File::ShareDir 'dist_dir';
-
 require Exporter;
 
-our @ISA = qw(Exporter);
+use utf8;
+#use File::ShareDir 'dist_dir';
+use Image::LibRSVG;
+use Image::Info qw(image_info dim);
+
+our @ISA = qw(Exporter Tcl::Tk::Widget);
 
 # Items to export into callers namespace by default. Note: do not export
 # names by default without a very good reason. Use EXPORT_OK instead.
@@ -31,127 +30,212 @@ our @EXPORT = qw(
 	
 );
 
-
-# Preloaded methods go here.
-
 sub new {
-	my ($class, %config) = @_;
-	
-	my $preview_object = \%config;
-	bless $preview_object;
-	
-	# page_id
-	$preview_object->page('1');
-	$preview_object->build_preview_object;
-	
-	#$preview_object->render_preview('content' => $preview_object->{'content'});
-	
-	return $preview_object;
+    my ($class, $parent, %config) = @_;
+    
+    my $obj = {};
+    bless $obj;
+    
+    $obj->page('1');
+    $obj->number_of_pages(0);
+    $obj->build_preview_object($parent);
+     
+    return $obj;
 }
 
 sub build_preview_object {
-	my ($self) = shift;
-	
-	# a scrolled window for the textview
-	my $scrolled_window = Gtk3::ScrolledWindow->new();
-	$scrolled_window->set_policy("automatic", "automatic");
-	$scrolled_window->set_border_width(5);
-	$scrolled_window->set_shadow_type('in');
-	
-	my $canvas = GooCanvas2::Canvas->new();
-	#$canvas->set_size_request(900,1000);
-	$canvas->set('automatic-bounds' => TRUE);
-	$canvas->signal_connect('size-allocate' => sub {$self->on_size_allocate(@_)});
-	
-	# Save the scrolled window
-	$self->{canvas} = $canvas;
-	$self->{view} = $scrolled_window;
-	$self->{scale_factor} = 1;
-	
-	# Show the Logo at the beginning; oh how nice ;-)
-	my $sharedir = dist_dir('Caecilia');	
-	$self->{filename} = "$sharedir/caecilia-logo.png";
-	
-	# Build the Preview
-	$self->load_image($self->{filename}, 1.0, 'center');
-	$scrolled_window->add($canvas);
-	
-	return ;
+    my ($self, $f) = @_;
+    
+    my $canvas = $f->tkpCanvas(-bg => 'white');
+    
+    my $xs = $f->ttkScrollbar(-orient => 'horizontal', -command => [$canvas, 'xview'])
+        ->pack(-side => "bottom",-fill => 'x');
+    $canvas->configure(-xscrollcommand => [$xs, 'set']);
+    
+    my $s = $f->ttkScrollbar(-orient => 'vertical', -command => [$canvas, 'yview'])
+        ->pack(-side => 'right',-fill => 'y');
+    $canvas->configure(-yscrollcommand => [$s, 'set']);
+    
+    
+    $canvas->pack(-side => "right", -fill => "both", -expand => 1);
+    
+    my $w = $canvas->cget('-width');
+    my $h = $canvas->cget('-height');
+    my $ih = $w*0.75;
+    my $y = $h/2;
+    #my $r = $w / $h;
+    #$self->{h}=$h; $self->{w}=$w,$self->{r}=$r;
+    $canvas->Photo('logo', -file => "$main::share/caecilia-logo.png");
+    my $logo = $canvas->createPimage(0,$y,-image => 'logo',-width => $w,-height => $ih);
+    
+    $self->{canvas} = $canvas;
+    $self->{logo} = $logo;
+    $self->{frame} = $f;
+    
+    $canvas->bind('<Configure>' => [\&resize, Tcl::Ev('%h','%w'), $self, $h]);
+    $canvas->bind("<MouseWheel>" => [\&on_mousewheel, Tcl::Ev('%D'),$canvas]);
+    $canvas->bind("<Button-4>" => sub {$canvas->interp->call('event',"generate", $canvas,"<MouseWheel>", -delta => 120);});
+    $canvas->bind("<Button-5>" => sub {$canvas->interp->call('event','generate',$canvas,"<MouseWheel>", -delta => -120);});
+    $canvas->bind("<Button>" => [\&on_hor_scroll, Tcl::Ev('%b'), $canvas]);
+    #$canvas->bind('<Configure>' => [\&size, Tcl::Ev('%h','%w'), $self]);
+    $canvas->configure(-scrollregion => "0 0 $w $h");
+    
 }
 
-sub load_image {
-	my ($self, $file, $scale_factor, $no_parse) = @_;
-	
-	my $canvas = $self->{canvas};
-	my $root = $canvas->get_root_item();
-	
-	# First cleanup Canvas
-	my $n_children = $root->get_n_children();
-	for (my $i = 0; $i < $n_children; $i++) {
-		$root->remove_child(0);
-	} 
-	
-	my $image='';
-	 
-	# At the beginning load the Caecilia Logo
-	if ($no_parse) {
-	    $image = Gtk3::Gdk::Pixbuf->new_from_file($file);	
-		my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
-						'pixbuf' => $image,
-						'x' => 20,
-						'y' => 100,
-						'scale-to-fit' => TRUE);
-		
-		# We need to save the image_item to keep the Logo in center
-		# if Canvas is resized
-		$self->{canvas_logo_item} = $image_item;
+sub on_hor_scroll {
+	my ($num, $canvas) = @_;
+	if ($num == 6) {
+		$canvas->xview('scroll', -5, 'units');
 	}
-	else {
-	    
-		# First render the svg
-		my ($format, $width, $height) = Gtk3::Gdk::Pixbuf::get_file_info($file);
-		$width = 816;$height = 1056;
-		$image = Gtk3::Gdk::Pixbuf->new_from_file_at_size($file, $width, $height);
-		my $image_item = GooCanvas2::CanvasImage->new('parent' => $root,
-						'pixbuf' => $image,'height' => $height, 'width' => $width);
-		$image_item->scale($scale_factor, $scale_factor);
-		$canvas->set_size_request($width*$scale_factor, $height*$scale_factor);
-					
-		# Now render the ABC links and link it to the Editor (TODO)
-		my $editor = $self->{editor};
-		my @notes = parse_abc($file);
-		foreach my $note (@notes) {
-		# Add a few simple items
-		my $rect_item = GooCanvas2::CanvasRect->new('parent' => $root,
-						'x' => $note->{'x'},
-						'y' => $note->{'y'},
-						'width' => $note->{'width'},
-						'height' => $note->{'height'},
-						'fill-color' => 'rgba(43,173,251,0)',
-						'stroke-color' => 'transparent');
-		$rect_item->scale($scale_factor, $scale_factor);
-		$rect_item->signal_connect('button_press_event' => sub {$editor->jump_to($note->{row}, $note->{col});});
-		$rect_item->signal_connect('enter_notify_event' => \&on_rect_enter);
-		$rect_item->signal_connect('leave_notify_event' => \&on_rect_leave);
+	elsif ($num == 7) {
+		$canvas->xview('scroll', 5, 'units');
+	}
+}
+sub on_mousewheel {
+	my ($delta,$canvas,$delta2) = @_;
+	my $numbers = -1*$delta/120;
+	$canvas->yview('scroll',$numbers,'units');
+}
+
+sub resize {
+    my ($h, $w, $self, $old_h) = @_;
+    my $canvas = $self->{canvas};
+    my $logo = $self->{logo};
+    
+    $canvas->itemconfigure($logo, -width => $w, -height => $w*0.75);
+    
+    if ($canvas->itemcget($logo,-state) eq "hidden") {
+        $canvas->configure(-scrollregion => [$canvas->bbox("all")]);
+    }
+    else {
+        $canvas->configure(-scrollregion => "0 0 $w $h");
+    }
+}
+
+sub load_tune {
+    my ($self,$file,$scale_factor,$no_parse) = @_;
+    
+    my $canvas = $self->{canvas};
+    
+    # Clear canvas
+    $self->clear_canvas();
+    
+    # Creating tune and notes
+    # estimate dimensions of the svg
+    my $info = image_info("$file");
+    my ($w,$h) = dim($info);
+    $w =~ s/in$//;$h =~ s/in$//;
+    $w = $w *96; $h = $h * 96;
+    
+    # create image
+    my $rsvg = Image::LibRSVG->new();
+    $rsvg->convertAtSize($file, "$file.png", $w,$h);
+    
+    my $tune = $canvas->Photo('tune', -file => "$file.png");
+    my $t = $canvas->createPimage(0,0,-image => 'tune',-anchor => 'nw', -tags => ['tune']);
+    
+    
+    my @notes = parse_abc("$file");
+    foreach my $note (@notes) { 
+        my $col = $note->{col};
+        my $row = $note->{row};
+        my $editor = $main::editor->{editor};
+        my $n = $canvas->create('prect',$note->{'x'}, $note->{'y'}, $note->{'x'} + $note->{'width'}, $note->{'y'} +$note->{'height'}, 
+        	-fill => $main::style->lookup('.','-selectbackground'), -fillopacity => 0,
+        	-stroke => $main::style->lookup('.','-selectbackground'), -strokeopacity => 0,
+        	-tags => ['notes']);
+        
+        # The method CanvasBind is defined in caecilia.pl in the package
+        # Tcl::Tk::Widget::tkpCanvas
+        # TODO: Do this somewhere else (e.g. Caecilia::MyTk)
+        $canvas->CanvasBind($n, "<Enter>" => sub {
+        	$canvas->itemconfigure($n, -fillopacity => 0.5, -strokeopacity => 0.5)
+        	});
+        $canvas->CanvasBind($n, "<Leave>" => sub {
+        	$canvas->itemconfigure($n, -fillopacity => 0, -strokeopacity => 0)
+        	});
+        # Click and jump in the editor to the note
+        $canvas->CanvasBind($n, "<Button-1>" => sub {
+        	$editor->markSet("insert","$row.$col");$editor->see('insert')
+        	});
+    }
+    $canvas->configure(-scrollregion => [$canvas->bbox("all")]);
+}
+
+sub parse_abc {
+	my ($file) = @_;
+	my @notes;
+	open my $fh, "<", $file;
+	while (my $line = <$fh>) {
+		if ($line =~ m!<abc type="N".* row="(.*)" col="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)"/>!) {
+			my %note = (
+					'row' => $1,
+					'col' => $2,
+					'x' => $3,
+					'y' => $4,
+					'width' => $5,
+					'height' => $6
+					);
+			push @notes, \%note;
 		}
-	}	
-	$canvas->update();
-	return $image;
+	}
+	close $fh;
+	return @notes;
 }
 
-sub zoom_in {
-	my $self = shift;
-	$self->{scale_factor} = $self->{scale_factor} + 0.1;
-	$self->load_image($self->{filename}, $self->{scale_factor});
-	return $self->{scale_factor};
+sub show_logo {
+    my ($self) = @_;
+    my $logo = $self->{logo};
+    my $canvas = $self->{canvas};
+    my $state = $canvas->itemcget($logo,-state);
+    $canvas->itemconfigure($logo,-state => "normal") if ($state eq "hidden");    
 }
 
-sub zoom_out {
-	my $self = shift;
-	$self->{scale_factor} = $self->{scale_factor} - 0.1;
-	$self->load_image($self->{filename}, $self->{scale_factor});
-	return $self->{scale_factor}
+sub hide_logo {
+    my ($self) = @_;
+    my $logo = $self->{logo};
+    my $canvas = $self->{canvas};
+    $canvas->itemconfigure($logo,-state => "hidden");
 }
+
+sub clear_canvas {
+    my ($self) = @_;
+    my $canvas = $self->{canvas};
+    $canvas->delete('tune','notes');
+}
+
+sub size {
+    my ($h, $w, $self) = @_;
+    my $canvas = $self->{canvas};
+    my $wscale = $w/$self->{w};
+    my $hscale = $h/$self->{h};
+    $self->{h} = $h; $self->{w} = $w;
+    my $logo = $self->{logo};
+    # resize canvas
+    #$canvas->configure(-width => $w, -height => $h);
+    # rescale all objects
+    if ( $self->{w} / $self->{h} > $self->{r} ) {
+        #$canvas->scale('all',0,0,$hscale,$hscale);
+        my $iw = $canvas->itemcget($logo, -width);
+        my $ih = $canvas->itemcget($logo, -height);
+        $canvas->itemconfigure($logo, -width => $iw * $hscale, -height => $ih*$hscale);
+    }
+    elsif ( $self->{w} / $self->{h} < $self->{r} ) {
+        #$canvas->scale('all',0,0,$wscale,$wscale);
+        my $iw = $canvas->itemcget($logo, -width);
+        my $ih = $canvas->itemcget($logo, -height);
+        $canvas->itemconfigure($logo, -width => $iw * $wscale, -height => $ih*$wscale);
+    }
+    elsif ( $self->{w} / $self->{h} == $self->{r} ) {
+        #$canvas->scale('all',0,0,$hscale,$wscale);
+        my $iw = $canvas->itemcget($logo, -width);
+        my $ih = $canvas->itemcget($logo, -height);
+        $canvas->itemconfigure($logo, -width => $iw * $wscale, -height => $ih*$hscale);
+    }
+    #$canvas->configure(-scrollregion => [$canvas->bbox("all")]);
+}
+
+
 
 sub render_preview {
 	my ($self, $filename) = @_;
@@ -167,13 +251,15 @@ sub render_preview {
 	else {
 		$filename = $filename . $page . ".svg";
 	}
-	$self->{filename} = $filename;
-	$self->load_image($filename, $self->{scale_factor});
+	if (-e $filename) {
+		$self->{filename} = $filename;
+		$self->load_tune($filename, 1);#scale_factor not used at moment
+	}
 }
+
 
 sub page {
 	my ($self, $new_page) = @_;
-	
 	
 	my $old_page = $self->{page};
 	
@@ -208,57 +294,11 @@ sub number_of_pages {
 	return $old_number_of_pages;
 }
 
-# Parse ABC
-sub parse_abc {
-	my ($file) = @_;
-	my @notes;
-	open my $fh, "<", $file;
-	while (my $line = <$fh>) {
-		if ($line =~ m!<abc .* row="(.*)" col="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)"/>!) {
-			my %note = (
-					'row' => $1,
-					'col' => $2,
-					'x' => $3,
-					'y' => $4,
-					'width' => $5,
-					'height' => $6
-					);
-			push @notes, \%note;
-		}
-	}
-	close $fh;
-	return @notes;
-}
 
-# Click to a note feature
 
-sub on_rect_enter {
-	my $item = shift;
-	$item->set('fill-color' => 'rgba(43,173,251,0.5)');
-	return 1;
-}
+# Preloaded methods go here.
 
-sub on_rect_leave {
-	my $item = shift;
-	$item->set('fill-color' => 'rgba(43,173,251,0)');
-	return 1;
-}
-
-# With the following function, we want keep the Caecilia Logo,
-# which is loaded at the beginning, in center, if Canvas is resized
-# okay, this is a little bit dirty :-)
-sub on_size_allocate {
-	my ($preview_object, $canvas, $allocation) = @_;
-	my $logo_item = $preview_object->{canvas_logo_item};
-	if (defined $logo_item) {
-		my $can_height = $allocation->{height};
-		my $can_width = $allocation->{width};
-		my $width = $can_width-40;
-		my $height = $width * 3/4;
-		$logo_item->set('width' => $width, 'height' => $height);
-	}
-	$canvas->update();
-}
+# Autoload methods go after =cut, and are processed by the autosplit program.
 
 1;
 __END__
@@ -300,14 +340,14 @@ If you have a web site set up for your module, mention it here.
 
 =head1 AUTHOR
 
-Maximilian Lika, E<lt>maximilian@(none)E<gt>
+Maximilian Lika, E<lt>maximilian@E<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2017 by Maximilian Lika
+Copyright (C) 2018 by Maximilian Lika
 
 This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.22.3 or,
+it under the same terms as Perl itself, either Perl version 5.26.1 or,
 at your option, any later version of Perl 5 you may have available.
 
 

@@ -1,5 +1,5 @@
 # Before 'make install' is performed this script should be runnable with
-# 'make test'. After 'make install' it should work as 'perl App-PlAbcEdit.t'
+# 'make test'. After 'make install' it should work as 'perl Caecilia.t'
 
 #########################
 
@@ -8,10 +8,8 @@
 use strict;
 use warnings;
 
-use Test;
-BEGIN { plan tests => 1 };
-use App::PlAbcEdit;
-ok(1); # If we made it this far, we're ok.
+use Test::More tests => 1;
+BEGIN { use_ok('Caecilia') };
 
 #########################
 

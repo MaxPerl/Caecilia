@@ -1,7 +1,9 @@
-Revision history for Perl extension App::PlAbcEdit.
+Revision history for Perl extension Caecilia.
 
-0.11 Sat Aug 16 07:00:00 2018
-    - Bugfix: Display the Preview in the right size (which is 8.5*11inc that means 816*1056px!)
+0.12 Mo Jul 29 21:53:00 2019
+	- Switch graphical toolkit to Tcl::Tk
+0.11 Tue March 12 09:34:00 2019
+	- Bugfix of Preview
 0.10 Sat Jul 15 11:15:00 2017
 	- Add abcm2ps options -F (formatfile), -D (directory for *.fmt) and -j (number measures every n bars)
 	- Use core module IPC::open3 for capturing STDERR of the abm2ps command for use in the error dialog
@@ -49,4 +51,3 @@ Revision history for Perl extension App::PlAbcEdit.
 0.01  Thu Jun  8 07:31:55 2017
 	- original version; created by h2xs 1.23 with options
 		-b 5.6.0 -XA -n App::PlAbcEdit
-

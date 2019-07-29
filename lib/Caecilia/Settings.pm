@@ -63,208 +63,117 @@ sub write_config {
 # The Settings GUI
 ####################
 sub settings_cb {
-	my ($window) = @_;
+	my ($mw) = @_;
 	# a Gtk3::Dialog
-	my $dialog = Gtk3::Dialog->new();
-	$dialog->set_transient_for($window);
-	
-	my $content_area = $dialog->get_content_area();
-	my $grid = Gtk3::Grid->new();
-	$grid->set_column_spacing(20); $grid->set_row_spacing(5);
+	my $dialog = $mw->Toplevel();
+    $dialog->title('Render Abc Music');
+	$dialog->transient("$mw");
 	
 	####
 	# Path 
 	####
-	my $pathlabel = _add_header("Path to abcm2ps");
-	my $abcpath_entry = Gtk3::Entry->new(); $abcpath_entry->set_hexpand(TRUE);
-	$abcpath_entry->set_text("$Caecilia::Settings::ABCM2PS_PATH");
+	_add_header($dialog,"Path to abcm2ps");
+	my $abcpath_entry = $dialog->ttkEntry(-textvariable => \$Caecilia::Settings::ABCM2PS_PATH)
+        ->pack(-expand=>1,-fill=>"x",-padx => 5,-pady => 5);
 	
 	#####
 	# Line Breaks options
 	#####
-	my $header_linebreak = _add_header("Line Breaks Options");
+	_add_header($dialog, "Line Breaks Options");
 	
-	my $autolinebreak = _add_checkoption(label => "Auto line break", value =>$Caecilia::Settings::ABCM2PS_AUTOLINEBREAK);
+	_add_checkoption($dialog, label => "Auto line break", value =>\$Caecilia::Settings::ABCM2PS_AUTOLINEBREAK);
 	
-	my ($breaknbars_check, $breaknbars_spin) = _add_spin_with_check(label => "Break every n bars", value => $Caecilia::Settings::ABCM2PS_BREAKNBARS,  min => 0, max => 100, step => 1, digits => 0);
+	_add_spin_with_check($dialog, label => "Break every n bars", value => \$Caecilia::Settings::ABCM2PS_BREAKNBARS,  min => 0, max => 100, step => 1, digits => 0);
 	
 	#####
 	# Output formatting
 	#####
-	my $header_outputf = _add_header("Output Formatting");
+	_add_header($dialog, "Output Formatting");
 	
-	my ($scale_check, $scale_spin) = _add_spin_with_check(label => "Set Scale Factor", value => $Caecilia::Settings::ABCM2PS_SCALEFACTOR,  min => 0, max => 100, step => 0.1, digits => 2);
+	_add_spin_with_check($dialog, label => "Set Scale Factor", value => \$Caecilia::Settings::ABCM2PS_SCALEFACTOR,  min => 0, max => 100, step => 0.1, digits => 2);
 	
-	my ($staffwidth_check,$staffwidth_entry) = _add_entry_with_check(label => "Set Staff width (cm/in/pt)", value => $Caecilia::Settings::ABCM2PS_STAFFWIDTH);
+	_add_entry_with_check($dialog, label => "Set Staff width (cm/in/pt)", value => \$Caecilia::Settings::ABCM2PS_STAFFWIDTH);
 	
-	my ($leftmargin_check,$leftmargin_entry) = _add_entry_with_check(label => "Set left margin (cm/in/pt)", value => $Caecilia::Settings::ABCM2PS_LEFTMARGIN);
+	_add_entry_with_check($dialog, label => "Set left margin (cm/in/pt)", value => \$Caecilia::Settings::ABCM2PS_LEFTMARGIN);
 	
-	my ($staffseparation_check,$staffseparation_entry) = _add_entry_with_check(label => "Set staff separation (cm/in/pt)", value => $Caecilia::Settings::ABCM2PS_STAFFSEPARATION);
+	_add_entry_with_check($dialog, label => "Set staff separation (cm/in/pt)", value => \$Caecilia::Settings::ABCM2PS_STAFFSEPARATION);
 	
-	my ($shrink_check, $shrink_spin) = _add_spin_with_check(label => "Set maximal shrinkage to", value => $Caecilia::Settings::ABCM2PS_MAXSHRINK,  min => 0, max => 1, step => 0.1, digits => 2);
+	_add_spin_with_check($dialog, label => "Set maximal shrinkage to", value => \$Caecilia::Settings::ABCM2PS_MAXSHRINK,  min => 0, max => 1, step => 0.1, digits => 2);
 	
-	my ($formatfile_check, $formatfile_entry) = _add_entry_with_check(label => "Read format file \"foo.fmt\"", value => $Caecilia::Settings::ABCM2PS_FORMATFILE);
+	_add_entry_with_check($dialog, label => "Read format file \"foo.fmt\"", value => \$Caecilia::Settings::ABCM2PS_FORMATFILE);
 	
-	my ($formatdir_check, $formatdir_entry) = _add_entry_with_check(label => "Read format file \"foo.fmt\"", value => $Caecilia::Settings::ABCM2PS_FORMATDIRECTORY);
+	_add_entry_with_check($dialog, label => "Read format file \"foo.fmt\"", value => \$Caecilia::Settings::ABCM2PS_FORMATDIRECTORY);
 	
 	#####
 	# Output Options
 	#####
-	my $header_outputopts = _add_header("Output Options");
-	my $landscape = _add_checkoption(label => "landscape mode", value =>$Caecilia::Settings::ABCM2PS_LANDSCAPE);
-	my ($indent_check,$indent_entry) = _add_entry_with_check(label => "indent first line (cm/in/pt)", value => $Caecilia::Settings::ABCM2PS_INDENTFIRSTLINE);
-	my $xref = _add_checkoption(label => "Add xref numbers in titles", value => $Caecilia::Settings::ABCM2PS_XREFNUMBERS);
-	my $nolyrics = _add_checkoption(label => "Don't output lyrics", value =>$Caecilia::Settings::ABCM2PS_NOLYRICS);
+	_add_header($dialog, "Output Options");
+	_add_checkoption($dialog, label => "landscape mode", value =>\$Caecilia::Settings::ABCM2PS_LANDSCAPE);
+	_add_entry_with_check($dialog, label => "indent first line (cm/in/pt)", value => \$Caecilia::Settings::ABCM2PS_INDENTFIRSTLINE);
+	_add_checkoption($dialog, label => "Add xref numbers in titles", value => \$Caecilia::Settings::ABCM2PS_XREFNUMBERS);
+	_add_checkoption($dialog, label => "Don't output lyrics", value =>\$Caecilia::Settings::ABCM2PS_NOLYRICS);
 	
-	my $pagenumbering_check = Gtk3::CheckButton->new("Set the page numbering mode");
+	# PAGE NUMBERING OPTIONS
 	my @pagenumberingmodes = ('off', 'left','right','even left, odd right','even right, odd left');
-	my $liststore = Gtk3::ListStore->new('Glib::String');
-	foreach my $mode (@pagenumberingmodes) {
-		my $iter = $liststore->append();
-		$liststore->set($iter, 0 => "$mode");
+	my $f = $dialog->ttkFrame()->pack(-expand => 1, -fill => 'both', -padx => 5,-pady => 5);
+	my $pagenr_combo = $f->ttkCombobox(-textvariable => \$Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE,
+        -values => \@pagenumberingmodes, -state => 'disabled');
+    my $check = 0;
+    my $pagenr_checkbutton = $f->ttkCheckbutton(
+        -text => "Set the pagenumbering mode", -variable => \$check, -onvalue => 1, -offvalue => 0,
+        -width => 30, 
+        -command => sub {toggle_combo($pagenr_combo,\$Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE)})
+        ->pack(-side => 'left');
+    $pagenr_combo->pack(-side => 'left', -expand => 1, -fill => 'x');
+    
+    if ($Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE) {
+		$check = 1;
+		$pagenr_combo->configure(-state => 'readonly')
 	}
-	my $pagenumbering_combobox = Gtk3::ComboBox->new_with_model($liststore);
-	my $cell = Gtk3::CellRendererText->new();
-	$pagenumbering_combobox->pack_start($cell, FALSE);
-	$pagenumbering_combobox->add_attribute($cell, 'text', 0);
-	if ($Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE) {
-		$pagenumbering_check->set_active(TRUE);
-		$pagenumbering_combobox->set_active($Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE);
+	
+	_add_checkoption($dialog, label => "Write one tune per page", value =>\$Caecilia::Settings::ABCM2PS_ONETUNEPERPAGE);
+	_add_checkoption($dialog, label => "no slur in grace notes", value =>\$Caecilia::Settings::ABCM2PS_NOSLURINGRACE);
+	
+	# This is a little bit complicated because numbernbars_check toggles
+	# both $numbersnbars_spin and $barnumbers
+	my ($numbernbars_check, $numbernbars_spin) =_add_spin_with_check($dialog, 
+		label => "Number the measures every n bars", 
+		value => \$Caecilia::Settings::ABCM2PS_NUMBERNBARS,  
+		min => 0, max => 100, step => 1, digits => 0);
+	my $barnumbers = _add_checkoption($dialog, 
+		label => "Display measure numbers in a box", 
+		value => \$Caecilia::Settings::ABCM2PS_NUMBERNBARSBOXED);
+	$barnumbers->configure(-state=>'disabled');
+	$numbernbars_check->configure(-command => sub {
+        		toggle($numbernbars_spin,\$Caecilia::Settings::ABCM2PS_NUMBERNBARS);
+        		toggle($barnumbers,\$Caecilia::Settings::ABCM2PS_NUMBERNBARSBOXED);
+       		}
+    );
+    if ($Caecilia::Settings::ABCM2PS_NUMBERNBARS) {
+		$barnumbers->configure(-state => 'normal')
 	}
-	else {
-		$pagenumbering_combobox->set_active(0);
-		$pagenumbering_combobox->set_state_flags('insensitive', TRUE);
-	}
-	$pagenumbering_check->signal_connect('toggled' => \&_toggle_check, $pagenumbering_combobox);
 	
-	my $onetuneperpage = _add_checkoption(label => "Write one tune per page", value =>$Caecilia::Settings::ABCM2PS_ONETUNEPERPAGE);
-	my $noslur = _add_checkoption(label => "no slur in grace notes", value =>$Caecilia::Settings::ABCM2PS_NOSLURINGRACE);
+	_add_checkoption($dialog, label => "have flat beams", value =>\$Caecilia::Settings::ABCM2PS_FLATBEAMS);
 	
-	my $barnumbers_boxed = _add_checkoption(label => "Display measure numbers in a box", value => $Caecilia::Settings::ABCM2PS_NUMBERNBARSBOXED);
-	my ($barnumbers_check, $barnumbers_spin) = _add_spin_with_check(label => "Number the measures every n bars", value => $Caecilia::Settings::ABCM2PS_NUMBERNBARS,  min => 0, max => 100, step => 1, digits => 0, additional_option => $barnumbers_boxed);
-	
-	my $flatbeams = _add_checkoption(label => "have flat beams", value =>$Caecilia::Settings::ABCM2PS_FLATBEAMS);
-	
-	# Attach the widgets to the grid
-	# attach(Kind, links, oben, Weite, Höhe)
-	$grid->attach($pathlabel, 0,0,1,1);
-	$grid->attach($abcpath_entry, 0, 1, 2, 1);
-	$grid->attach($header_linebreak, 0,2,1,1);
-	$grid->attach($autolinebreak, 0,3,2,1);
-	$grid->attach($breaknbars_check, 0,4,1,1);$grid->attach($breaknbars_spin, 1,4,1,1);
-	$grid->attach($header_outputf, 0,5,1,1);
-	$grid->attach($scale_check, 0,6,1,1);$grid->attach($scale_spin, 1,6,1,1);
-	$grid->attach($staffwidth_check, 0,7,1,1);$grid->attach($staffwidth_entry, 1,7,1,1);
-	$grid->attach($leftmargin_check, 0,8,1,1);$grid->attach($leftmargin_entry, 1,8,1,1);
-	$grid->attach($staffseparation_check, 0,9,1,1);$grid->attach($staffseparation_entry, 1,9,1,1);
-	$grid->attach($shrink_check, 0,10,1,1);$grid->attach($shrink_spin, 1,10,1,1);
-	$grid->attach($formatfile_check, 0,11,1,1);$grid->attach($formatfile_entry, 1,11,1,1);
-	$grid->attach($formatdir_check, 0,12,1,1);$grid->attach($formatdir_entry, 1,12,1,1);
-	$grid->attach($header_outputopts, 0,13,1,1);
-	$grid->attach($landscape, 0,14,2,1);
-	$grid->attach($indent_check, 0,15,1,1);$grid->attach($indent_entry, 1,15,1,1);
-	$grid->attach($xref, 0,16,2,1);
-	$grid->attach($nolyrics, 0,17,2,1);
-	$grid->attach($pagenumbering_check, 0,18,1,1);$grid->attach($pagenumbering_combobox, 1,18,1,1);
-	$grid->attach($onetuneperpage, 0,19,2,1);
-	$grid->attach($noslur, 0,20,2,1);
-	$grid->attach($barnumbers_check, 0,23,1,1);$grid->attach($barnumbers_spin, 1,23,1,1);$grid->attach($barnumbers_boxed, 0,24,1,1);
-	$grid->attach($flatbeams, 0,25,2,1);
 	
 	####
 	# The Apply/Cancel Buttons
 	####
-	$dialog->add_button('Apply', 'apply');
-	$dialog->add_button('Cancel', 'cancel');
-	# After clicking Apply we need all widgets to save the content of them
-	my @widgets = ($abcpath_entry, $autolinebreak,$breaknbars_spin,$scale_spin, $staffwidth_entry, $leftmargin_entry, $staffseparation_entry, $shrink_spin,$formatfile_entry,$formatdir_entry, $landscape, $indent_entry, $xref, $nolyrics, $pagenumbering_combobox, $onetuneperpage, $noslur, $barnumbers_spin, $barnumbers_boxed, $flatbeams);
-	$dialog->signal_connect('response' => \&settings_response,\@widgets);
-	
-	$content_area->add($grid);
-	
-	$dialog->show_all();
+	my $f4 = $dialog->ttkFrame()->pack(-expand => 1, -fill => 'x',-padx => 5,-pady => 5);
+	my $ok_button = $f4->ttkButton(
+        -text => "Apply",
+        -command => sub {settings_response($dialog,'apply')})
+        ->pack(-side => 'left');
+    my $cancel_button = $f4->ttkButton(
+        -text => "Cancel",
+        -command => sub {settings_response($dialog,'cancel')})
+        ->pack(-side => 'left', -padx => 5);
 }
 
 sub settings_response {
-	my ($dialog, $response, $widgets_ref) = @_;
-	my ($abcpath_entry, $autolinebreak,$breaknbars_spin,$scale_spin, $staffwidth_entry, $leftmargin_entry, $staffseparation_entry, $shrink_spin, $formatfile_entry,$formatdir_entry, $landscape, $indent_entry, $xref, $nolyrics, $pagenumbering_combobox, $onetuneperpage, $noslur, $barnumbers_spin, $barnumbers_boxed, $flatbeams) = @$widgets_ref;
+	my ($dialog, $response) = @_;
 	
 	if ($response eq "apply") {
-		$Caecilia::Settings::ABCM2PS_PATH = $abcpath_entry->get_text();
-		$Caecilia::Settings::ABCM2PS_AUTOLINEBREAK = $autolinebreak->get_active();
-		
-		if (grep/insensitive/, @{$breaknbars_spin->get_state_flags()}) {
-			undef $Caecilia::Settings::ABCM2PS_BREAKNBARS
-		} 
-		else { 
-			$Caecilia::Settings::ABCM2PS_BREAKNBARS = $breaknbars_spin->get_value_as_int
-		}
-		
-		if (grep /insensitive/, @{$scale_spin->get_state_flags()}) {
-			undef $Caecilia::Settings::ABCM2PS_SCALEFACTOR
-		} else {
-			$Caecilia::Settings::ABCM2PS_SCALEFACTOR = $scale_spin->get_value; 
-			$Caecilia::Settings::ABCM2PS_SCALEFACTOR =~ s/,/./;
-		}
-		
-		if (grep /insensitive/, @{$staffwidth_entry->get_state_flags()} ) { 
-			undef $Caecilia::Settings::ABCM2PS_STAFFWIDTH
-		} elsif ($staffwidth_entry->get_text()) { 
-			$Caecilia::Settings::ABCM2PS_STAFFWIDTH = $staffwidth_entry->get_text()
-		}
-		
-		if (grep /insensitive/, @{$leftmargin_entry->get_state_flags()} ) { 
-			undef $Caecilia::Settings::ABCM2PS_LEFTMARGIN 
-		} elsif ($leftmargin_entry->get_text()) { 
-			$Caecilia::Settings::ABCM2PS_LEFTMARGIN = $leftmargin_entry->get_text() 
-		}
-		
-		if (grep /insensitive/, @{$staffseparation_entry->get_state_flags()}) { undef $Caecilia::Settings::ABCM2PS_STAFFSEPARATION }
-		elsif ($staffseparation_entry->get_text()) {$Caecilia::Settings::ABCM2PS_STAFFSEPARATION = $staffseparation_entry->get_text() }
-		
-		if (grep /insensitive/, @{$shrink_spin->get_state_flags()}) {
-			undef $Caecilia::Settings::ABCM2PS_MAXSHRINK
-		} 
-		else { 
-			$Caecilia::Settings::ABCM2PS_MAXSHRINK = $shrink_spin->get_value;
-			$Caecilia::Settings::ABCM2PS_MAXSHRINK =~ s/,/./;
-		}
-		
-		if (grep /insensitive/, @{$formatfile_entry->get_state_flags()}) { undef $Caecilia::Settings::ABCM2PS_FORMATFILE }
-		elsif ($staffseparation_entry->get_text()) {$Caecilia::Settings::ABCM2PS_FORMATFILE = $staffseparation_entry->get_text() }
-		
-		if (grep /insensitive/, @{$formatdir_entry->get_state_flags()}) { undef $Caecilia::Settings::ABCM2PS_FORMATDIRECTORY }
-		elsif ($staffseparation_entry->get_text()) {$Caecilia::Settings::ABCM2PS_FORMATDIRECTORY = $staffseparation_entry->get_text() } 
-		
-		$Caecilia::Settings::ABCM2PS_LANDSCAPE = $landscape->get_active();
-		
-		if (grep /insensitive/, @{$indent_entry->get_state_flags()}) { 
-			undef $Caecilia::Settings::ABCM2PS_INDENTFIRSTLINE
-		} elsif ($indent_entry->get_text()) { 
-			$Caecilia::Settings::ABCM2PS_INDENTFIRSTLINE = $indent_entry->get_text() 
-		}
-		
-		$Caecilia::Settings::ABCM2PS_XREFNUMBERS = $xref->get_active();
-		$Caecilia::Settings::ABCM2PS_NOLYRICS = $nolyrics->get_active();
-		
-		if (grep /insensitive/, @{$pagenumbering_combobox->get_state_flags()}) { 
-			undef $Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE 
-		} else {
-			$Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE = $pagenumbering_combobox->get_active()
-		}
-		
-		$Caecilia::Settings::ABCM2PS_ONETUNEPERPAGE = $onetuneperpage->get_active();
-		$Caecilia::Settings::ABCM2PS_NOSLURINGRACE = $noslur->get_active();
-		
-		if (grep /insensitive/, @{$barnumbers_spin->get_state_flags()}) {
-			undef $Caecilia::Settings::ABCM2PS_NUMBERNBARS
-		} 
-		else { 
-			$Caecilia::Settings::ABCM2PS_NUMBERNBARS = $barnumbers_spin->get_value();
-		}
-		$Caecilia::Settings::ABCM2PS_NUMBERNBARSBOXED = $barnumbers_boxed->get_active();
-		
-		$Caecilia::Settings::ABCM2PS_FLATBEAMS = $flatbeams->get_active();
 		Caecilia::Settings->write_config();
 		$dialog->destroy();
 	}
@@ -278,81 +187,84 @@ sub settings_response {
 ##############
 
 sub _add_header {
-	my ($label) = shift;
-	my $header = Gtk3::Label->new();
-	$header->set_xalign(0);
-	$header->set_markup("<b>$label</b>");
-	return $header;
+	my ($dialog,$label) = @_;
+	my $header = $dialog->ttkLabel(-text => "$label",-font=>"Helvetiva 10 bold")
+        ->pack(-expand => 1, -fill => "both",-padx => 5,-pady => 5);
 }
 
 sub _add_checkoption {
-	my (%opts) = @_;
-	
-	my $checkbutton = Gtk3::CheckButton->new($opts{'label'});
-	if ($opts{'value'}) {
-		$checkbutton->set_active(TRUE);
-	}
+	my ($dialog, %opts) = @_;
+	my $f = $dialog->ttkFrame()->pack(-expand => 1, -fill => 'both', -padx => 5,-pady => 5);
+	my $checkbutton = $f->ttkCheckbutton(-text => $opts{'label'},-variable => $opts{value} )
+        ->pack(-side => "left");
 	return $checkbutton;
 }
 
 sub _add_entry_with_check {
-	my (%opts) = @_;
-	my $check = Gtk3::CheckButton->new("$opts{label}");
-	my $entry = Gtk3::Entry->new();$entry->set_hexpand(TRUE);
-	$entry->set_state_flags('insensitive', TRUE);
-	if ($opts{value}) {
-		$entry->unset_state_flags('insensitive');
-		$check->set_active(TRUE);
-		$entry->set_text("$opts{value}");
+	my ($dialog, %opts) = @_;
+	my $f = $dialog->ttkFrame()->pack(-expand => 1, -fill => 'both', -padx => 5,-pady => 5);
+	my $check = 0;
+	my $entry = $f->ttkEntry(-textvariable => $opts{value},-state => 'disabled',);
+	my $checkbutton = $f->ttkCheckbutton(
+        -text => $opts{label}, -variable => \$check, -onvalue => 1, -offvalue => 0,
+        -width => 30,
+        -command => sub {toggle($entry,$opts{value})})
+        ->pack(-side => 'left');
+    $entry->pack(-side => 'left', -expand => 1, -fill => 'x');
+	
+	if (${$opts{value}}) {
+		$check = 1;
+		$entry->configure(-state => 'normal')
 	}
-	$check->signal_connect('toggled' => \&_toggle_check, $entry);
-	return ($check, $entry);
+	
+	
+	return ($checkbutton, $entry);
 }
 
 sub _add_spin_with_check {
-	my (%opts) = @_;
-	my $check = Gtk3::CheckButton->new("$opts{label}");
-	my $ad = Gtk3::Adjustment->new(0,$opts{min},$opts{max},$opts{step},0,0);
-	my $spin = Gtk3::SpinButton->new($ad, $opts{step}, $opts{digits});
-	$spin->set_state_flags('insensitive', TRUE);
-	$opts{additional_option}->set_state_flags('insensitive', FALSE) if ($opts{additional_option});
+	my ($dialog,%opts) = @_;
 	
-	if ($opts{value}) {
-		$spin->unset_state_flags('insensitive');
-		$opts{additional_option}->unset_state_flags('insensitive') if ($opts{additional_option});
-		$check->set_active(TRUE);
-		$spin->set_value($opts{value});
+	my $f = $dialog->ttkFrame()->pack(-expand => 1, -fill => 'both', -padx => 5,-pady => 5);
+    my $spin = $f->ttkSpinbox(
+        -from => $opts{min}, -to=>$opts{max}, -textvariable => $opts{value},-increment => $opts{step},-state => 'disabled');
+    my $check = 0;
+    my $checkbutton = $f->ttkCheckbutton(
+        -text => $opts{label}, -variable => \$check, -onvalue => 1, -offvalue => 0,
+        -width => 30,
+        -command => sub {
+        		toggle($spin,$opts{value})
+        	}
+        )->pack(-side => 'left');
+    $spin->pack(-side => 'left', -expand => 1, -fill => 'x');
+	
+	if (${$opts{value}}) {
+		$check = 1;
+		$spin->configure(-state => 'normal')
 	}
 	
-	# Additional Option is only relevant for the abcm2ps -j option
-	# here you can also select, whether measure numbers shall be displayed in
-	# a box
-	if ($opts{additional_option})
-	{
-		my @args = ($spin, $opts{additional_option});
-		$check->signal_connect('toggled' => \&_toggle_check, \@args);
-	}
-	else {
-		$check->signal_connect('toggled' => \&_toggle_check, $spin);
-	}
-	
-	return ($check, $spin);
+	return ($checkbutton, $spin);
 }
 
-sub _toggle_check {
-	my ($check, $widget) = @_;
-	my $additional_option;
-	if (ref($widget) eq "ARRAY") {
-		$additional_option = $widget->[1];
-		$widget = $widget->[0];
-	}
-	if ($check->get_active()) {
-		$widget->unset_state_flags('insensitive');
-		$additional_option->unset_state_flags('insensitive') if ($additional_option);
-	}
-	else {
-		$widget->set_state_flags('insensitive', FALSE);
-		$additional_option->set_state_flags('insensitive', FALSE) if ($additional_option);
-	}
+sub toggle {
+    my ($widget,$value_ref) = @_;
+    if ($widget->state eq 'disabled') {
+        $widget->configure(-state => 'normal')
+    }
+    else {
+        $widget->state('disabled');
+        ${$value_ref}= '';
+    }
 }
+
+sub toggle_combo {
+    my ($widget,$value_ref) = @_;
+    if ($widget->state eq 'disabled') {
+        $widget->configure(-state => 'readonly')
+    }
+    else {
+        $widget->state('disabled');
+        ${$value_ref}= '';
+    }
+}
+
 return 1;

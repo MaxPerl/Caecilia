@@ -5,8 +5,6 @@ use strict;
 use warnings;
 
 use utf8;
-use Gtk3;
-use Glib('TRUE','FALSE');
 use File::ShareDir 'dist_dir';
 use Caecilia::Settings;
 use Cwd;
@@ -43,21 +41,35 @@ sub new {
 	bless $renderer_object;
 	
 	# Sharedir
-	my $sharedir = dist_dir('Caecilia');
+	#my $sharedir = dist_dir('Caecilia');
+	my $share = ('../share');
 	
 	return $renderer_object;
 }
 
 sub render {
 	my (%opts) = @_;
-	my $dir = $opts{tmpdir};
+	my $dir = $main::tmpdir;
 	
 	my @cmd;
 	push @cmd, '-c' if ($Caecilia::Settings::ABCM2PS_AUTOLINEBREAK);
 	push @cmd, '-A' if ($opts{mode} eq 'preview');
+	push @cmd, '-q' if ($opts{mode} eq 'preview');
+	push @cmd, '-s' if ($opts{mode} eq 'preview');
+	push @cmd, '0.75' if ($opts{mode} eq 'preview');
+	
 	push @cmd, "-B$Caecilia::Settings::ABCM2PS_BREAKNBARS" if ($Caecilia::Settings::ABCM2PS_BREAKNBARS);
 	push @cmd, "-e$opts{pattern}" if ($opts{pattern});
-	push @cmd, "-s$Caecilia::Settings::ABCM2PS_SCALEFACTOR" if ($Caecilia::Settings::ABCM2PS_SCALEFACTOR);
+	
+	# no scale in preview
+	if ($Caecilia::Settings::ABCM2PS_SCALEFACTOR) {
+        if ($opts{mode} eq 'preview') {
+            warn "The option scalefactor (-s) is not supported in Preview. So preview and  rendered output may differ\n";
+        }
+        else {
+            push @cmd, "-s$Caecilia::Settings::ABCM2PS_SCALEFACTOR";
+        }
+	}
 	push @cmd, "-w$Caecilia::Settings::ABCM2PS_STAFFWIDTH" if ($Caecilia::Settings::ABCM2PS_STAFFWIDTH);
 	push @cmd, "-m$Caecilia::Settings::ABCM2PS_LEFTMARGIN" if ($Caecilia::Settings::ABCM2PS_LEFTMARGIN);
 	push @cmd, "-d$Caecilia::Settings::ABCM2PS_STAFFSEPARATION" if ($Caecilia::Settings::ABCM2PS_STAFFSEPARATION);
@@ -68,7 +80,9 @@ sub render {
 	push @cmd, "-I$Caecilia::Settings::ABCM2PS_INDENTFIRSTLINE" if ($Caecilia::Settings::ABCM2PS_INDENTFIRSTLINE);
 	push @cmd, "-x" if ($Caecilia::Settings::ABCM2PS_XREFNUMBERS);
 	push @cmd, "-M" if ($Caecilia::Settings::ABCM2PS_NOLYRICS);
-	push @cmd, "-N$Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE " if ($Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE);
+	
+	my %pagenumberingmodes = ('off'=>0, 'left'=>1,'right'=>2,'even left, odd right'=>3,'even right, odd left'=>4);
+	push @cmd, "-N".$pagenumberingmodes{$Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE}  if ($Caecilia::Settings::ABCM2PS_PAGENUMBERINGMODE);
 	push @cmd, "-1" if ($Caecilia::Settings::ABCM2PS_ONETUNEPERPAGE);
 	push @cmd, "-G" if ($Caecilia::Settings::ABCM2PS_NOSLURINGRACE);
 	
@@ -81,8 +95,9 @@ sub render {
 	push @cmd, "-b$opts{firstmeasure}" if ($opts{firstmeasure});
 	push @cmd, "-f" if ($Caecilia::Settings::ABCM2PS_FLATBEAMS);
 	
-	my $text = $opts{editor}->get_text();
-	
+	my $text = $main::editor->get_text();
+	# Scale stylesheet directive isn't supported in preview
+	#$text =~ s/%%scale.*\n//g if ($opts{mode} eq 'preview');
 	# create new files for preview	
 	open my $fh, ">:encoding(utf8)", "$dir/render.abc";
 	print $fh "$text";
@@ -90,22 +105,23 @@ sub render {
 	
 	push @cmd, "$dir/render.abc";
 	
-	push @cmd, "-E" if ($opts{outformat} eq "1");
-	push @cmd, "-g" if ($opts{outformat} eq "2");
-	push @cmd, "-v" if ($opts{outformat} eq "3");
-	push @cmd, "-X" if ($opts{outformat} eq "4");
-	push @cmd, "-z" if ($opts{outformat} eq "5");
+	push @cmd, "-E" if ($opts{outformat} eq '.eps');
+	push @cmd, "-g" if ($opts{outformat} eq '.svg (one tune per file)');
+	push @cmd, "-v" if ($opts{outformat} eq '.svg (one page per file)');
+	push @cmd, "-X" if ($opts{outformat} eq '.xhtml');
+	push @cmd, "-z" if ($opts{outformat} eq '.xhtml (embedded abc)');
 	
-	$opts{outfile} = $opts{outfile} . ".ps" if ($opts{outformat} eq "0");
-	$opts{outfile} = $opts{outfile} . ".eps" if ($opts{outformat} eq "1");
-	$opts{outfile} = $opts{outfile} . ".svg" if ($opts{outformat} eq "2");
-	$opts{outfile} = $opts{outfile} . ".svg" if ($opts{outformat} eq "3");
-	$opts{outfile} = $opts{outfile} . ".xhtml" if ($opts{outformat} eq "4");
-	$opts{outfile} = $opts{outfile} . ".xhtml" if ($opts{outformat} eq "5");
+	$opts{outfile} = $opts{outfile} . ".ps" if ($opts{outformat} eq '.ps');
+	$opts{outfile} = $opts{outfile} . ".eps" if ($opts{outformat} eq '.eps');
+	$opts{outfile} = $opts{outfile} . ".svg" if ($opts{outformat} eq '.svg (one tune per file)');
+	$opts{outfile} = $opts{outfile} . ".svg" if ($opts{outformat} eq '.svg (one page per file)');
+	$opts{outfile} = $opts{outfile} . ".xhtml" if ($opts{outformat} eq '.xhtml');
+	$opts{outfile} = $opts{outfile} . ".xhtml" if ($opts{outformat} eq '.xhtml (embedded abc)');
 	push @cmd, "-O$opts{outfile}";
 	
 	my ($stdin,$stdout, $stderr);
-	my $pid = open3(\*IN, \*OUT, \*ERR, $Caecilia::Settings::ABCM2PS_PATH, @cmd); 
+	#my $pid = open3(\*IN, \*OUT, \*ERR, $Caecilia::Settings::ABCM2PS_PATH, @cmd); 
+	my $pid = open3(\*IN, \*OUT, \*ERR, "abcm2ps", @cmd);
 	my $error_message ='';
 		while(my $line = <ERR>) {
 			$error_message .= $line
@@ -114,125 +130,100 @@ sub render {
 	waitpid($pid,0);
 	if ($?) {
 		# if generating preview doesn't work, show an error dialog
-		my $dialog = Gtk3::Dialog->new();
-		$dialog->set_title('Error');
-		$dialog->set_default_size(400,200);
-		$dialog->set_transient_for($opts{window});
-		$dialog->set_modal('TRUE');
-		$dialog->add_button('Ok','ok');
-		$dialog->signal_connect('response' => sub {shift->destroy();});
-		my $content_area = $dialog->get_content_area();
-		my $hbox = Gtk3::Box->new('vertical',10);
-		my $scrolled = Gtk3::ScrolledWindow->new();
-		my $label= Gtk3::Label->new("Errors occured while running abcm2ps:");
-		my $errormessage = Gtk3::Label->new("$error_message");
-		$scrolled->add_with_viewport($errormessage);
-		$scrolled->set_shadow_type("in");
-		$hbox->pack_start($label, FALSE, FALSE, 5);
-		$hbox->pack_start($scrolled, TRUE, TRUE, 5);
-		
-		$content_area->pack_start($hbox, TRUE, TRUE, 10);
-		$dialog->show_all();
+		my $dialog = $main::mw->messageBox(
+            -type => "ok",
+            -message => "Error occured while running abcm2ps",
+            -icon => "error",
+            -title => "Error",
+            -detail => $error_message);
 	}
 }
 
 sub render_dialog {
-	my ($self, $window,$editor, $tmpdir, $filename_ref) = @_;
+    my ($mw) = @_;
+    
+    my $dialog = $mw->Toplevel();
+    $dialog->title('Render Abc Music');
+	$dialog->transient("$mw");
 	
-	my $dialog = Gtk3::Dialog->new();
-	$dialog->set_transient_for($window);
-	
-	my $content_area = $dialog->get_content_area();
-	my $grid = Gtk3::Grid->new();
-	$grid->set_column_spacing(20); $grid->set_row_spacing(5);
-	
+	my $f1 = $dialog->ttkFrame()->pack(-expand => 1, -fill => 'x', -padx => 5,-pady => 5);
 	# Output label
-	my $outfile_label = Gtk3::Label->new("Outfile");
-	my $outfile_entry = Gtk3::Entry->new(); $outfile_entry->set_hexpand(TRUE);
-	if ($$filename_ref) {
-		my $filename = $$filename_ref;
-		$filename =~ s/.abc$//;
-		$outfile_entry->set_text($filename);
-	}
-	else {
-		my $filename = getcwd . "/Out";
-		$outfile_entry->set_text($filename);
-	}
+	my $outfile_label = $f1->ttkLabel(-text => "Outfile")->pack(-side => 'left');
 	
 	# output format combobox
 	my @outformats = ('.ps', '.eps','.svg (one tune per file)','.svg (one page per file)','.xhtml','.xhtml (embedded abc)');
-	my $liststore = Gtk3::ListStore->new('Glib::String');
-	foreach my $mode (@outformats) {
-		my $iter = $liststore->append();
-		$liststore->set($iter, 0 => "$mode");
-	}
-	my $outformats_combobox = Gtk3::ComboBox->new_with_model($liststore);
-	my $cell = Gtk3::CellRendererText->new();
-	$outformats_combobox->pack_start($cell, FALSE);
-	$outformats_combobox->add_attribute($cell, 'text', 0);
-	$outformats_combobox->set_active(0);
+	my $formatsvar='.ps';
+	my $formats_cbox = $f1->ttkCombobox(
+        -values => \@outformats, -textvariable => \$formatsvar)
+        ->pack(-side =>'right');
+	#TODO filename_ref if en empty doc
+	my $filename = $main::filename;
+	$filename =~ s/\..*$//;
+	my $outfile_entry = $f1->ttkEntry(-textvariable => \$filename)->pack(-side => 'right', -expand => 1, -fill => 'x');
 	
-	# first measure number
-	my $firstmeasure_check = Gtk3::CheckButton->new("first measure number");
-	my $ad = Gtk3::Adjustment->new(0,0,1000,1,0,0);
-	my $firstmeasure_spin = Gtk3::SpinButton->new($ad, 1, 0);
-	$firstmeasure_spin->set_state_flags('insensitive', TRUE);
-	$firstmeasure_check->signal_connect('toggled' => \&_toggle_check, $firstmeasure_spin);
+	# TODO tune selection TODO
+	my $f3 = $dialog->ttkFrame()->pack(-expand => 1, -fill => 'both', -padx => 5,-pady => 5);
+	my $pattern_bool = 0; my $pattern_val='';
+	my $pattern_entry = $f3->ttkEntry(-textvariable => \$pattern_val,-state => 'disabled',);
+	my $pattern_check = $f3->ttkCheckbutton(
+        -text => "Tune selection", -variable => \$pattern_bool, -onvalue => 1, -offvalue => 0,
+        -width => 20,
+        -command => sub {toggle($pattern_entry)})
+        ->pack(-side => 'left');
+    $pattern_entry->pack(-side => 'left', -expand => 1, -fill => 'x');
 	
-	# tune selection
-	my $pattern_check = Gtk3::CheckButton->new("Tune Selection");
-	my $pattern_entry = Gtk3::Entry->new();$pattern_entry->set_hexpand(TRUE);
-	$pattern_entry->set_state_flags('insensitive', TRUE);
-	$pattern_check->signal_connect('toggled' => \&_toggle_check, $pattern_entry);
-	
-	# Attach the widgets to the grid
-	# attach(Kind, links, oben, Weite, Höhe)
-	$grid->attach($outfile_label, 0,0,1,1);
-	$grid->attach($outfile_entry, 1, 0, 1, 1);
-	$grid->attach($outformats_combobox, 2,0,1,1);
-	$grid->attach($pattern_check, 0,1,1,1);$grid->attach($pattern_entry, 1,1,2,1);
-	$grid->attach($firstmeasure_check, 0,2,1,1);$grid->attach($firstmeasure_spin, 1,2,2,1);
+    # first measure number
+    my $f2 = $dialog->ttkFrame()->pack(-expand => 1, -fill => 'both', -padx => 5,-pady => 5);
+    my $firstmeasurebool = 0;
+    my $firstmeasure_spinvar = 0;
+    my $firstmeasure_spin = $f2->ttkSpinbox(
+        -from => 1, -to=>1000, -textvariable => \$firstmeasure_spinvar,-increment => 1,-state => 'disabled');
+    my $firstmeasure_check = $f2->ttkCheckbutton(
+        -text => "first measure number", -variable => \$firstmeasurebool, -onvalue => 1, -offvalue => 0,
+        -width => 20,
+        -command => sub {toggle($firstmeasure_spin)})
+        ->pack(-side => 'left');
+    $firstmeasure_spin->pack(-side => 'left', -expand => 1, -fill => 'x');
 	
 	####
 	# The Apply/Cancel Buttons
 	####
-	$dialog->add_button('Abcm2ps Settings', '1');
-	$dialog->add_button('Ok', 'ok');
-	$dialog->add_button('Cancel', 'cancel');
-	my @widgets = ($window, $editor, $tmpdir, $outfile_entry, $outformats_combobox, $pattern_entry, $firstmeasure_spin);
-	$dialog->signal_connect('response' => \&render_dialog_response, \@widgets);
-	
-	$content_area->add($grid);
-	$dialog->show_all();
+	my $f4 = $dialog->ttkFrame()->pack(-expand => 1, -fill => 'x',-padx => 5,-pady => 5);
+	my @params = (\$filename,\$formatsvar,\$firstmeasurebool,\$firstmeasure_spinvar);
+	my $ok_button = $f4->ttkButton(
+        -text => "Ok",
+        -command => sub {render_dialog_response($dialog,'ok',\@params)})
+        ->pack(-side => 'left', -padx => 3);
+    my $cancel_button = $f4->ttkButton(
+        -text => "Cancel",
+        -command => sub {render_dialog_response($dialog,'cancel',\@params)})
+        ->pack(-side => 'left', -padx => 3);
+    my $settings_button = $f4->ttkButton(
+        -text => "Abcm2ps Settings",
+        -command => sub {Caecilia::Settings::settings_cb( $mw);})
+        ->pack(-side => 'left', -padx => 3);
 }
 
 sub render_dialog_response {
-	my ($dialog, $response, $widgets_ref) = @_;
-	my ($window, $editor, $tmpdir,  $outfile_entry, $outformats_combobox, $pattern_entry, $firstmeasure_spin) = @$widgets_ref;
+	my ($dialog, $response, $params_ref) = @_;
+	my ($filename,$formatsvar,$firstmeasurebool,$firstmeasure_spinvar) = @$params_ref;
 	if ($response eq 'ok') {
-		my $outfile = $outfile_entry->get_text();
-		my $outformat = $outformats_combobox->get_active();
-		my $pattern = $pattern_entry->get_text() unless (grep /insensitive/, @{$pattern_entry->get_state_flags()});
-		my $firstmeasure = $firstmeasure_spin->get_value() unless (grep /insensitive/, @{$firstmeasure_spin->get_state_flags()});
-		render(outfile => $outfile, outformat => $outformat, pattern => $pattern, firstmeasure => $firstmeasure, editor => $editor, tmpdir => $tmpdir, window => $window);
+		render(outfile => $$filename, outformat => $$formatsvar, firstmeasure => $$firstmeasure_spinvar, mode => '');
 		$dialog->destroy; 
-	}
-	elsif ($response eq "1") {
-		Caecilia::Settings::settings_cb($window);
 	}
 	else {
 		$dialog->destroy();
 	}
 }
 
-sub _toggle_check {
-	my ($check, $widget) = @_;
-	if ($check->get_active()) {
-		$widget->set_state_flags('normal', TRUE);
-	}
-	else {
-		$widget->set_state_flags('insensitive', TRUE);
-	}
+sub toggle {
+    my ($widget) = @_;
+    if ($widget->state eq 'disabled') {
+        $widget->configure(-state => 'normal')
+    }
+    else {
+        $widget->state('disabled')
+    }
 }
 
 1;
