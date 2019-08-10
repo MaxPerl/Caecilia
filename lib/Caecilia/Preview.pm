@@ -178,7 +178,7 @@ sub jump_to_note {
 		$end = pos($line) + $col;
 	}
 	else {
-		$line =~ m/\[*[_=^abcdefgxzABCDEFGXZ,'-]+\]*[0-9\/]*/gc;
+		$line =~ m/[_=^abcdefgxzABCDEFGXZ,'-][0-9\/]*/gc;
 		$end = pos($line) + $col;
 	}
 	$editor->tagRemove("sel","1.0","end");
