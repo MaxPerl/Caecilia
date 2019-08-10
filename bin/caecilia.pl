@@ -4,13 +4,15 @@ use strict;
 use warnings;
 use utf8;
 
-use lib ('../lib');
+#use lib ('../lib');
 use Caecilia::MyTk;
 use File::Temp;
+use Caecilia;
 use Caecilia::Editor;
 use Caecilia::Preview;
 use Caecilia::Renderer;
 use File::ShareDir 'dist_dir';
+use File::Basename;
 
 # Variable for filename
 our $filename = '';
@@ -23,39 +25,33 @@ our $tmpdir = File::Temp->newdir();
 
 my $int = Caecilia::MyTk->new();
 $int->lappend('auto_path', "$share");
-$int->packageRequire('ctextAdvanced');
 $int->packageRequire('Img');
-$int->Declare('ctext', 'ctextAdvanced', -prefix => 'ctextAdvanced' );
 $int->Declare('tkpCanvas', 'tkp::canvas', -prefix => 'tkpcan', -require => 'tkpath' );
 
 # Theme settings
 our $style = Tcl::Tk::ttkStyle->new($int);
 
 $int->Eval('package require ttk::theme::Breeze');
-#$int->Eval('package require ttk::theme::Arc');
-#$int->packageRequire('ttk::theme::scidthemes');
 
 $style->theme_use('Breeze');
-#$int->tk_setPalette(
-#    background => $style->lookup('.','-background'),
-#    foreground => $style->lookup('.','-foreground'),
-#    highlightColor => $style->lookup('.','-focuscolor') || $style->lookup('.','-highlightcolor') || $style->lookup('.','-selectbackground'),
-#    selectBackground => $style->lookup('.','-selectbackground'),
-#    selectForeground => $style->lookup('.','-selectforeground'),
-#    activeBackground => $style->lookup('.','-selectbackground'),
-#    activeForeground => $style->lookup('.','-selectforeground'),
-#);
-#my $font = $style->lookup('.','-font');
-#$int->optionAdd('*font',$font);
-#$int->optionAdd('*font',"Helvetica 16");
 
 our $mw = $int->ttk_mainwindow();
 $mw->geometry('960x600');
 $mw->title('Caecilia - An editor for the ABC notation language');
+my $icon = $mw->Photo(-file => "$share/caecilia-logo.gif");
+$mw->interp->Eval("wm iconphoto $mw $icon");
 
 $int->Eval("set ::tk::Priv(folderImage) [image create photo -file $share/breeze-icons/folder-blue.png]");
 $int->Eval("set ::tk::Priv(updirImage) [image create photo -file $share/breeze-icons/go-parent-folder.png]");
 $int->Eval("set ::tk::Priv(fileImage) [image create photo -file $share/breeze-icons/text-x-generic.png]");
+
+# standard Tk workaround for option Show hidden files in the file dialogs
+# see https://blog.tcl.tk/1060
+$int->Eval(<<"EOS");
+	catch {tk_getOpenFile foo bar} 
+	set ::tk::dialog::file::showHiddenVar 0
+	set ::tk::dialog::file::showHiddenBtn 1
+EOS
 
 # Initialization
 Caecilia::Settings->init();
@@ -97,7 +93,7 @@ sub create_menu {
     $file->addCommand(-label => 'Open       ', -command => \&open_file, -accelerator => 'Ctrl+O');
     $file->addCommand(-label => 'Save       ', -command => \&save, -accelerator => 'Ctrl+S');
     $file->addCommand(-label => 'Save as        ', -command => \&save_as);
-    $file->addCommand(-label => 'Quit       ', -command => sub {$mw->destroy()}, -accelerator => 'Ctrl+Q');
+    $file->addCommand(-label => 'Quit       ', -command => sub {warn_unsaved(); $mw->destroy() unless ($editor->modified());}, -accelerator => 'Ctrl+Q');
     
     $mw->bind('<Control-n>' => \&new);
     $mw->bind('<Control-o>' => \&open_file);
@@ -124,8 +120,8 @@ sub create_menu {
     $view->addCheckbutton(-label => 'Syntax Highlighting', 
     	-variable => \$highlight, 
     	-command => sub {
-    			if ($highlight == 1) {$editor->highlight} 
-    			else {$editor->clear_highlight}
+    			if ($highlight == 1) {$editor->highlight(1)} 
+    			else {$editor->highlight(0)}
     			}
 	);
     $view->addCheckbutton(-label => 'Highlight Current Line', 
@@ -137,8 +133,8 @@ sub create_menu {
     $view->addCheckbutton(-label => 'Show Line Numbers', 
     	-variable => \$linenumbers,
     	-command => sub {
-    			if ($linenumbers == 1) {$editor->tk->configure(-linemap =>1)} 
-    			else {$editor->tk->configure(-linemap =>0)}
+    			if ($linenumbers == 1) {$editor->linemap(1)} 
+    			else {$editor->linemap(0)}
     			}
     	);
     
@@ -186,13 +182,16 @@ sub new {
     # if user clicks "yes"
     warn_unsaved();
     $editor->set_text('') unless ( $editor->modified() );
+    $preview->clear_canvas();
+    $preview->show_logo();
 }
 
 sub open_file {
     # Note: warn_unsaved changes the modified property of $editor,
     # if user clicks "yes"
     warn_unsaved();
-    my $file = $mw->getOpenFile() unless ( $editor->modified() );
+    my @types = (['abc files' =>".abc"], ['All files' => '*']);
+    my $file = $mw->getOpenFile(-filetypes => \@types) unless ( $editor->modified() );
     
     if ($file) {
         open my $fh, "<:encoding(utf-8)", $file;
@@ -204,6 +203,12 @@ sub open_file {
 		
 		# Change the filename variable
 		$filename = $file;
+		my ($name,$dirs,$suffix) = fileparse($filename); 
+		$mw->title("Caecilia - An editor for the ABC notation language - $name");
+		
+		# Clear canvas
+		$preview->clear_canvas();
+    	$preview->show_logo();
 	}
 }
 
@@ -219,6 +224,8 @@ sub save {
 		close $fh;
 		
 		$editor->modified(0);
+		my ($name,$dirs,$suffix) = fileparse($filename); 
+		$mw->title("Caecilia - An editor for the ABC notation language - $name");
 	}
 	else {
 		# use save_as_callback
@@ -227,7 +234,8 @@ sub save {
 }
 
 sub save_as {
-    my $file = $mw->getSaveFile(); 
+    my @types = (['abc files' =>".abc"], ['All files' => '*']);
+    my $file = $mw->getSaveFile(-filetypes => \@types,-defaultextension => '.abc'); 
     
     if ($file) {
         # get the content of the buffer, without hidden characters
@@ -241,6 +249,8 @@ sub save_as {
 		
 		# Change the filename variable
 		$filename = $file;
+		my ($name,$dirs,$suffix) = fileparse($filename); 
+		$mw->title("Caecilia - An editor for the ABC notation language - $name");
 	}
 }
 
@@ -269,10 +279,10 @@ sub preview_cb {
     Caecilia::Renderer::render(outfile => "$tmpdir/preview", outformat => '.svg (one page per file)', mode => 'preview');
     
     if (-e "$tmpdir/preview001.svg") {
-		$preview->render_preview("$tmpdir/preview");
-		my @filelist = <"$tmpdir/preview*.svg">;
+    	my @filelist = <"$tmpdir/preview*.svg">;
 		my $number_of_pages = @filelist;
 		$preview->number_of_pages($number_of_pages);
+		$preview->render_preview("$tmpdir/preview");
     }
 }
 
@@ -294,20 +304,9 @@ sub about {
     my $logo = $frame->Photo('about-logo', -file => "$share/about.png");
     my $img = $frame->ttkLabel(-image => $logo)->pack();
     my $label = $frame->ttkLabel(-justify => "center",-font => 'Helvetica 10 bold', -text => "Caecilia")->pack;
-    my $label2 = $frame->ttkLabel(-justify => "center", -text => "0.12\n A yet simple Editor for the ABC notation format\nwritten in perl/Tcl::Tk")->pack;
+    my $label2 = $frame->ttkLabel(-justify => "center", -text => $Caecilia::VERSION . "\n A yet simple Editor for the ABC notation format\nwritten in perl/Tcl::Tk")->pack;
     my $frame2 = $about_dialog->ttkFrame(-height => 20, -borderwidth=>1)->pack(-fill=> 'x',-expand => 1);
     my $button = $frame2->ttkButton(-text => "Close",-command => sub {$about_dialog->destroy()})->pack(-side => "right",-padx => 5,-pady => 5);
     
     
 }
-
-package Tcl::Tk::Widget::tkpCanvas;
-our @ISA = qw(Tcl::Tk::ttkWidget);
-
-sub CanvasBind {
-	my $self = shift;
-    my $item = shift;
-    $self->interp->call($self,'bind',$item,@_);
-}
-
-1;

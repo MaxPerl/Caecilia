@@ -103,6 +103,4 @@ share/Breeze/demo.tcl
 share/Breeze/pkgIndex.tcl
 share/Breeze/Screenshot.png
 share/caecilia-logo.png
-share/ctextAdvanced/ctextAdvanced.tcl
-share/ctextAdvanced/pkgIndex.tcl
 t/Caecilia.t

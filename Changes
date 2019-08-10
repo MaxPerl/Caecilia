@@ -1,5 +1,21 @@
 Revision history for Perl extension Caecilia.
 
+0.17 Sat Aug 10 09:40:00
+	- Further improvement with the jump_to_note callback 
+	  (the note is now selected in Caecilia::Editor instead that only the cursor jumps at the note)
+	- some code cleaning
+0.16 Sat Aug 10 09:00:00
+	- Update of Makefile.PL
+	- Improving of the click and jump to the note feature in Caecilia::Preview
+	  (after clicking on a note the keyboard focus is set automatically to Caecilia::Editor)
+0.15 Fr Aug 9 23:06:00
+	- Many Bugfixes in Editor, Preview and the GUI
+	- Add window icon
+0.14 Wed Aug 7 08:34:00
+	- Reimplementation of Editor (Syntax Highlighting and Line numbers) in Perl/Tcl::Tk
+	- Solving compatibility problems of abcm2ps in Caecilia::Preview
+0.13 Mo Aug 5 20:30:00 2019
+	- Minor improvements with Syntax highlighting
 0.12 Mo Jul 29 21:53:00 2019
 	- Switch graphical toolkit to Tcl::Tk
 0.11 Tue March 12 09:34:00 2019

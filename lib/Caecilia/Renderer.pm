@@ -121,7 +121,8 @@ sub render {
 	
 	my ($stdin,$stdout, $stderr);
 	#my $pid = open3(\*IN, \*OUT, \*ERR, $Caecilia::Settings::ABCM2PS_PATH, @cmd); 
-	my $pid = open3(\*IN, \*OUT, \*ERR, "abcm2ps", @cmd);
+	
+	my $pid = open3(\*IN, \*OUT, \*ERR, $Caecilia::Settings::ABCM2PS_PATH, @cmd);
 	my $error_message ='';
 		while(my $line = <ERR>) {
 			$error_message .= $line

@@ -124,12 +124,19 @@ sub load_tune {
     # estimate dimensions of the svg
     my $info = image_info("$file");
     my ($w,$h) = dim($info);
-    $w =~ s/in$//;$h =~ s/in$//;
-    $w = $w *96; $h = $h * 96;
+    $w =~ s/px$//;$h =~ s/px$//;
+    # In older versions of abcm2ps the dimensions are 
+    # in inch
+    if ($w =~ s/in$//) {
+    	$w = $w *96;
+    }
+    if ($h =~ s/in$//) {
+     	$h = $h * 96;
+     }
     
     # create image
     my $rsvg = Image::LibRSVG->new();
-    $rsvg->convertAtSize($file, "$file.png", $w,$h);
+    $rsvg->convertAtSize($file, "$file.png", $w,$h) or die "Could not convert svg: $!\n";
     
     my $tune = $canvas->Photo('tune', -file => "$file.png");
     my $t = $canvas->createPimage(0,0,-image => 'tune',-anchor => 'nw', -tags => ['tune']);
@@ -145,9 +152,8 @@ sub load_tune {
         	-stroke => $main::style->lookup('.','-selectbackground'), -strokeopacity => 0,
         	-tags => ['notes']);
         
-        # The method CanvasBind is defined in caecilia.pl in the package
+        # The method CanvasBind is defined in Caecilia::MyTk in the package
         # Tcl::Tk::Widget::tkpCanvas
-        # TODO: Do this somewhere else (e.g. Caecilia::MyTk)
         $canvas->CanvasBind($n, "<Enter>" => sub {
         	$canvas->itemconfigure($n, -fillopacity => 0.5, -strokeopacity => 0.5)
         	});
@@ -155,11 +161,30 @@ sub load_tune {
         	$canvas->itemconfigure($n, -fillopacity => 0, -strokeopacity => 0)
         	});
         # Click and jump in the editor to the note
-        $canvas->CanvasBind($n, "<Button-1>" => sub {
-        	$editor->markSet("insert","$row.$col");$editor->see('insert')
-        	});
+        $canvas->CanvasBind($n, "<Button-1>" => sub {jump_to_note($editor,$row,$col);});
     }
     $canvas->configure(-scrollregion => [$canvas->bbox("all")]);
+}
+
+sub jump_to_note {
+	my ($editor,$row,$col) = @_;
+	$editor->markSet("insert","$row.$col");
+	$editor->focus;
+	$editor->see('insert');
+	my $line = $editor->get("$row.$col","$row.end");
+	my $end;
+	if ($line =~ m/^\[/) {
+		$line =~ m/\[.+?\][0-9\/]*/gc;
+		$end = pos($line) + $col;
+	}
+	else {
+		$line =~ m/\[*[_=^abcdefgxzABCDEFGXZ,'-]+\]*[0-9\/]*/gc;
+		$end = pos($line) + $col;
+	}
+	$editor->tagRemove("sel","1.0","end");
+	$editor->tagAdd("sel", "$row.$col", "$row.$end"); 
+	$editor->interp->Eval("event generate $editor <<ReHighlight>>");
+	
 }
 
 sub parse_abc {
@@ -240,6 +265,8 @@ sub size {
 sub render_preview {
 	my ($self, $filename) = @_;
 	my $page = $self->page();
+	my $number_of_pages = $self->number_of_pages;
+	$page = $number_of_pages if ($page > $number_of_pages);
 	$filename =~ s/\.abc$//;
 	$filename =~ s/\d{3}$//;
 	if ($page < 10) {

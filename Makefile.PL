@@ -7,7 +7,14 @@ install_share 'share';
 WriteMakefile(
     NAME              => 'Caecilia',
     VERSION_FROM      => 'lib/Caecilia.pm', # finds $VERSION, requires EU::MM from perl >= 5.5
-    PREREQ_PM         => {}, # e.g., Module::Name => 1.1
+    PREREQ_PM         => {	File::Temp => 0,
+    						File::ShareDir => 0,
+    						File::Basename => 0,
+    						Image::LibRSVG => 0,
+    						Image::Info => 0,
+    						Cwd => 0,
+    						IPC::Open3 => 0,
+    						}, # e.g., Module::Name => 1.1
     BUILD_REQUIRES    => {'File::ShareDir::Install' => 0},
     ABSTRACT_FROM     => 'lib/Caecilia.pm', # retrieve abstract from module
     EXE_FILES	      => ['bin/caecilia.pl'],

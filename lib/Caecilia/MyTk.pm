@@ -267,9 +267,20 @@ sub map {
 	return $self->interp->call("ttk::style", "map", $style, @_);
 }
 
+1;
 #TODO: element_create, element_names, theme_create, theme_settings
 
+package Tcl::Tk::Widget::tkpCanvas;
+our @ISA = qw(Tcl::Tk::ttkWidget);
+
+sub CanvasBind {
+	my $self = shift;
+    my $item = shift;
+    $self->interp->call($self,'bind',$item,@_);
+}
+
 1;
+
 __END__
 # Below is stub documentation for your module. You'd better edit it!
 

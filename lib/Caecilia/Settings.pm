@@ -3,7 +3,6 @@ package Caecilia::Settings;
 use strict;
 no strict 'vars';
 use warnings;
-use Glib('TRUE', 'FALSE');
 
 ################
 # The configuration part
