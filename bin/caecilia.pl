@@ -19,6 +19,8 @@ our $filename = '';
 
 # Sharedir
 our $share = dist_dir('Caecilia');
+# Fix path incompatibility of Tcl/Tk and Windows
+$share =~ s/\\/\//g;
 #our $share = ('../share');
 
 our $tmpdir = File::Temp->newdir();
@@ -45,13 +47,15 @@ $int->Eval("set ::tk::Priv(folderImage) [image create photo -file $share/breeze-
 $int->Eval("set ::tk::Priv(updirImage) [image create photo -file $share/breeze-icons/go-parent-folder.png]");
 $int->Eval("set ::tk::Priv(fileImage) [image create photo -file $share/breeze-icons/text-x-generic.png]");
 
-# standard Tk workaround for option Show hidden files in the file dialogs
+# standard Tk workaround for option Show hidden files in linux file dialogs
 # see https://blog.tcl.tk/1060
-$int->Eval(<<"EOS");
-	catch {tk_getOpenFile foo bar} 
-	set ::tk::dialog::file::showHiddenVar 0
-	set ::tk::dialog::file::showHiddenBtn 1
+if ($^O =~ m/linux/) {
+	$int->Eval(<<"EOS");
+		catch {tk_getOpenFile foo bar} 
+		set ::tk::dialog::file::showHiddenVar 0
+		set ::tk::dialog::file::showHiddenBtn 1
 EOS
+}
 
 # Initialization
 Caecilia::Settings->init();

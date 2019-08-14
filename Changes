@@ -1,5 +1,10 @@
 Revision history for Perl extension Caecilia.
 
+0.18 Wed Aug 14 19:00:00
+	- Some adoptions for compatibility with Windows
+	- Caecilia::Preview improvement: Jump to note now also works with rests
+	- Bugfix: Keep modified status as it was before jumping to/selecting the note in Caecilia::Editor
+	- Make settings dialog smaller and scrollable
 0.17 Sat Aug 10 09:40:00
 	- Further improvement with the jump_to_note callback 
 	  (the note is now selected in Caecilia::Editor instead that only the cursor jumps at the note)

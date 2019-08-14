@@ -91,6 +91,7 @@ sub on_hor_scroll {
 		$canvas->xview('scroll', 5, 'units');
 	}
 }
+
 sub on_mousewheel {
 	my ($delta,$canvas,$delta2) = @_;
 	my $numbers = -1*$delta/120;
@@ -184,7 +185,6 @@ sub jump_to_note {
 	$editor->tagRemove("sel","1.0","end");
 	$editor->tagAdd("sel", "$row.$col", "$row.$end"); 
 	$editor->interp->Eval("event generate $editor <<ReHighlight>>");
-	
 }
 
 sub parse_abc {
@@ -192,7 +192,7 @@ sub parse_abc {
 	my @notes;
 	open my $fh, "<", $file;
 	while (my $line = <$fh>) {
-		if ($line =~ m!<abc type="N".* row="(.*)" col="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)"/>!) {
+		if ($line =~ m!<abc type="[NR]".* row="(.*)" col="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)"/>!) {
 			my %note = (
 					'row' => $1,
 					'col' => $2,

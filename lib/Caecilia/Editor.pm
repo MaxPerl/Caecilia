@@ -75,7 +75,7 @@ sub new {
     # Syntax Highlighting Bindings
     $obj->setup_highlight($editor);
     $editor->bind('<<ReHighlight>>' => sub {$editor->update('idletasks'); $obj->forAllMatches($editor,\@classes);});
-    $editor->bind("<KeyRelease>" => sub {$editor->interp->Eval("event generate $editor <<ReHighlight>>");});
+    $editor->bind("<KeyRelease>" => sub {\&on_keyrelease($editor),});
     $editor->bind("<MouseWheel>" => [\&on_mousewheel, Tcl::Ev('%D'),$editor]);
 	$editor->bind("<ButtonRelease-4>" => sub {$editor->interp->Eval("event generate $editor <MouseWheel> -delta 120 -when now");});
 	$editor->bind("<ButtonRelease-5>" => sub {$editor->interp->Eval("event generate $editor <MouseWheel> -delta -120 -when now");});
@@ -219,12 +219,16 @@ sub modified {
 	return $old_status;
 }
 
-sub forAllMatches {
-	my ($self, $editor, $classes, $all) = @_;
-	
+
+sub on_keyrelease {
+	my ($editor) = @_;
 	# First check modify status and print a * in title if the abc file was modified
 	my $title=$main::mw->title();
 	$main::mw->title($title . ' *') if ($editor->edit('modified') && $title !~/\*$/);
+	$editor->interp->Eval("event generate $editor <<ReHighlight>>");
+}
+sub forAllMatches {
+	my ($self, $editor, $classes, $all) = @_;
 	
 	# Syntax Highlighting Support
 	return unless ($self->highlight());
