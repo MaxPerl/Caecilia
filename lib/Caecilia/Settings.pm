@@ -67,21 +67,22 @@ sub settings_cb {
 	my $dialog = $mw->Toplevel();
     $dialog->title('Render Abc Music');
 	$dialog->transient("$mw");
-	$dialog->geometry('450x450');
+	$dialog->geometry('550x450');
 	
-	
+	#my $container = $dialog->ttkFrame();
 	my $canvas = $dialog->Canvas();
-	my $s = $dialog->ttkScrollbar(-orient => 'vertical', -command => [$canvas, 'yview'])
-        ->pack(-side => 'right',-fill => 'y');
-    $canvas->configure(-yscrollcommand => [$s, 'set']);
-	$canvas->pack(-side => "right", -fill => "both", -expand => 1);
+	my $s = $dialog->ttkScrollbar(-orient => 'vertical', -command => [$canvas, 'yview']);
+        
+	my $content = $canvas->ttkFrame();
 	
-	####
-	# Path 
-	####
+	$content->bind('<Configure>' => sub {
+        $canvas->configure(-scrollregion => [$canvas->bbox('all')]);
+    
+    });
 	
-	my $content = $canvas->ttkFrame(-width => 400, -height => 970);
+	
 	$canvas->createWindow(0, 0,-anchor, 'nw',-window, $content);
+    $canvas->configure(-yscrollcommand => [$s, 'set']);
 	
 	###
 	_add_header($content,"Path to abcm2ps");
@@ -198,7 +199,9 @@ sub settings_cb {
     $dialog->bind("<Button-4>" => sub {$canvas->interp->call('event',"generate", $content,"<MouseWheel>", -delta => 120);});
     $dialog->bind("<Button-5>" => sub {$canvas->interp->call('event','generate',$content,"<MouseWheel>", -delta => -120);});
     
-    $canvas->configure(-scrollregion => [$canvas->bbox('all')]);
+    #$container->pack(-fill => "both",-expand=>1);
+    $canvas->pack(-side => "left", -fill => "both", -expand => 1);
+    $s->pack(-side => 'right',-fill => 'y');
 }
 
 

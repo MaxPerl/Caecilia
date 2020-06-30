@@ -136,8 +136,13 @@ sub load_tune {
      }
     
     # create image
-    my $rsvg = Image::LibRSVG->new();
-    $rsvg->convertAtSize($file, "$file.png", $w,$h) or die "Could not convert svg: $!\n";
+    #my $rsvg = Image::LibRSVG->new();
+    #$rsvg->convertAtSize($file, "$file.png", $w,$h) or die "Could not convert svg: $!\n";
+    use Image::Magick; 
+    my $image = Image::Magick->new;
+    # Imager auto-detects the input file type
+    $image->Read("$file");
+    $image->Write("$file.png");
     
     my $tune = $canvas->Photo('tune', -file => "$file.png");
     my $t = $canvas->createPimage(0,0,-image => 'tune',-anchor => 'nw', -tags => ['tune']);
