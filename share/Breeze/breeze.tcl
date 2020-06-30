@@ -8,7 +8,7 @@ package require Tk 8.6.0
 
 namespace eval ttk::theme::Breeze {
 
-    variable version 0.6
+    variable version 0.7
     package provide ttk::theme::Breeze $version
 
     variable colors
@@ -119,7 +119,7 @@ namespace eval ttk::theme::Breeze {
                 disabled    $I(button-insensitive) \
             ] -border 3 -sticky ewns
 
-        ttk::style element create Toolbutton.button image [list $I(button-empty) \
+        ttk::style element create Toolbutton.button image [list $I(empty) \
                 {active selected !disabled}  $I(button-active) \
                 selected            $I(button-toggled) \
                 pressed             $I(button-active) \
