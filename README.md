@@ -14,11 +14,8 @@ make install
 
 Therefore you need the following libraries and perl modules:
 
-* Gtk3
-* GooCanvas2
-* GtkSourceView 3
-* perl-Gtk3
-* perl-Gtk3-SourceView
-* perl-GooCanvas2
-* perl-ShareDir
-* perl-ShareDir-Install
+* Tk with tkpath and Img extension
+* Tcl::Tk
+* Image::Magick
+* Image::Info
+* File::ShareDir

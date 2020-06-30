@@ -1,5 +1,8 @@
 Revision history for Perl extension Caecilia.
 
+0.19 Sun Jun 28 00:43:00
+    - Move from Image::LibRSVG to Image::Magick
+    - Minor design improvements in Breeze theme and settings dialog
 0.18 Wed Aug 14 19:00:00
 	- Some adoptions for compatibility with Windows
 	- Caecilia::Preview improvement: Jump to note now also works with rests
