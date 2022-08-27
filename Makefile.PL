@@ -10,10 +10,10 @@ WriteMakefile(
     PREREQ_PM         => {	File::Temp => 0,
     						File::ShareDir => 0,
     						File::Basename => 0,
-    						Image::Magick => 0,
+							Image::Magick => 0,
     						Image::Info => 0,
-                            Image::LibRSVG => 0,
-                            Tcl::Tk => 0,
+							Image::LibRSVG => 0,
+							Tcl::Tk => 0,
     						Cwd => 0,
     						IPC::Open3 => 0,
     						}, # e.g., Module::Name => 1.1
