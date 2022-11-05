@@ -31,55 +31,55 @@ our @EXPORT = qw(
 );
 
 sub new {
-    my ($class, $parent, %config) = @_;
-    
-    my $obj = {};
-    bless $obj;
-    
-    $obj->page('1');
-    $obj->number_of_pages(0);
-    $obj->build_preview_object($parent);
-     
-    return $obj;
+	my ($class, $parent, %config) = @_;
+	
+	my $obj = {};
+	bless $obj;
+	
+	$obj->page('1');
+	$obj->number_of_pages(0);
+	$obj->build_preview_object($parent);
+	 
+	return $obj;
 }
 
 sub build_preview_object {
-    my ($self, $f) = @_;
-    
-    my $canvas = $f->tkpCanvas(-bg => 'white');
-    
-    my $xs = $f->ttkScrollbar(-orient => 'horizontal', -command => [$canvas, 'xview'])
-        ->pack(-side => "bottom",-fill => 'x');
-    $canvas->configure(-xscrollcommand => [$xs, 'set']);
-    
-    my $s = $f->ttkScrollbar(-orient => 'vertical', -command => [$canvas, 'yview'])
-        ->pack(-side => 'right',-fill => 'y');
-    $canvas->configure(-yscrollcommand => [$s, 'set']);
-    
-    
-    $canvas->pack(-side => "right", -fill => "both", -expand => 1);
-    
-    my $w = $canvas->cget('-width');
-    my $h = $canvas->cget('-height');
-    my $ih = $w*0.75;
-    my $y = $h/2;
-    #my $r = $w / $h;
-    #$self->{h}=$h; $self->{w}=$w,$self->{r}=$r;
-    $canvas->Photo('logo', -file => "$main::share/caecilia-logo.png");
-    my $logo = $canvas->createPimage(0,$y,-image => 'logo',-width => $w,-height => $ih);
-    
-    $self->{canvas} = $canvas;
-    $self->{logo} = $logo;
-    $self->{frame} = $f;
-    
-    $canvas->bind('<Configure>' => [\&resize, Tcl::Ev('%h','%w'), $self, $h]);
-    $canvas->bind("<MouseWheel>" => [\&on_mousewheel, Tcl::Ev('%D'),$canvas]);
-    $canvas->bind("<Button-4>" => sub {$canvas->interp->call('event',"generate", $canvas,"<MouseWheel>", -delta => 120);});
-    $canvas->bind("<Button-5>" => sub {$canvas->interp->call('event','generate',$canvas,"<MouseWheel>", -delta => -120);});
-    $canvas->bind("<Button>" => [\&on_hor_scroll, Tcl::Ev('%b'), $canvas]);
-    #$canvas->bind('<Configure>' => [\&size, Tcl::Ev('%h','%w'), $self]);
-    $canvas->configure(-scrollregion => "0 0 $w $h");
-    
+	my ($self, $f) = @_;
+	
+	my $canvas = $f->tkpCanvas(-bg => 'white');
+	
+	my $xs = $f->ttkScrollbar(-orient => 'horizontal', -command => [$canvas, 'xview'])
+		->pack(-side => "bottom",-fill => 'x');
+	$canvas->configure(-xscrollcommand => [$xs, 'set']);
+	
+	my $s = $f->ttkScrollbar(-orient => 'vertical', -command => [$canvas, 'yview'])
+		->pack(-side => 'right',-fill => 'y');
+	$canvas->configure(-yscrollcommand => [$s, 'set']);
+	
+	
+	$canvas->pack(-side => "right", -fill => "both", -expand => 1);
+	
+	my $w = $canvas->cget('-width');
+	my $h = $canvas->cget('-height');
+	my $ih = $w*0.75;
+	my $y = $h/2;
+	#my $r = $w / $h;
+	#$self->{h}=$h; $self->{w}=$w,$self->{r}=$r;
+	$canvas->Photo('logo', -file => "$main::share/caecilia-logo.png");
+	my $logo = $canvas->createPimage(0,$y,-image => 'logo',-width => $w,-height => $ih);
+	
+	$self->{canvas} = $canvas;
+	$self->{logo} = $logo;
+	$self->{frame} = $f;
+	
+	$canvas->bind('<Configure>' => [\&resize, Tcl::Ev('%h','%w'), $self, $h]);
+	$canvas->bind("<MouseWheel>" => [\&on_mousewheel, Tcl::Ev('%D'),$canvas]);
+	$canvas->bind("<Button-4>" => sub {$canvas->interp->call('event',"generate", $canvas,"<MouseWheel>", -delta => 120);});
+	$canvas->bind("<Button-5>" => sub {$canvas->interp->call('event','generate',$canvas,"<MouseWheel>", -delta => -120);});
+	$canvas->bind("<Button>" => [\&on_hor_scroll, Tcl::Ev('%b'), $canvas]);
+	#$canvas->bind('<Configure>' => [\&size, Tcl::Ev('%h','%w'), $self]);
+	$canvas->configure(-scrollregion => "0 0 $w $h");
+	
 }
 
 sub on_hor_scroll {
@@ -99,77 +99,72 @@ sub on_mousewheel {
 }
 
 sub resize {
-    my ($h, $w, $self, $old_h) = @_;
-    my $canvas = $self->{canvas};
-    my $logo = $self->{logo};
-    
-    $canvas->itemconfigure($logo, -width => $w, -height => $w*0.75);
-    
-    if ($canvas->itemcget($logo,-state) eq "hidden") {
-        $canvas->configure(-scrollregion => [$canvas->bbox("all")]);
-    }
-    else {
-        $canvas->configure(-scrollregion => "0 0 $w $h");
-    }
+	my ($h, $w, $self, $old_h) = @_;
+	my $canvas = $self->{canvas};
+	my $logo = $self->{logo};
+	
+	$canvas->itemconfigure($logo, -width => $w, -height => $w*0.75);
+	
+	if ($canvas->itemcget($logo,-state) eq "hidden") {
+		$canvas->configure(-scrollregion => [$canvas->bbox("all")]);
+	}
+	else {
+		$canvas->configure(-scrollregion => "0 0 $w $h");
+	}
 }
 
 sub load_tune {
-    my ($self,$file,$scale_factor,$no_parse) = @_;
-    
-    my $canvas = $self->{canvas};
-    
-    # Clear canvas
-    $self->clear_canvas();
-    
-    # Creating tune and notes
-    # estimate dimensions of the svg
-    my $info = image_info("$file");
-    my ($w,$h) = dim($info);
-    $w =~ s/px$//;$h =~ s/px$//;
-    # In older versions of abcm2ps the dimensions are 
-    # in inch
-    if ($w =~ s/in$//) {
-    	$w = $w *96;
-    }
-    if ($h =~ s/in$//) {
-     	$h = $h * 96;
-     }
-    
-    # create image
-    #my $rsvg = Image::LibRSVG->new();
-    #$rsvg->convertAtSize($file, "$file.png", $w,$h) or die "Could not convert svg: $!\n";
-    use Image::Magick; 
-    my $image = Image::Magick->new;
-    # Imager auto-detects the input file type
-    $image->Read("$file");
-    $image->Write("$file.png");
-    
-    my $tune = $canvas->Photo('tune', -file => "$file.png");
-    my $t = $canvas->createPimage(0,0,-image => 'tune',-anchor => 'nw', -tags => ['tune']);
-    
-    
-    my @notes = parse_abc("$file");
-    foreach my $note (@notes) { 
-        my $col = $note->{col};
-        my $row = $note->{row};
-        my $editor = $main::editor->{editor};
-        my $n = $canvas->create('prect',$note->{'x'}, $note->{'y'}, $note->{'x'} + $note->{'width'}, $note->{'y'} +$note->{'height'}, 
-        	-fill => $main::style->lookup('.','-selectbackground'), -fillopacity => 0,
-        	-stroke => $main::style->lookup('.','-selectbackground'), -strokeopacity => 0,
-        	-tags => ['notes']);
-        
-        # The method CanvasBind is defined in Caecilia::MyTk in the package
-        # Tcl::Tk::Widget::tkpCanvas
-        $canvas->CanvasBind($n, "<Enter>" => sub {
-        	$canvas->itemconfigure($n, -fillopacity => 0.5, -strokeopacity => 0.5)
-        	});
-        $canvas->CanvasBind($n, "<Leave>" => sub {
-        	$canvas->itemconfigure($n, -fillopacity => 0, -strokeopacity => 0)
-        	});
-        # Click and jump in the editor to the note
-        $canvas->CanvasBind($n, "<Button-1>" => sub {jump_to_note($editor,$row,$col);});
-    }
-    $canvas->configure(-scrollregion => [$canvas->bbox("all")]);
+	my ($self,$file,$scale_factor,$no_parse) = @_;
+	
+	my $canvas = $self->{canvas};
+	
+	# Clear canvas
+	$self->clear_canvas();
+	
+	# Creating tune and notes
+	# estimate dimensions of the svg
+	my $info = image_info("$file");
+	my ($w,$h) = dim($info);
+	$w =~ s/px$//;$h =~ s/px$//;
+	# In older versions of abcm2ps the dimensions are 
+	# in inch
+	if ($w =~ s/in$//) {
+		$w = $w *96;
+	}
+	if ($h =~ s/in$//) {
+		$h = $h * 96;
+	 }
+	
+	# create image
+	my $rsvg = Image::LibRSVG->new();
+	$rsvg->convertAtSize($file, "$file.png", $w,$h) or die "Could not convert svg: $!\n";
+	
+	my $tune = $canvas->Photo('tune', -file => "$file.png");
+	my $t = $canvas->createPimage(0,0,-image => 'tune',-anchor => 'nw', -tags => ['tune']);
+	
+	
+	my @notes = parse_abc("$file");
+	foreach my $note (@notes) { 
+		my $col = $note->{col};
+		my $row = $note->{row};
+		my $editor = $main::editor->{editor};
+		my $n = $canvas->create('prect',$note->{'x'}, $note->{'y'}, $note->{'x'} + $note->{'width'}, $note->{'y'} +$note->{'height'}, 
+			-fill => $main::style->lookup('.','-selectbackground'), -fillopacity => 0,
+			-stroke => $main::style->lookup('.','-selectbackground'), -strokeopacity => 0,
+			-tags => ['notes']);
+		
+		# The method CanvasBind is defined in Caecilia::MyTk in the package
+		# Tcl::Tk::Widget::tkpCanvas
+		$canvas->CanvasBind($n, "<Enter>" => sub {
+			$canvas->itemconfigure($n, -fillopacity => 0.5, -strokeopacity => 0.5)
+			});
+		$canvas->CanvasBind($n, "<Leave>" => sub {
+			$canvas->itemconfigure($n, -fillopacity => 0, -strokeopacity => 0)
+			});
+		# Click and jump in the editor to the note
+		$canvas->CanvasBind($n, "<Button-1>" => sub {jump_to_note($editor,$row,$col);});
+	}
+	$canvas->configure(-scrollregion => [$canvas->bbox("all")]);
 }
 
 sub jump_to_note {
@@ -214,55 +209,55 @@ sub parse_abc {
 }
 
 sub show_logo {
-    my ($self) = @_;
-    my $logo = $self->{logo};
-    my $canvas = $self->{canvas};
-    my $state = $canvas->itemcget($logo,-state);
-    $canvas->itemconfigure($logo,-state => "normal") if ($state eq "hidden");    
+	my ($self) = @_;
+	my $logo = $self->{logo};
+	my $canvas = $self->{canvas};
+	my $state = $canvas->itemcget($logo,-state);
+	$canvas->itemconfigure($logo,-state => "normal") if ($state eq "hidden");	 
 }
 
 sub hide_logo {
-    my ($self) = @_;
-    my $logo = $self->{logo};
-    my $canvas = $self->{canvas};
-    $canvas->itemconfigure($logo,-state => "hidden");
+	my ($self) = @_;
+	my $logo = $self->{logo};
+	my $canvas = $self->{canvas};
+	$canvas->itemconfigure($logo,-state => "hidden");
 }
 
 sub clear_canvas {
-    my ($self) = @_;
-    my $canvas = $self->{canvas};
-    $canvas->delete('tune','notes');
+	my ($self) = @_;
+	my $canvas = $self->{canvas};
+	$canvas->delete('tune','notes');
 }
 
 sub size {
-    my ($h, $w, $self) = @_;
-    my $canvas = $self->{canvas};
-    my $wscale = $w/$self->{w};
-    my $hscale = $h/$self->{h};
-    $self->{h} = $h; $self->{w} = $w;
-    my $logo = $self->{logo};
-    # resize canvas
-    #$canvas->configure(-width => $w, -height => $h);
-    # rescale all objects
-    if ( $self->{w} / $self->{h} > $self->{r} ) {
-        #$canvas->scale('all',0,0,$hscale,$hscale);
-        my $iw = $canvas->itemcget($logo, -width);
-        my $ih = $canvas->itemcget($logo, -height);
-        $canvas->itemconfigure($logo, -width => $iw * $hscale, -height => $ih*$hscale);
-    }
-    elsif ( $self->{w} / $self->{h} < $self->{r} ) {
-        #$canvas->scale('all',0,0,$wscale,$wscale);
-        my $iw = $canvas->itemcget($logo, -width);
-        my $ih = $canvas->itemcget($logo, -height);
-        $canvas->itemconfigure($logo, -width => $iw * $wscale, -height => $ih*$wscale);
-    }
-    elsif ( $self->{w} / $self->{h} == $self->{r} ) {
-        #$canvas->scale('all',0,0,$hscale,$wscale);
-        my $iw = $canvas->itemcget($logo, -width);
-        my $ih = $canvas->itemcget($logo, -height);
-        $canvas->itemconfigure($logo, -width => $iw * $wscale, -height => $ih*$hscale);
-    }
-    #$canvas->configure(-scrollregion => [$canvas->bbox("all")]);
+	my ($h, $w, $self) = @_;
+	my $canvas = $self->{canvas};
+	my $wscale = $w/$self->{w};
+	my $hscale = $h/$self->{h};
+	$self->{h} = $h; $self->{w} = $w;
+	my $logo = $self->{logo};
+	# resize canvas
+	#$canvas->configure(-width => $w, -height => $h);
+	# rescale all objects
+	if ( $self->{w} / $self->{h} > $self->{r} ) {
+		#$canvas->scale('all',0,0,$hscale,$hscale);
+		my $iw = $canvas->itemcget($logo, -width);
+		my $ih = $canvas->itemcget($logo, -height);
+		$canvas->itemconfigure($logo, -width => $iw * $hscale, -height => $ih*$hscale);
+	}
+	elsif ( $self->{w} / $self->{h} < $self->{r} ) {
+		#$canvas->scale('all',0,0,$wscale,$wscale);
+		my $iw = $canvas->itemcget($logo, -width);
+		my $ih = $canvas->itemcget($logo, -height);
+		$canvas->itemconfigure($logo, -width => $iw * $wscale, -height => $ih*$wscale);
+	}
+	elsif ( $self->{w} / $self->{h} == $self->{r} ) {
+		#$canvas->scale('all',0,0,$hscale,$wscale);
+		my $iw = $canvas->itemcget($logo, -width);
+		my $ih = $canvas->itemcget($logo, -height);
+		$canvas->itemconfigure($logo, -width => $iw * $wscale, -height => $ih*$hscale);
+	}
+	#$canvas->configure(-scrollregion => [$canvas->bbox("all")]);
 }
 
 
