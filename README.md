@@ -14,7 +14,7 @@ make install
 
 Therefore you need the following libraries and perl modules:
 
-* Tk with tkpath and Img extension
+* the Tk library **with tkpath and Img extension**
 * Tcl::Tk
 * Image::LibRSVG
 * Image::Info
