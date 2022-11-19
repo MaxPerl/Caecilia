@@ -16,6 +16,6 @@ Therefore you need the following libraries and perl modules:
 
 * Tk with tkpath and Img extension
 * Tcl::Tk
-* libRSVG
+* Image::LibRSVG
 * Image::Info
 * File::ShareDir
