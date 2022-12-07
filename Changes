@@ -1,0 +1,79 @@
+Revision history for Perl extension Caecilia.
+
+0.20 Wed Dec 07 07:00:00
+	- complete rewrite wit pEFL (Einlightenment foundation library)
+0.19 Sun Jun 28 00:43:00
+    - Move from Image::LibRSVG to Image::Magick
+    - Minor design improvements in Breeze theme and settings dialog
+0.18 Wed Aug 14 19:00:00
+	- Some adoptions for compatibility with Windows
+	- Caecilia::Preview improvement: Jump to note now also works with rests
+	- Bugfix: Keep modified status as it was before jumping to/selecting the note in Caecilia::Editor
+	- Make settings dialog smaller and scrollable
+0.17 Sat Aug 10 09:40:00
+	- Further improvement with the jump_to_note callback 
+	  (the note is now selected in Caecilia::Editor instead that only the cursor jumps at the note)
+	- some code cleaning
+0.16 Sat Aug 10 09:00:00
+	- Update of Makefile.PL
+	- Improving of the click and jump to the note feature in Caecilia::Preview
+	  (after clicking on a note the keyboard focus is set automatically to Caecilia::Editor)
+0.15 Fr Aug 9 23:06:00
+	- Many Bugfixes in Editor, Preview and the GUI
+	- Add window icon
+0.14 Wed Aug 7 08:34:00
+	- Reimplementation of Editor (Syntax Highlighting and Line numbers) in Perl/Tcl::Tk
+	- Solving compatibility problems of abcm2ps in Caecilia::Preview
+0.13 Mo Aug 5 20:30:00 2019
+	- Minor improvements with Syntax highlighting
+0.12 Mo Jul 29 21:53:00 2019
+	- Switch graphical toolkit to Tcl::Tk
+0.11 Tue March 12 09:34:00 2019
+	- Bugfix of Preview
+0.10 Sat Jul 15 11:15:00 2017
+	- Add abcm2ps options -F (formatfile), -D (directory for *.fmt) and -j (number measures every n bars)
+	- Use core module IPC::open3 for capturing STDERR of the abm2ps command for use in the error dialog
+0.09 Sat Jul 15 08:35:00 2017
+	- Show the warn_unsaved dialog, even if user exits the application with unsaved content
+	- Add options for abcm2ps in the Settings GUI
+	- Add render dialog and Renderer-Module/Object
+	- Bugfix: Open imediately FileChooser Dialog if the user after open clicks "okay" in the warn_unsaved dialog 
+	- Adjust automatically the version in the AboutDialog after updating Caecilia 
+	- Bugfix: Fix Scroll problems in Preview (Scrolling is now done via ScrolledWindow)
+	- Add STDERR output to the error dialog if errors occurs while rendering ABC
+0.08  
+	- Disable highlighting of bracket matches
+	- After clicking to a note in Preview, ensure that the cursor blinks
+	- Bugfix: Don't change the change status if the user selects Cancel in the warn_usaved_files dialog
+	- Add AboutDialog
+	- Adjust Font Size to 12 (better for the eyes ;-) )
+	- Add Error dialog if abcm2ps doesn't run successfully 
+	- Add menubar (inclusive toggle items for editor options)
+	- Add Settings dialog ( at the moment only path to abcm2ps can be set; but more will come)
+0.07  Mo Jun  19 23:53:00 2017
+	- Add basic syntax highlighting
+	- Center the Caecilia Logo and keep centered if window/canvas is resized
+0.06  Mo Jun  19 08:13:00 2017
+	- Add basic support of selecting notes by clicking on them
+	- Add GooCanvas2 to the PREREQ-Perl Modules
+	- Merge Bugfix https://github.com/MaxPerl/Caecilia/pull/1
+0.05  Fr Jun  16 22:39:00 2017
+	- Add Icon and show Logo in the Preview at the beginning
+	- Several Bugfixes regarding Preview: 
+		-> If a new file is saved, save the filename in $filename_ref, so that a later save call does not open save as dialog
+		-> Pass to Preview::render_preview() the right filename at next_page_cb/previous_page_cb
+	- Code cleaning in Caecilia.PM
+	- Bugfix in Caecilia.PM (ApplicationMenu->Quit does work now, too)
+0.04  Su  Jun  11 15:51:00 2017
+	- Improvements with Preview:
+		-> Scale/Zoom the Preview/preview.svg without loss of quality
+0.03  Su  Jun  11 12:43:00 2017
+	- Improvements with Preview:
+		-> Next/Previos page does count $self->page only, if next/previous page exists
+		-> Before creating a new preview the old preview files are deleted
+	- Minor Bugfix in Makefile.PL
+0.02  Sa  Jun  10 19:31:00 2017
+	- First released version of Caecilia - still much too do!
+0.01  Thu Jun  8 07:31:55 2017
+	- original version; created by h2xs 1.23 with options
+		-b 5.6.0 -XA -n App::PlAbcEdit

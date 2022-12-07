@@ -1,0 +1,35 @@
+# inlineheader
+preproc = '\[[a-vx-zA-VX-Z]:.*?\]'
+
+# header
+# pattern => "^[a-vx-zA-VX-Z]:.*"
+preproc start '[a-vx-zA-VX-Z]:'
+
+# Notes
+keyword = '\[*[_=^]*[abcdefgxzABCDEFGXZ][,\']*\]*[0-9\/]*'
+
+# Slurs
+symbol = '[\(\)\-]'
+
+# lyrics
+string start "w:"
+string start "W:"
+
+# keywords
+# pattern => '![\S]+?!'
+specialchar delim "!" "!"
+
+# remark
+preproc = '\[r:.*\]'
+
+# string
+# pattern => "\".*?\""
+string delim "\"" "\"" escape "\\"
+
+# layout
+function = '%%.+'
+
+# comment
+comment = '%.*'
+
+# bars (gray bold)
