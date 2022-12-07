@@ -102,7 +102,7 @@ sub _add_spin_with_check {
 		$spinner->disabled_set(1);
 	}
 	_expand_widget_x($spinner);
-	$spinner->show(); $table->pack($spinner,2,$opts{row},2,1);
+	$spinner->show(); $table->pack($spinner,2,$opts{row},1,1);
 	
 	$check->smart_callback_add("changed", \&toggle, $spinner);
 	

@@ -112,7 +112,6 @@ sub init_ui {
 	my $box = pEFL::Elm::Box->add($win);
 	$box->size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
 	$box->size_hint_align_set(EVAS_HINT_FILL,EVAS_HINT_FILL);
-	$win->resize_object_add($box);
 	$box->show();
 	
 	$self->add_toolbar($win,$box);
@@ -151,6 +150,7 @@ sub init_ui {
 		$self->tabs()->push_tab($tab);
 	}
 	
+	$win->resize_object_add($box);
 	$win->resize(900,600);
 	$win->show();
 
@@ -325,6 +325,10 @@ sub key_down {
 	elsif ($modifiers == 2 && $keyname eq "p") {
 		preview_cb($self);
 	}
+	elsif ($modifiers == 2 && $keyname eq "r") {
+		my $r = $self->renderer(); 
+		$r->show_dialog()
+	}
 	#elsif ($modifiers == 2 && $keyname eq "Up") {
 	#	$self->elm_toolbar->focus_set(1);
 	#	next_page_cb($self);
@@ -417,7 +421,6 @@ sub file_cb {
 	$fs->show();
 	
 	$vbox->pack_end($fs);
-	#$fs_win->resize_object_add($fs);
 	$fs_win->resize(600,400);
 	$fs_win->show();
 	
@@ -428,7 +431,9 @@ sub about {
 	my ($self) = @_;
 	
 	my $popup = pEFL::Elm::Popup->add($self->elm_mainwindow());
-	$popup->text_set("<b>Caecilia</b><br/><br/>A simple Editor for the ABC notation format written in Perl/pEFL");
+	
+	$popup->part_text_set("title,text","<b>Caecilia</b>");
+	$popup->text_set("A simple Editor for the ABC notation format written in Perl/pEFLimage");
 	
 	# popup buttons
 	my $btn = pEFL::Elm::Button->add($popup);
@@ -656,14 +661,14 @@ sub add_statusbar {
 	$hbox->padding_set(25,25);
 	$hbox->horizontal_set(1);
 	$hbox->size_hint_weight_set(EVAS_HINT_EXPAND,0);
-	$hbox->size_hint_align_set(EVAS_HINT_FILL,EVAS_HINT_FILL);
+	$hbox->size_hint_align_set(EVAS_HINT_FILL,0);
 	$vbox->pack_end($hbox);
 	$hbox->show();
 	
 	my $separator = pEFL::Elm::Separator->add($hbox);
 	$separator->horizontal_set(1);
 	$separator->size_hint_weight_set(EVAS_HINT_EXPAND,0);
-	$separator->size_hint_align_set(EVAS_HINT_FILL,EVAS_HINT_FILL);
+	$separator->size_hint_align_set(EVAS_HINT_FILL,0);
 	$hbox->pack_end($separator);
 	$separator->show();
 	

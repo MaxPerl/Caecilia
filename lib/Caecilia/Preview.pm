@@ -168,10 +168,9 @@ sub jump_to_note {
 	$cp2->pos_set($cp2->pos_get() + $end);
 	my $start = $cp1->pos_get();
 	my $e = $cp2->pos_get();
-	print "START $start END $e\n";
+	
 	$en->cursor_pos_set($start);
 	$en->select_region_set($start,$e);
-	#$en->cursor_pos_set($start);
 	
 	$cp1->free();
 	$cp2->free();
