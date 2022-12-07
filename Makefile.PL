@@ -22,6 +22,7 @@ WriteMakefile(
 							File::Basename => 0,
 							Image::Info => 0,
 							pEFL => 0,
+							Syntax::SourceHighlight => 0,
 							Cwd => 0,
 							IPC::Open3 => 0,
 							}, # e.g., Module::Name => 1.1

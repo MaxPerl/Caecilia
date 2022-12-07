@@ -16,5 +16,6 @@ sudo make install
 Therefore you need the following libraries and perl modules:
 
 * pEFL
+* Source::SyntaxHighlight
 * Image::Info
 * File::ShareDir

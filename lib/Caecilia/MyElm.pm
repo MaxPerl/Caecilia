@@ -143,64 +143,25 @@ sub _combobox_item_pressed_cb {
 1;
 
 __END__
-# Below is stub documentation for your module. You'd better edit it!
 
 =head1 NAME
 
-Tcl::Tk::ttk - A very tiny extension for Tcl::Tk to allow using the ttk styled widgets.
-
-=head1 SYNOPSIS
-
-  use Tcl::Tk;
-  use Tcl::Tk::ttk;
-  my $int = Tcl::Tk->new();
-  load_ttk_widgets($int);
-  my $mw = $int->mainwindow();
-  my $lab = $mw->ttkLabel(-text => "Hello World")->pack();
-  my $btn = $mw->ttkButton(-text => "test", -command => sub {
-      $lab->configure(-text => "[". $lab->cget('-text')."]");
-      })->pack;
-  $int->MainLoop();
+Caecilia::MyElm
 
 =head1 DESCRIPTION
 
-Tcl::Tk::ttk declares the ttkWidgets for Tcl::Tk and provides access to the most ttk::style methods.
-
-=head2 EXPORT
-
-The only function which is exported is load_ttk_widget(), which declares the ttk::* widgets.
-You have to pass the Tcl::Tk interpreter to the function and to call the function before the
-first use of a ttkWidget.
-
-The following widgets are declared:
-
-=over
-
-=item* 
-
-=back
-
-=head1 SEE ALSO
-
-Mention other useful documentation such as the documentation of
-related modules or operating system documentation (such as man pages
-in UNIX), or any relevant external documentation such as RFCs or
-standards.
-
-If you have a mailing list set up for your module, mention it here.
-
-If you have a web site set up for your module, mention it here.
+Some helpers / shortcuts for the pEFL UI parts of Caecilia.
 
 =head1 AUTHOR
 
-Maximilian Lika, E<lt>maximilian@(none)E<gt>
+Maximilian Lika, E<lt>maxperl@cpan.org<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2018 by Maximilian Lika
+Copyright (C) 2022 by Maximilian Lika
 
 This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.22.3 or,
+it under the same terms as Perl itself, either Perl version 5.32.1 or,
 at your option, any later version of Perl 5 you may have available.
 
 

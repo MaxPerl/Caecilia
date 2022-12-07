@@ -707,49 +707,30 @@ sub DESTROY {
 
 1;
 __END__
-# Below is stub documentation for your module. You'd better edit it!
 
 =head1 NAME
 
-Caecilia - Perl extension for blah blah blah
-
-=head1 SYNOPSIS
-
-  use Caecilia;
-  blah blah blah
+Caecilia
 
 =head1 DESCRIPTION
 
-Stub documentation for Caecilia, created by h2xs. It looks like the
-author of the extension was negligent enough to leave the stub
-unedited.
-
-Blah blah blah.
-
-=head2 EXPORT
-
-None by default.
-
-
+A simple Editor with Syntax Highlighting, a preview function and click-to-note feature for the ABC notation format (http://abcnotation.com/) written with perl/pEFL
 
 =head1 SEE ALSO
 
-Mention other useful documentation such as the documentation of
-related modules or operating system documentation (such as man pages
-in UNIX), or any relevant external documentation such as RFCs or
-standards.
+L<pEFL Perl module|pEFL>
 
-If you have a mailing list set up for your module, mention it here.
+L<ABC Notation website|http://abcnotation.com/>
 
-If you have a web site set up for your module, mention it here.
+L<ABC plus website|http://abcplus.sourceforge.net/>
 
 =head1 AUTHOR
 
-Maximilian, E<lt>maximilian@E<gt>
+Maximilian Lika, E<lt>perlmax@cpan.org<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2022 by Maximilian
+Copyright (C) 2022 by Maximilian Lika
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.32.1 or,
