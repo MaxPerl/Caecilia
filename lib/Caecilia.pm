@@ -433,7 +433,7 @@ sub about {
 	my $popup = pEFL::Elm::Popup->add($self->elm_mainwindow());
 	
 	$popup->part_text_set("title,text","<b>Caecilia</b>");
-	$popup->text_set("A simple Editor for the ABC notation format written in Perl/pEFLimage");
+	$popup->text_set("A simple Editor for the ABC notation format written in Perl/pEFL");
 	
 	# popup buttons
 	my $btn = pEFL::Elm::Button->add($popup);
