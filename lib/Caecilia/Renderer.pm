@@ -210,7 +210,7 @@ sub show_dialog {
 	foreach my $format (@outformats) {
 		$format_combo->item_append($itc,$format,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
-	$format_combo->smart_callback_add("item,pressed",\&_combobox_item_pressed_cb, undef);
+	$format_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
 	$format_combo->show(); $table->pack($format_combo,2,0,2,1);
 	
 	my ($pattern_check, $pattern_en) = _add_entry_with_check($table,

@@ -164,7 +164,7 @@ sub _settings_appearance_create {
 	foreach my $f (@mono) {
 		$font_combo->item_append($itc,$f,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
-	$font_combo->smart_callback_add("item,pressed",\&_combobox_item_pressed_cb, undef);
+	$font_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
 	$font_combo->show(); $table->pack($font_combo,0,1,2,1);
 	
 	my $tabs_label = pEFL::Elm::Label->new($table);
@@ -230,7 +230,7 @@ sub _settings_tabulator_create {
 	$itc->text_get(sub {return $_[0];});
 	$tabmode_combo->item_append($itc,"Add tabulators",undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	$tabmode_combo->item_append($itc,"Add whitespace",undef,ELM_GENLIST_ITEM_NONE,undef,undef);
-	$tabmode_combo->smart_callback_add("item,pressed",\&_combobox_item_pressed_cb, undef);
+	$tabmode_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
 	$tabmode_combo->show(); $table->pack($tabmode_combo,0,3,2,1);
 	
 	my $header2 = pEFL::Elm::Label->add($table);
@@ -369,7 +369,7 @@ sub _settings_abcm2ps_create {
 	foreach my $mode (@pagenumberingmodes) {
 		$pagenumbering_combo->item_append($itc,$mode,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
-	$pagenumbering_combo->smart_callback_add("item,pressed",\&_combobox_item_pressed_cb, undef);
+	$pagenumbering_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
 	$pagenumbering_combo->show(); $table->pack($pagenumbering_combo,0,21,4,1);
 	
 	
