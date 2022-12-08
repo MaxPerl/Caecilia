@@ -92,7 +92,7 @@ sub show_dialog {
 }
 
 sub _settings_category_cb {
-	my ($it) = @_;
+	my ($it,$obj) = @_;
 	$it->promote();
 }
 
