@@ -296,14 +296,8 @@ sub fill_undo_stack {
 			my $prev_content = $last_undo->{content} || "";
 			
 			my $new_pos = $change->{insert}->{pos};
-			#my $insert_content = $change->{insert}->{content};
-			
-			# Problem: In $change->{insert}->{plain_length} are \n = <br/>,
-			# Tabs = <tab/> and umlauts &ouml;. Therefore the length is longer than utf8
-			# with the following we correct plain length
-			my $new_plain_length;
 			my $insert_content_plain = $change->{insert}->{content};
-			$new_plain_length = $change->{insert}->{plain_length};
+			my $new_plain_length = $change->{insert}->{plain_length};
 			
 			# Special case: <tab/> was replaced by filter
 			# Undo record is already created 
@@ -313,15 +307,14 @@ sub fill_undo_stack {
 			# Make a new undo record, only if a new word starts, a tab is inserted or a newline
 			elsif ($prev_pos == ($new_pos - $prev_plain_length) && $insert_content_plain =~ m/\S/ && $insert_content_plain ne "\n" && $insert_content_plain ne "\t" ) {
 				pop @{$current_tab->undo_stack};
-				$new_undo->{pos} = $prev_pos;
-				
+				$new_undo->{pos} = $prev_pos;	
 				$new_undo->{plain_length} = $prev_plain_length + $new_plain_length;
 				$new_undo->{content} = $prev_content . $insert_content_plain;
 				push @{$current_tab->undo_stack}, $new_undo;
 			}
 			elsif (defined($insert_content_plain)) {
 				$new_undo->{pos} = $new_pos;
-				$new_undo->{content} = $insert_content_plain if (defined($insert_content_plain));
+				$new_undo->{content} = $insert_content_plain;
 				$new_undo->{plain_length} = $new_plain_length;
 				push @{$current_tab->undo_stack}, $new_undo;
 			}

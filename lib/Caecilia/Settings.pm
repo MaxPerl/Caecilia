@@ -59,6 +59,7 @@ sub show_dialog {
 	$tb->select_mode_set(ELM_OBJECT_SELECT_MODE_ALWAYS);
 	$tb->homogeneous_set(0);
 	$tb->horizontal_set(0);
+	$container->size_hint_max_set(100,400);
 	$tb->align_set(0.0);
 	$tb->size_hint_weight_set(0.0,EVAS_HINT_EXPAND);
 	$tb->size_hint_align_set(0.0,EVAS_HINT_FILL);
@@ -81,10 +82,10 @@ sub show_dialog {
 	my $tab_item = $tb->item_append("preferences-desktop-font","Appearance",\&_settings_category_cb, $settings_appearance_it);
 	my $tab_item2 = $tb->item_append("media-playback-start","abcm2ps Options",\&_settings_category_cb, $settings_abcm2ps_it);
 	my $tab_item3 = $tb->item_append("applications-development","Tabulator",\&_settings_category_cb, $settings_tabulator_it);
-	
+
 	$tab_item->selected_set(1);
 	
-	$settings_win->resize(500,400);
+	$settings_win->resize(600,400);
 	
 	$settings_win->show();
 	
@@ -92,8 +93,11 @@ sub show_dialog {
 }
 
 sub _settings_category_cb {
-	my ($it,$obj) = @_;
+	my ($it,$obj,$ev) = @_;
 	$it->promote();
+	
+	#my $tit = pEFL::ev_info2obj($ev,"ElmToolbarItemPtr");
+	#$tit->selected_set(1);
 }
 
 sub _add_buttons {
@@ -102,7 +106,7 @@ sub _add_buttons {
 	my $btn_bx = pEFL::Elm::Box->add($table);
 	_expand_widget_x($btn_bx);
 	$btn_bx->horizontal_set(1);
-	$btn_bx->show(); $table->pack($btn_bx,0,$row,2,1);
+	$btn_bx->show(); $table->pack_end($btn_bx);
 	
 	my $ok_btn = pEFL::Elm::Button->new($btn_bx);
 	$ok_btn->text_set("OK");
@@ -131,16 +135,16 @@ sub _settings_appearance_create {
 	_expand_widget($box);
 	$box->show();
 	
-	my $frame = pEFL::Elm::Frame->add($parent);
-	$frame->text_set("Appearance settings");
-	$frame->part_content_set("default",$box);
-	_expand_widget($frame);
-	$frame->show();
-	
 	my $table = pEFL::Elm::Table->add($parent);
 	_expand_widget($table);
 	$table->padding_set(10,10);
-	$table->show(); $box->pack_end($table);
+	$table->show();
+	
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("Appearance settings");
+	$frame->part_content_set("default",$table);
+	_expand_widget($frame);
+	$frame->show();
 	
 	my $font_combo = pEFL::Elm::Combobox->add($table);
 	_expand_widget_x($font_combo);
@@ -165,11 +169,11 @@ sub _settings_appearance_create {
 		$font_combo->item_append($itc,$f,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
 	$font_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
-	$font_combo->show(); $table->pack($font_combo,0,1,2,1);
+	$font_combo->show(); $table->pack($font_combo,0,1,4,1);
 	
 	my $tabs_label = pEFL::Elm::Label->new($table);
 	$tabs_label->text_set("Font size");
-	$tabs_label->show(); $table->pack($tabs_label,0,2,1,1);
+	$tabs_label->show(); $table->pack($tabs_label,0,2,2,1);
 	
 	my $font_size_spinner = pEFL::Elm::Slider->add($table);
 	$font_size_spinner->size_hint_align_set(EVAS_HINT_FILL,0.5);
@@ -179,15 +183,16 @@ sub _settings_appearance_create {
 	$font_size_spinner->min_max_set(6,24);
 	$font_size_spinner->step_set(1);
 	$font_size_spinner->value_set($config->{font_size} || 10.0);
-	$font_size_spinner->show(); $table->pack($font_size_spinner,1,2,1,1);
+	$font_size_spinner->show(); $table->pack($font_size_spinner,2,2,2,1);
 		
 	# Save important widgets
 	$self->elm_font_size_slider($font_size_spinner);
 	$self->elm_font_combo($font_combo);
 	
-	$self->_add_buttons($table,3);
+	$box->pack_end($frame);
+	$self->_add_buttons($box);
 	
-	return $frame;
+	return $box;
 }
 
 sub _settings_tabulator_create {
@@ -200,57 +205,57 @@ sub _settings_tabulator_create {
 	_expand_widget($box);
 	$box->show();
 	
-	my $frame = pEFL::Elm::Frame->add($parent);
-	$frame->text_set("Tabulator settings");
-	$frame->part_content_set("default",$box);
-	_expand_widget($frame);
-	$frame->show();
-	
 	my $table = pEFL::Elm::Table->add($parent);
 	_expand_widget($table);
 	$table->padding_set(10,10);
-	$table->show(); $box->pack_end($table);
+	$table->show();
+	
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("Tabulator settings");
+	$frame->part_content_set("default",$table);
+	_expand_widget($frame);
+	$frame->show();
 	
 	my $tabs_label = pEFL::Elm::Label->new($table);
 	$tabs_label->text_set("Tabstops");
-	$tabs_label->show(); $table->pack($tabs_label,0,2,1,1);
+	$tabs_label->show(); $table->pack($tabs_label,0,1,1,1);
 	
 	my $tabs_spinner = pEFL::Elm::Spinner->add($table);
 	$tabs_spinner->value_set($config->{tabstops} || 4);
 	_expand_widget_x($tabs_spinner);
-	$tabs_spinner->show(); $table->pack($tabs_spinner,1,2,1,1);
+	$tabs_spinner->show(); $table->pack($tabs_spinner,1,1,3,1);
 	
 	my $tabmode_combo = pEFL::Elm::Combobox->add($table);
 	_expand_widget_x($tabmode_combo);
 	my $tabmode = $config->{tabmode} || "Tabulator mode";
 	$tabmode_combo->text_set($tabmode);
-	# elm_object_part_content_set(hoversel, "icon", rect);
+	
 	my $itc = pEFL::Elm::GenlistItemClass->new();
 	$itc->item_style("default");
 	$itc->text_get(sub {return $_[0];});
 	$tabmode_combo->item_append($itc,"Add tabulators",undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	$tabmode_combo->item_append($itc,"Add whitespace",undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	$tabmode_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
-	$tabmode_combo->show(); $table->pack($tabmode_combo,0,3,2,1);
+	$tabmode_combo->show(); $table->pack($tabmode_combo,0,2,4,1);
 	
 	my $header2 = pEFL::Elm::Label->add($table);
 	$header2->text_set("<b>Customize when opening a file</b>");
 	$header2->size_hint_weight_set(EVAS_HINT_EXPAND,0);
 	$header2->size_hint_align_set(0,0);
 	#$header2->align_set(0.0);
-	$header2->show(); $table->pack($header2,0,4,2,1);
+	$header2->show(); $table->pack($header2,0,3,4,1);
 	
 	my $unexpand_check = pEFL::Elm::Check->add($table);
 	_expand_widget_x($unexpand_check);
 	$unexpand_check->text_set("Unexpand white space to tabs");
 	$unexpand_check->state_set(1) if ($config->{unexpand_tabs});
-	$unexpand_check->show(); $table->pack($unexpand_check,0,5,2,1);
+	$unexpand_check->show(); $table->pack($unexpand_check,0,4,4,1);
 	
 	my $expand_check = pEFL::Elm::Check->add($table);
 	_expand_widget_x($expand_check);
 	$expand_check->text_set("Expand tabs to white space");
 	$expand_check->state_set(1) if ($config->{expand_tabs});
-	$expand_check->show(); $table->pack($expand_check,0,6,2,1);
+	$expand_check->show(); $table->pack($expand_check,0,5,4,1);
 	
 	# Save important widgets
 	$self->elm_tabs_spinner($tabs_spinner);
@@ -258,9 +263,10 @@ sub _settings_tabulator_create {
 	$self->elm_unexpand_check($unexpand_check);
 	$self->elm_expand_check($expand_check);
 	
-	$self->_add_buttons($table,7);
+	$box->pack_end($frame);
+	$self->_add_buttons($box);
 	
-	return $frame;
+	return $box;
 }
 
 sub _settings_abcm2ps_create {
@@ -268,25 +274,27 @@ sub _settings_abcm2ps_create {
 	
 	my $config = $self->load_config();
 	
-	my $scroller = pEFL::Elm::Scroller->add($parent);
+	my $container = pEFL::Elm::Box->add($parent);
+	_expand_widget($container);
+	$container->padding_set(10,10);
+	$container->horizontal_set(0);
+	$container->show();
 	
-	my $box = pEFL::Elm::Box->add($parent);
-	$box->horizontal_set(0);
-	_expand_widget($box);
-	$box->show();
+	my $scroller = pEFL::Elm::Scroller->add($container);
+	$scroller->policy_set(ELM_SCROLLER_POLICY_OFF, ELM_SCROLLER_POLICY_ON);
+	$scroller->region_show(0,0,0,0);
+	_expand_widget($scroller); 
 	
-	my $frame = pEFL::Elm::Frame->add($parent);
+	my $frame = pEFL::Elm::Frame->add($scroller);
 	$frame->text_set("abcm2ps settings");
-	#$frame->part_content_set("default",$box);
-	$frame->part_content_set("default",$scroller);
 	_expand_widget($frame);
 	$frame->show();
 	
-	
-	my $table = pEFL::Elm::Table->add($parent);
+	my $table = pEFL::Elm::Table->add($frame);
 	_expand_widget($table);
 	$table->padding_set(10,10);
-	$table->show(); $box->pack_end($table);
+	$table->show();
+	$frame->part_content_set("default",$table);
 	
 	_add_header($table,0,"Path to abcm2ps");
 	
@@ -413,12 +421,16 @@ sub _settings_abcm2ps_create {
 	$self->elm_numbernbarsboxed_check($numbernbarsboxed_check);
 	$self->elm_flatbeams_check($flatbeams_check);
 	
-	$self->_add_buttons($table,27);
+	#$container->pack_end($frame);
+	$container->pack_end($scroller);
 	
-	$scroller->content_set($box);
+	$scroller->content_set($frame);
 	$scroller->show();
 	
-	return $frame;
+	$self->_add_buttons($container);
+	
+	return $container;
+	#return $frame;
 }
 
 sub save_settings {

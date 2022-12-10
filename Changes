@@ -1,5 +1,7 @@
 Revision history for Perl extension Caecilia.
 
+0.21
+	- Fix undo/redo issues
 0.20 Wed Dec 07 07:00:00
 	- complete rewrite wit pEFL (Einlightenment foundation library)
 0.19 Sun Jun 28 00:43:00

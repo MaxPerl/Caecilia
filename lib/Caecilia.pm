@@ -52,7 +52,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 our $SELF;
 
@@ -355,6 +355,7 @@ sub key_down {
 	elsif ($modifiers == 2 && $keyname eq "y") {
 		Caecilia::Entry::redo($self->entry);
 	}
+	pEFL::Ecore::Event::type_flush_internal(ECORE_EVENT_KEY_DOWN, ECORE_EVENT_NONE);
 	
 	return ECORE_CALLBACK_DONE;
 } 
