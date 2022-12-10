@@ -48,29 +48,27 @@ sub show_dialog {
 	
 	my $bg = pEFL::Elm::Bg->add($settings_win);
 	_expand_widget($bg);
-	$bg->show(); $settings_win->resize_object_add($bg);
+	$settings_win->resize_object_add($bg); $bg->show();
 	
 	my $container = pEFL::Elm::Table->add($settings_win);
 	_expand_widget($container);
-	$container->show(); $settings_win->resize_object_add($container);
+	$settings_win->resize_object_add($container); $container->show();
 	
 	my $tb = pEFL::Elm::Toolbar->add($container);
+	$tb->homogeneous_set(0);
 	$tb->shrink_mode_set(ELM_TOOLBAR_SHRINK_SCROLL);
 	$tb->select_mode_set(ELM_OBJECT_SELECT_MODE_ALWAYS);
-	$tb->homogeneous_set(0);
-	$tb->horizontal_set(0);
-	$container->size_hint_max_set(100,400);
 	$tb->align_set(0.0);
+	$tb->horizontal_set(0);
 	$tb->size_hint_weight_set(0.0,EVAS_HINT_EXPAND);
 	$tb->size_hint_align_set(0.0,EVAS_HINT_FILL);
-	$tb->show(); $container->pack($tb,0,0,1,5);
+	$container->pack($tb,0,0,1,5); $tb->show();
 
 	$self->elm_toolbar($tb);
 
 	my $naviframe = pEFL::Elm::Naviframe->add($settings_win);
 	_expand_widget($naviframe);
-	$naviframe->show();
-	$container->pack($naviframe,1,0,4,5);
+	$container->pack($naviframe,1,0,4,5); $naviframe->show();
 	
 	my $settings_appearance_it = $naviframe->item_push("",undef,undef,$self->_settings_appearance_create($naviframe),undef);
 	$settings_appearance_it->title_enabled_set(0,0);
@@ -85,6 +83,7 @@ sub show_dialog {
 
 	$tab_item->selected_set(1);
 	
+	$naviframe->show();
 	$settings_win->resize(600,400);
 	
 	$settings_win->show();
