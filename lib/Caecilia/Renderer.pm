@@ -148,7 +148,18 @@ sub render {
 	if ($?) {
 		# TODO:
 		# if generating preview doesn't work, show an error dialog
-		warn "Error occured while running abcm2ps: $error_message\n";
+		my $popup = pEFL::Elm::Popup->add($app->elm_mainwindow());
+		$popup->part_text_set("default", "Error occured while running abcm2ps:<br/><br/>$error_message");
+		
+		my $btn = pEFL::Elm::Button->add($popup);
+		$btn->text_set("Close");
+		$popup->part_content_set("button1",$btn);
+		$btn->smart_callback_add("clicked",sub {$_[0]->del},$popup);
+	
+		# popup show should be called after adding all the contents and the buttons
+		# of popup to set the focus into popup's contents correctly.
+		$popup->show();
+		
 	}
 }
 
@@ -190,7 +201,7 @@ sub show_dialog {
 	$out_label->show(); $table->pack($out_label, 0,0,1,1);
 	
 	my $out_en = pEFL::Elm::Entry->new($table);
-	my $filename = $app->current_tab->filename || "";
+	my $filename = $app->current_tune->filename || "";
 	$filename =~ s/\..*$//;
 	$out_en->entry_set($filename);
 	$out_en->scrollable_set(1);

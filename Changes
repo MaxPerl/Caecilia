@@ -2,6 +2,9 @@ Revision history for Perl extension Caecilia.
 
 0.21
 	- Fix undo/redo issues
+	- Code cleanup
+	- fix rounding with font size slider
+	- show popup when an error occured by rendering
 0.20 Wed Dec 07 07:00:00
 	- complete rewrite wit pEFL (Einlightenment foundation library)
 0.19 Sun Jun 28 00:43:00
@@ -77,5 +80,4 @@ Revision history for Perl extension Caecilia.
 0.02  Sa  Jun  10 19:31:00 2017
 	- First released version of Caecilia - still much too do!
 0.01  Thu Jun  8 07:31:55 2017
-	- original version; created by h2xs 1.23 with options
-		-b 5.6.0 -XA -n App::PlAbcEdit
+	- original version; created by h2xs 1.23

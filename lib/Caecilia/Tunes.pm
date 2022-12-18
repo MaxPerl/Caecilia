@@ -1,4 +1,4 @@
-package Caecilia::Tabs;
+package Caecilia::Tunes;
 
 use 5.006001;
 use strict;
@@ -42,41 +42,41 @@ sub new {
 	
 	my $obj = {
 		app => $app,
-		tabs => [],
+		tunes => [],
 		elm_tabsbar => undef,
 		
 		};
 	bless($obj,$class);
-	$obj->init_tabsbar($app,$box);
+	$obj->init_tunesbar($app,$box);
 	return $obj;
 }
 
-sub init_tabsbar {
+sub init_tunesbar {
 	my ($self, $app, $box) = @_;
 	
-	my $tabsbar = pEFL::Elm::Toolbar->add($box);
-	$tabsbar->homogeneous_set(0);
-	$tabsbar->align_set(0);
-	$tabsbar->size_hint_align_set(EVAS_HINT_FILL, 0);
-	$tabsbar->size_hint_weight_set(EVAS_HINT_EXPAND, 0);
-	$tabsbar->shrink_mode_set(ELM_TOOLBAR_SHRINK_SCROLL);
-	$tabsbar->transverse_expanded_set(1);
-	$box->pack_end($tabsbar);
+	my $tunesbar = pEFL::Elm::Toolbar->add($box);
+	$tunesbar->homogeneous_set(0);
+	$tunesbar->align_set(0);
+	$tunesbar->size_hint_align_set(EVAS_HINT_FILL, 0);
+	$tunesbar->size_hint_weight_set(EVAS_HINT_EXPAND, 0);
+	$tunesbar->shrink_mode_set(ELM_TOOLBAR_SHRINK_SCROLL);
+	$tunesbar->transverse_expanded_set(1);
+	$box->pack_end($tunesbar);
 	
-	$self->elm_tabsbar($tabsbar);
+	$self->elm_tabsbar($tunesbar);
 	
 	# This is very tricky
-	# _close_tab_cb only works if the right tab is selected
+	# _close_tune_cb only works if the right tune is selected
 	# the easiest solution would be to make an own menu for each toolbar item
 	# unfortunately this does not work (because items can not have own evas (smart) events
 	# therefore the solution here is only to show the menu when a left click occurs at the
-	# selected tab item (see show_tab_menu)
-	my $menu = pEFL::Elm::Menu->add($tabsbar);
-	$menu->item_add(undef,undef,"Close tab",\&_close_tab_cb,$self);
-	$tabsbar->event_callback_add(EVAS_CALLBACK_MOUSE_DOWN,\&show_tab_menu,$menu);
-	$tabsbar->smart_callback_add("selected",\&_no_change_tab,$self);
+	# selected tune item (see show_tab_menu)
+	my $menu = pEFL::Elm::Menu->add($tunesbar);
+	$menu->item_add(undef,undef,"Close tune",\&_close_tune_cb,$self);
+	$tunesbar->event_callback_add(EVAS_CALLBACK_MOUSE_DOWN,\&show_tab_menu,$menu);
+	$tunesbar->smart_callback_add("selected",\&_no_change_tab,$self);
 
-	$tabsbar->show();
+	$tunesbar->show();
 }
 
 sub _no_change_tab {
@@ -87,20 +87,20 @@ sub _no_change_tab {
 	}
 } 
 
-sub _close_tab_cb {
+sub _close_tune_cb {
 	my ($self) = @_;
 	
-	my @tabs = @{$self->tabs}; 
-	my $current_tab = $self->app->current_tab();
+	my @tunes = @{$self->tunes}; 
+	my $current_tune = $self->app->current_tune();
 	
-	if ($current_tab->changed() > 0) {
+	if ($current_tune->changed() > 0) {
 		my $popup = pEFL::Elm::Popup->add($self->app->elm_mainwindow());
 		
-		$popup->part_text_set("default","Warning: Tab contains unsaved content. Close anyway?");
+		$popup->part_text_set("default","Warning: Tune contains unsaved content. Close anyway?");
 		
 		my $btn1 = pEFL::Elm::Button->add($popup);
 		$btn1->text_set("Okay");
-		$btn1->smart_callback_add("clicked" => sub {$current_tab->changed(0); $popup->del(); $self->_close_tab_cb});
+		$btn1->smart_callback_add("clicked" => sub {$current_tune->changed(0); $popup->del(); $self->_close_tune_cb});
 		
 		my $btn2 = pEFL::Elm::Button->add($popup);
 		$btn2->text_set("Cancel");
@@ -112,64 +112,64 @@ sub _close_tab_cb {
 		$popup->show();
 	}
 	else {
-		my $tab_id = $current_tab->id();
-		$self->clear_tabs();
-		splice @tabs,$tab_id,1;
-		$self->refresh_tabs(@tabs);
+		my $tune_id = $current_tune->id();
+		$self->clear_tunes();
+		splice @tunes,$tune_id,1;
+		$self->refresh_tunes(@tunes);
 	}
 	
-	if ($#tabs < 0 ) {
+	if ($#tunes < 0 ) {
 		pEFL::Elm::exit();
 	}
 }
 
-sub _new_tab_cb {
+sub _new_tune_cb {
 	my ($self) = @_;
-	my @tabs = @{$self->tabs};
-	my $tab_id = $#tabs+1;
-	my $tab = Caecilia::Tab->new(id => $tab_id);
-	$self->push_tab($tab);
+	my @tunes = @{$self->tunes};
+	my $tune_id = $#tunes+1;
+	my $tune = Caecilia::Tune->new(id => $tune_id);
+	$self->push_tune($tune);
 }
 
-sub clear_tabs {
+sub clear_tunes {
 	my ($self) = @_;
 	
-	foreach my $tab (@{$self->tabs}) {
-		$tab->elm_toolbar_item->del();
-		$tab->elm_toolbar_item(undef);
+	foreach my $tune (@{$self->tunes}) {
+		$tune->elm_toolbar_item->del();
+		$tune->elm_toolbar_item(undef);
 	}
 	
-	$self->tabs([]);
+	$self->tunes([]);
 }
 
-sub refresh_tabs {
-	my ($self,@tabs) = @_;
+sub refresh_tunes {
+	my ($self,@tunes) = @_;
 	
 	my $id = 0;
-	foreach my $tab (@tabs) {
-		$self->push_tab($tab);
-		$tab->id($id);
+	foreach my $tune (@tunes) {
+		$self->push_tune($tune);
+		$tune->id($id);
 		$id++;
 	}
 }
 
-sub push_tab {
-	my ($self, $tab) = @_;
+sub push_tune {
+	my ($self, $tune) = @_;
 	
-	push @{$self->tabs}, $tab;
-	my @tabs = @{$self->tabs};
+	push @{$self->tunes}, $tune;
+	my @tunes = @{$self->tunes};
 	
-	my $tabsbar = $self->elm_tabsbar();
-	my $filename = $tab->filename() || "Untitled";
+	my $tunesbar = $self->elm_tabsbar();
+	my $filename = $tune->filename() || "Untitled";
 	
 	my ($name,$dirs,$suffix) = fileparse($filename);
-	$name = "$name*" if ($tab->changed()>0);
+	$name = "$name*" if ($tune->changed()>0);
 	 
-	my $id = $#tabs;
+	my $id = $#tunes;
 	
-	my $tab_item = $tabsbar->item_append(undef,$name, \&change_tab, [$self, $id]);
+	my $tab_item = $tunesbar->item_append(undef,$name, \&change_tab, [$self, $id]);
 	
-	$tab->elm_toolbar_item($tab_item);
+	$tune->elm_toolbar_item($tab_item);
 	
 	# Select the new item and deselect the actual selected item
 	$tab_item->selected_set(1);
@@ -200,24 +200,24 @@ sub change_tab {
 	my $self = $data->[0];
 	my $id = $data->[1]; 
 	
-	my $tabs = $self->tabs();
+	my $tunes = $self->tunes();
 	my $entry = $self->app->entry;
 	
 	
 	my $en=$entry->elm_entry;
-	if ( ref($self->app->current_tab) eq "Caecilia::Tab") {
-		 my $current = $self->app->current_tab;
+	if ( ref($self->app->current_tune) eq "Caecilia::Tune") {
+		 my $current = $self->app->current_tune;
 		 $current->content($en->entry_get);
 		 $current->cursor_pos($en->cursor_pos_get());
 	}
 	else {
-		warn "Warn: This is very curious :-S There is no current tab???\n";
+		warn "Warn: This is very curious :-S There is no current tune???\n";
 	}
-	my $tab = $tabs->[$id];
-	$self->app->current_tab($tab);
+	my $tune = $tunes->[$id];
+	$self->app->current_tune($tune);
 		
 	$entry->is_change_tab("yes");
-	$en->entry_set($tab->content);
+	$en->entry_set($tune->content);
 	$en->focus_set(1);
 		
 }
@@ -231,7 +231,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|tabs|elm_tabsbar/;
+		unless $AUTOLOAD =~m/app|tunes|elm_tabsbar/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;
@@ -253,11 +253,11 @@ __END__
 
 =head1 NAME
 
-Caecilia::Tabs
+Caecilia::Tunes
 
 =head1 DESCRIPTION
 
-This is the Tabs component (e.g. the tabsbar where you can select the opened tunes) of the Caecilia Appliation.
+This is the Tunes component (e.g. the tunesbar where you can select the opened tunes) of the Caecilia Appliation.
 
 =head1 AUTHOR
 

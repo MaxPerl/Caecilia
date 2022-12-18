@@ -4,12 +4,12 @@ context gray; // the color for context lines (when specified with line ranges)
 keyword blue ; // for language keywords
 type green ; // for basic types
 usertype teal ; // for user defined types
-string gray f ; // for strings and chars
+string i ; // for strings and chars
 regexp orange f ; // for strings and chars
 specialchar purple b ; // for special chars, e.g., \n, \t, \\
 comment pink i, noref; // for comments
 number yellow ;	// for literal numbers
-preproc gray b; // for preproc directives (e.g. #include, import)
+preproc b; // for preproc directives (e.g. #include, import)
 symbol blue b ; // for simbols (e.g. <, >, +)
 function pink; // for function calls and declarations
 cbracket gray b; // for block brackets (e.g. {, })

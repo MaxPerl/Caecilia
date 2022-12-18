@@ -170,6 +170,9 @@ sub _settings_appearance_create {
 	$font_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
 	$font_combo->show(); $table->pack($font_combo,0,1,4,1);
 	
+	$font_combo->realized_items_update();
+	$itc->free();
+	
 	my $tabs_label = pEFL::Elm::Label->new($table);
 	$tabs_label->text_set("Font size");
 	$tabs_label->show(); $table->pack($tabs_label,0,2,2,1);
@@ -236,6 +239,9 @@ sub _settings_tabulator_create {
 	$tabmode_combo->item_append($itc,"Add whitespace",undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	$tabmode_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
 	$tabmode_combo->show(); $table->pack($tabmode_combo,0,2,4,1);
+	
+	$tabmode_combo->realized_items_update();
+	$itc->free();
 	
 	my $header2 = pEFL::Elm::Label->add($table);
 	$header2->text_set("<b>Customize when opening a file</b>");
@@ -379,6 +385,8 @@ sub _settings_abcm2ps_create {
 	$pagenumbering_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
 	$pagenumbering_combo->show(); $table->pack($pagenumbering_combo,0,21,4,1);
 	
+	$pagenumbering_combo->realized_items_update();
+	$itc->free();
 	
 	my $onetuneperpage_check = _add_checkoption($table,
 		value => $config->{abcm2ps_onetuneperpage}, label => "Write one tune per page", row => 22);
@@ -466,7 +474,7 @@ sub save_settings {
 	$font =~ s/ //g;
 	$config->{font} = $font;
 	
-	$config->{font_size} = int($font_size_slider->value_get());
+	$config->{font_size} = sprintf("%1.0f", $font_size_slider->value_get());
 	
 	my $entry = $self->app->entry();
 	my $en = $entry->elm_entry();

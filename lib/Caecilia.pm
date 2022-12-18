@@ -19,8 +19,8 @@ use File::HomeDir;
 use File::Basename;
 use Cwd qw(abs_path getcwd);
 
-use Caecilia::Tab;
-use Caecilia::Tabs;
+use Caecilia::Tune;
+use Caecilia::Tunes;
 use Caecilia::Entry;
 use Caecilia::Search;
 use Caecilia::Settings;
@@ -61,10 +61,10 @@ sub new {
 	our $share = dist_dir('Caecilia');
 	
 	my $obj = {
-		tabs => undef,
+		tunes => undef,
 		entry => undef,
 		preview => undef,
-		current_tab => 0,
+		current_tune => 0,
 		settings => undef,
 		share_dir => $share,
 		tmpdir => File::Temp->newdir(),
@@ -116,8 +116,8 @@ sub init_ui {
 	
 	$self->add_toolbar($win,$box);
 	
-	my $tabs = Caecilia::Tabs->new($self,$box);
-	$self->tabs($tabs);
+	my $tunes = Caecilia::Tunes->new($self,$box);
+	$self->tunes($tunes);
 	
 	my $panes = pEFL::Elm::Panes->add($box);
 	$panes->size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
@@ -145,9 +145,9 @@ sub init_ui {
 		}
 	}
 	else {
-		my $tab = Caecilia::Tab->new(filename => "", id => 0);
-		$self->current_tab($tab);
-		$self->tabs()->push_tab($tab);
+		my $tune = Caecilia::Tune->new(filename => "", id => 0);
+		$self->current_tune($tune);
+		$self->tunes()->push_tune($tune);
 	}
 	
 	$win->resize_object_add($box);
@@ -176,12 +176,12 @@ sub add_menu {
 	
 	my $file_it = $menu->item_add(undef,undef,"File",undef, undef);
 	
-	$menu->item_add($file_it,"document-new","New",sub {$self->tabs->_new_tab_cb},undef);
+	$menu->item_add($file_it,"document-new","New",sub {$self->tunes->_new_tune_cb},undef);
 	$menu->item_add($file_it,"document-open","Open",\&_open_cb,$self);
 	$menu->item_add($file_it,"document-save","Save",\&save,$self);
 	$menu->item_add($file_it,"document-save-as","Save as",\&save_as,$self);
 	$menu->item_add($file_it,"document-export","Export",sub {my $r = $self->renderer(); $r->show_dialog()},undef);
-	$menu->item_add($file_it,"document-close","Close",\&_close_tab_cb,$self->tabs());
+	$menu->item_add($file_it,"document-close","Close",\&_close_tune_cb,$self->tunes());
 	$menu->item_add($file_it,"window-close","Exit",\&on_exit,$self);
 	
 	
@@ -246,7 +246,7 @@ sub add_toolbar {
 	$tabsbar->icon_size_set(14);
 	$f->content_set($tabsbar);
 	
-	$tabsbar->item_append("document-new","New",sub {$self->tabs->_new_tab_cb},undef);
+	$tabsbar->item_append("document-new","New",sub {$self->tunes->_new_tune_cb},undef);
 	$tabsbar->item_append("document-open","Open",\&_open_cb,$self);
 	$tabsbar->item_append("document-save","Save",\&save,$self);
 	$tabsbar->item_append("document-save-as","Save as",\&save_as,$self);
@@ -317,7 +317,7 @@ sub key_down {
 	my $modifiers = $e->modifiers();
 	
 	if ($modifiers == 2 && $keyname eq "n") {
-		$self->tabs->_new_tab_cb();
+		$self->tunes->_new_tune_cb();
 	}
 	elsif ($modifiers == 2 && $keyname eq "o") {
 		_open_cb($self);
@@ -344,7 +344,7 @@ sub key_down {
 		save_as($self);
 	}
 	elsif ($modifiers == 2 && $keyname eq "w") {
-		_close_tab_cb($self->tabs);
+		_close_tune_cb($self->tunes);
 	}
 	elsif ($modifiers == 2 && $keyname eq "q") {
 		on_exit($self);
@@ -363,7 +363,7 @@ sub key_down {
 sub on_exit {
 	my ($self) = @_;
 	
-	my @unsaved = grep $_->changed() > 0, @{$self->tabs->tabs()};
+	my @unsaved = grep $_->changed() > 0, @{$self->tunes->tunes()};
 	
 	if (@unsaved) {
 		my $popup = pEFL::Elm::Popup->add($self->elm_mainwindow());
@@ -404,9 +404,9 @@ sub file_cb {
 	my $fs = pEFL::Elm::Fileselector->add($fs_win);
 	
 	my $path; my $filename;
-	if ($self->current_tab->filename) { 
-		(undef, $path, undef) = fileparse( $self->current_tab->filename );
-		$filename = $self->current_tab->filename;
+	if ($self->current_tune->filename) { 
+		(undef, $path, undef) = fileparse( $self->current_tune->filename );
+		$filename = $self->current_tune->filename;
 	}
 	else { 
 		$path = getcwd || File::HomeDir->my_home;
@@ -472,10 +472,10 @@ sub save_as {
 sub save {
 	my ($self) = @_;
 	
-	my $current_tab = $self->current_tab();
-	my $elm_it = $current_tab->elm_toolbar_item();
+	my $current_tune = $self->current_tune();
+	my $elm_it = $current_tune->elm_toolbar_item();
 	my $en = $self->entry->elm_entry();
-	my $filename = $current_tab->filename || "";
+	my $filename = $current_tune->filename || "";
 	
 	if ($filename) {
 		# get the content of the buffer, without hidden characters
@@ -494,7 +494,7 @@ sub save {
 		print $fh "$content";
 		close $fh;
 		
-		$current_tab->changed(0);
+		$current_tune->changed(0);
 		my ($name,$dirs,$suffix) = fileparse($filename); 
 		$elm_it->part_text_set("default",$name);
 	}
@@ -520,8 +520,8 @@ sub _fs_save_done {
 	
 	return unless($selected);
 	
-	my $current_tab = $self->current_tab();
-	$current_tab->filename($selected);
+	my $current_tune = $self->current_tune();
+	$current_tune->filename($selected);
 	
 	$self->save();
 }
@@ -557,20 +557,20 @@ sub open_file {
 		# Change the filename variable and/or open a new tab
 		my ($name,$dirs,$suffix) = fileparse($selected); 
 		
-		my $tab = $self->current_tab();
+		my $tune = $self->current_tune();
 		
-		if ( (scalar(@{$self->tabs->tabs}) == 1) && (!$tab->filename) && ($tab->id == 0) && ($tab->changed() == 0)) { 
-			$tab->filename($selected);
+		if ( (scalar(@{$self->tunes->tunes}) == 1) && (!$tune->filename) && ($tune->id == 0) && ($tune->changed() == 0)) { 
+			$tune->filename($selected);
 		}
 		else {
-			if ($tab) {
-				$tab->content($en->entry_get);
-				$tab->cursor_pos($en->cursor_pos_get());
+			if ($tune) {
+				$tune->content($en->entry_get);
+				$tune->cursor_pos($en->cursor_pos_get());
 			}
 			
-			my $new_tab = Caecilia::Tab->new(filename => $selected, id => scalar( @{$self->tabs->tabs} ) );
-			$self->current_tab($new_tab);
-			$self->tabs()->push_tab($new_tab);
+			my $new_tune = Caecilia::Tune->new(filename => $selected, id => scalar( @{$self->tunes->tunes} ) );
+			$self->current_tune($new_tune);
+			$self->tunes()->push_tune($new_tune);
 		}
 	
 		# change content of the entry
@@ -587,8 +587,8 @@ sub open_file {
 		$self->entry->rehighlight_all();
 		
 		# Workaround: Through inserting changed event is triggered
-		$self->current_tab->changed(0);
-		$self->current_tab->elm_toolbar_item->text_set($name);
+		$self->current_tune->changed(0);
+		$self->current_tune->elm_toolbar_item->text_set($name);
 		
 		$en->cursor_pos_set(0);
 	}
@@ -635,16 +635,16 @@ sub toggle_src_highlight {
 	my ($self, $obj, $ev) = @_;
 	my $check = $self->elm_src_highlight_check();
 	
-	my $current_tab = $self->current_tab();
+	my $current_tune = $self->current_tune();
 	
-	if ($current_tab->source_highlight() eq "yes") {
-		$current_tab->source_highlight("no");
+	if ($current_tune->source_highlight() eq "yes") {
+		$current_tune->source_highlight("no");
 		$self->entry->clear_highlight();
 		
 		$check->state_set(0);
 	}
 	else {
-		$current_tab->source_highlight("yes");
+		$current_tune->source_highlight("yes");
 		$self->entry->rehighlight_all();
 		
 		$check->state_set(1);
@@ -693,7 +693,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~ m/tabs|entry|settings|renderer|share_dir|tmpdir|current_tab|preview|elm_mainwindow|elm_menu|elm_toolbar|elm_src_highlight_check|elm_linewrap_check|elm_linecolumn_label/;
+		unless $AUTOLOAD =~ m/tunes|entry|settings|renderer|share_dir|tmpdir|current_tune|preview|elm_mainwindow|elm_menu|elm_toolbar|elm_src_highlight_check|elm_linewrap_check|elm_linecolumn_label/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

@@ -1,4 +1,4 @@
-package Caecilia::Tab;
+package Caecilia::Tune;
 
 use 5.006001;
 use strict;
@@ -81,11 +81,11 @@ __END__
 
 =head1 NAME
 
-Caecilia::Tab
+Caecilia::Tune
 
 =head1 DESCRIPTION
 
-This saves information of a single tab (e.g. a single tune).
+This saves information of a single tune (e.g. a single tune).
 
 =head1 AUTHOR
 

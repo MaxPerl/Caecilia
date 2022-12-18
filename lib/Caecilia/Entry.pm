@@ -192,14 +192,14 @@ sub changed {
 	
 	
 	########################
-	# Change Tab name, if changed status has changed
+	# Change Tune name, if changed status has changed
 	########################
-	my $current_tab = $self->app->current_tab();
-	$current_tab->changed($current_tab->changed()+1) if ($self->is_undo() eq "no" && $self->is_rehighlight() eq "no");
-	my $elm_it = $current_tab->elm_toolbar_item; 
+	my $current_tune = $self->app->current_tune();
+	$current_tune->changed($current_tune->changed()+1) if ($self->is_undo() eq "no" && $self->is_rehighlight() eq "no");
+	my $elm_it = $current_tune->elm_toolbar_item; 
 	my $title = $elm_it->text_get();
-	$elm_it->text_set("$title*") if ($current_tab->changed() && $title !~/\*$/);
-	$elm_it->text_set("$title") if ($current_tab->changed() == 0 && $title =~/\*$/);
+	$elm_it->text_set("$title*") if ($current_tune->changed() && $title !~/\*$/);
+	$elm_it->text_set("$title") if ($current_tune->changed() == 0 && $title =~/\*$/);
 	
 	########################
 	# Fill undo stack
@@ -217,7 +217,7 @@ sub changed {
 	
 	my $text = $self->get_rehighlight_lines($cp1,$cp2, $new_undo);
 	
-	if ( $current_tab->source_highlight() eq "yes" ) {
+	if ( $current_tune->source_highlight() eq "yes" ) {
 		$text = $self->highlight_str($text);
 	}
 	
@@ -253,7 +253,7 @@ sub text_set_done {
 	my ($self, $entry) = @_;
 	
 	if ($self->is_change_tab() eq "yes") {
-		my $pos = $self->app->current_tab->cursor_pos;
+		my $pos = $self->app->current_tune->cursor_pos;
 		$entry->cursor_pos_set($pos);
 		$self->is_change_tab("no");
 	}
@@ -266,11 +266,11 @@ sub text_set_done {
 sub fill_undo_stack {
 	my ($self, $change_info, $change) = @_;
 	
-	my $current_tab = $self->app->current_tab();
+	my $current_tune = $self->app->current_tune();
 
 	#use Data::Dumper;
 	#print "CHANGE " . Dumper($change) . "\n";
-	my @undo_stack = @{$current_tab->undo_stack};
+	my @undo_stack = @{$current_tune->undo_stack};
 	my $last_undo = $undo_stack[$#undo_stack];
 	my $new_undo;
 	
@@ -287,7 +287,7 @@ sub fill_undo_stack {
 		# print "rehighlight found $insert_content\n";
 	}
 	else {
-		undef @{$current_tab->redo_stack};
+		undef @{$current_tune->redo_stack};
 		
 		if ($change_info->insert) {
 			
@@ -306,17 +306,17 @@ sub fill_undo_stack {
 			}
 			# Make a new undo record, only if a new word starts, a tab is inserted or a newline
 			elsif ($prev_pos == ($new_pos - $prev_plain_length) && $insert_content_plain =~ m/\S/ && $insert_content_plain ne "\n" && $insert_content_plain ne "\t" ) {
-				pop @{$current_tab->undo_stack};
+				pop @{$current_tune->undo_stack};
 				$new_undo->{pos} = $prev_pos;	
 				$new_undo->{plain_length} = $prev_plain_length + $new_plain_length;
 				$new_undo->{content} = $prev_content . $insert_content_plain;
-				push @{$current_tab->undo_stack}, $new_undo;
+				push @{$current_tune->undo_stack}, $new_undo;
 			}
 			elsif (defined($insert_content_plain)) {
 				$new_undo->{pos} = $new_pos;
 				$new_undo->{content} = $insert_content_plain;
 				$new_undo->{plain_length} = $new_plain_length;
-				push @{$current_tab->undo_stack}, $new_undo;
+				push @{$current_tune->undo_stack}, $new_undo;
 			}
 				
 		}
@@ -341,21 +341,21 @@ sub fill_undo_stack {
 			
 			# BackSlash key is pressed
 			if ($last_undo->{del} && $prev_start == ($start +1) ) {
-				pop @{$current_tab->undo_stack};
+				pop @{$current_tune->undo_stack};
 				$new_undo->{del} = 1;
 				$new_undo->{start} = $start;
 				$new_undo->{end} = $prev_end;
 				$new_undo->{content} = $content_plain . $prev_content;
-				push @{$current_tab->undo_stack}, $new_undo;
+				push @{$current_tune->undo_stack}, $new_undo;
 			}
 			# Delete key is pressed
 			elsif ($last_undo->{del} && $prev_start == $start && $prev_end == $end) {
-				pop @{$current_tab->undo_stack};
+				pop @{$current_tune->undo_stack};
 				$new_undo->{del} = 1;
 				$new_undo->{start} = $start;
 				$new_undo->{end} = $end;
 				$new_undo->{content} = $prev_content . $content_plain;
-				push @{$current_tab->undo_stack}, $new_undo;
+				push @{$current_tune->undo_stack}, $new_undo;
 			}
 			# a new area is deleted
 			else {
@@ -363,7 +363,7 @@ sub fill_undo_stack {
 				$new_undo->{start} = $start;
 				$new_undo->{end} = $end;
 				$new_undo->{content} = $content_plain;
-				push @{$current_tab->undo_stack}, $new_undo;
+				push @{$current_tune->undo_stack}, $new_undo;
 			}
 		
 		}
@@ -371,7 +371,7 @@ sub fill_undo_stack {
 	
 	# use Data::Dumper;
 	# print "NEW UNDO " . Dumper($new_undo) . "\n\n";
-	# print "UNDO STACK" . Dumper(@{$current_tab->undo_stack}) . "\n\n";
+	# print "UNDO STACK" . Dumper(@{$current_tune->undo_stack}) . "\n\n";
 	return $new_undo;
 }
 
@@ -379,18 +379,18 @@ sub undo {
 	my ($self) = @_;
 	my $entry = $self->elm_entry();
 	
-	my $current_tab = $self->app->current_tab();
+	my $current_tune = $self->app->current_tune();
 	
 	#use Data::Dumper;
-	#print "\n DO UNDO " . Dumper($current_tab->undo_stack) . "\n";
+	#print "\n DO UNDO " . Dumper($current_tune->undo_stack) . "\n";
 	
-	my $undo = pop @{$current_tab->undo_stack};
+	my $undo = pop @{$current_tune->undo_stack};
 	# print "CURSOR " . $entry->cursor_pos_get() . "\n";
 	
 	unless (defined($undo)) {
 		return;
 	}
-	push @{$current_tab->redo_stack}, $undo;
+	push @{$current_tune->redo_stack}, $undo;
 	if ($undo->{del}) {
 		# It seems that if one inserts withous selection
 		# the event changed,user is not triggered
@@ -424,15 +424,15 @@ sub redo {
 	my ($self) = @_;
 	
 	my $entry = $self->elm_entry();
-	my $current_tab = $self->app->current_tab();
+	my $current_tune = $self->app->current_tune();
 	
 	#use Data::Dumper;
-	#print "\n DO REDO " . Dumper($current_tab->redo_stack) . "\n";
+	#print "\n DO REDO " . Dumper($current_tune->redo_stack) . "\n";
 	
-	my $redo = pop @{$current_tab->redo_stack};
+	my $redo = pop @{$current_tune->redo_stack};
 	return unless( defined($redo) );
 	
-	push @{$current_tab->undo_stack}, $redo;
+	push @{$current_tune->undo_stack}, $redo;
 	
 	if ($redo->{del}) {
 		$self->is_undo("yes");
@@ -583,8 +583,8 @@ sub tabs_to_whitespaces {
 			pos => $en->cursor_pos_get(),
 			replaced_tab => 1,
 		};
-		my $current_tab = $entry->app->current_tab();
-		push @{$current_tab->undo_stack}, $replaced_char_undo;
+		my $current_tune = $entry->app->current_tune();
+		push @{$current_tune->undo_stack}, $replaced_char_undo;
 	}
 	
 	return $text;
@@ -720,7 +720,7 @@ sub rehighlight_and_retab_lines {
 	my ($self, $new_undo) = @_;
 	
 	my $entry = $self->elm_entry();
-	my $current_tab = $self->app->current_tab();
+	my $current_tune = $self->app->current_tune();
 	
 	my $textblock = $entry->textblock_get();
 	my $cp1 = pEFL::Evas::TextblockCursor->new($textblock);
@@ -731,7 +731,7 @@ sub rehighlight_and_retab_lines {
 	my $text = $self->get_rehighlight_lines($cp1,$cp2, $new_undo);
 	my $mkp_text = $text;
 	
-	if ( $current_tab->source_highlight() eq "yes" ) {
+	if ( $current_tune->source_highlight() eq "yes" ) {
 		$mkp_text = $self->highlight_str($text);
 	}
 	
