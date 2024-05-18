@@ -22,7 +22,7 @@ use Cwd qw(abs_path getcwd);
 use Caecilia::Tune;
 use Caecilia::Tunes;
 use Caecilia::Entry;
-use Caecilia::Search;
+#use Caecilia::Search;
 use Caecilia::Settings;
 use Caecilia::Preview;
 use Caecilia::Renderer;
@@ -66,6 +66,7 @@ sub new {
 		preview => undef,
 		current_tune => 0,
 		settings => undef,
+		user_dir => File::HomeDir->my_home . "/.caecilia",
 		share_dir => $share,
 		tmpdir => File::Temp->newdir(),
 		elm_mainwindow => undef,
@@ -83,8 +84,18 @@ sub new {
 sub init_ui {
 	my ($self) = @_;
 	
+	# Create settings instance
+	my $settings = Caecilia::Settings->new($self);
+	$self->settings($settings);
+	my $config = $settings->config();
+	
 	pEFL::Elm::init($#ARGV, \@ARGV);
 	pEFL::Elm::Config::scroll_accel_factor_set(1);
+	
+	if ($config->{color_palette} ne "system") {
+		pEFL::Elm::Config::palette_set($config->{color_palette});
+	} 
+	
 	pEFL::Elm::policy_set(ELM_POLICY_QUIT, ELM_POLICY_QUIT_LAST_WINDOW_CLOSED);
 	
 	my $win = pEFL::Elm::Win->util_standard_add("Caecilia", "Caecilia");
@@ -99,15 +110,8 @@ sub init_ui {
 	$ic->size_hint_aspect_set(EVAS_ASPECT_CONTROL_VERTICAL, 1, 1);
 	$win->icon_object_set($ic);
 	
-	# Create settings instance
-	my $settings = Caecilia::Settings->new($self);
-	$self->settings($settings);
-	
 	my $renderer = Caecilia::Renderer->new($self);
 	$self->renderer($renderer);
-	
-	my $config = $settings->load_config();
-	$tabstop = $config->{tabstops} || 4; 
 	
 	my $box = pEFL::Elm::Box->add($win);
 	$box->size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
@@ -300,7 +304,7 @@ sub preview_cb {
 	if (-e "$tmpdir/preview001.svg") {
 		my @filelist = <"$tmpdir/preview*.svg">;
 		my $number_of_pages = @filelist;
-		$self->preview->page(1);
+		$self->preview->page(1) unless $self->preview->page();
 		$self->preview->number_of_pages($number_of_pages);
 		$self->preview->render_preview("$tmpdir/preview");
 	}
@@ -662,14 +666,14 @@ sub add_statusbar {
 	$hbox->padding_set(25,25);
 	$hbox->horizontal_set(1);
 	$hbox->size_hint_weight_set(EVAS_HINT_EXPAND,0);
-	$hbox->size_hint_align_set(EVAS_HINT_FILL,0);
+	$hbox->size_hint_align_set(EVAS_HINT_FILL,EVAS_HINT_FILL);
 	$vbox->pack_end($hbox);
 	$hbox->show();
 	
 	my $separator = pEFL::Elm::Separator->add($hbox);
 	$separator->horizontal_set(1);
 	$separator->size_hint_weight_set(EVAS_HINT_EXPAND,0);
-	$separator->size_hint_align_set(EVAS_HINT_FILL,0);
+	$separator->size_hint_align_set(EVAS_HINT_FILL,EVAS_HINT_FILL);
 	$hbox->pack_end($separator);
 	$separator->show();
 	
@@ -693,7 +697,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~ m/tunes|entry|settings|renderer|share_dir|tmpdir|current_tune|preview|elm_mainwindow|elm_menu|elm_toolbar|elm_src_highlight_check|elm_linewrap_check|elm_linecolumn_label/;
+		unless $AUTOLOAD =~ m/tunes|entry|settings|renderer|user_dir|share_dir|tmpdir|current_tune|preview|elm_mainwindow|elm_menu|elm_toolbar|elm_src_highlight_check|elm_linewrap_check|elm_linecolumn_label/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

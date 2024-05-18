@@ -15,6 +15,7 @@ use pEFL::Evas;
 use Syntax::SourceHighlight;
 use HTML::Entities;
 use Encode;
+use Convert::Color;
 
 use Text::Tabs;
 
@@ -55,15 +56,16 @@ sub init_entry {
 	my ($self,$app,$box) = @_;
 	
 	my $config = $app->settings->load_config();
-	$self->tabmode("whitespaces") if ($config->{tabmode} eq "Add whitespace");
+	$self->tabmode("whitespaces") if ($config->{tabmode} && $config->{tabmode} eq "Add whitespace");
 	
-	my $share = $app->share_dir();
-	my $h1 = Syntax::SourceHighlight->new("$share/source-highlight/myhtml.outlang"); $self->sh_obj($h1);
-	$h1->setStyleFile("$share/source-highlight/mystyle.style");
-	$h1->setOutputDir("$share/source-highlight");
-	$h1->setDataDir("$share/source-highlight");
+	my $userdir = $app->user_dir();;
+	my $h1 = Syntax::SourceHighlight->new("$userdir/source-highlight/myhtml.outlang"); $self->sh_obj($h1);
+	$h1->setStyleFile("$userdir/source-highlight/mystyle.style");
+	$h1->setOutputDir("$userdir/source-highlight");
+	$h1->setDataDir("$userdir/source-highlight");
 	$h1->setOptimize(1);
 	
+	my $share = $app->share_dir();
 	my $lm = Syntax::SourceHighlight::LangMap->new("$share/source-highlight/lang.map"); $self->sh_langmap($lm);
 	
 	my $edj_path = $share . "/custom.edj";
@@ -93,8 +95,13 @@ sub init_entry {
 	my $w = $self->_calc_em($user_style);
 	
 	my $tabs = $w * 4;
-	
-	$user_style = "DEFAULT='font=$font:style=Regular font_size=$font_size tabstops=$tabs'";
+	my $fcolor = "";
+	if ($config->{font_color}) {
+		my $c = Convert::Color->new("rgb8:" . join(",",@{$config->{font_color}})); 
+		$fcolor = " color=#".$c->hex;
+	}
+
+	$user_style = "DEFAULT='font=$font:style=Regular font_size=$font_size tabstops=$tabs$fcolor'";
 	$en->text_style_user_push($user_style);
 	
 	$en->markup_filter_append(\&tabs_to_whitespaces, $self);
@@ -215,7 +222,7 @@ sub changed {
 	my $cp2 = pEFL::Evas::TextblockCursor->new($textblock);
 	$cp2->pos_set($entry->cursor_pos_get());
 	
-	my $text = $self->get_rehighlight_lines($cp1,$cp2, $new_undo);
+	my $text = $self->get_rehighlight_lines($cp1,$cp2);
 	
 	if ( $current_tune->source_highlight() eq "yes" ) {
 		$text = $self->highlight_str($text);
@@ -296,8 +303,14 @@ sub fill_undo_stack {
 			my $prev_content = $last_undo->{content} || "";
 			
 			my $new_pos = $change->{insert}->{pos};
+			#my $insert_content = $change->{insert}->{content};
+			
+			# Problem: In $change->{insert}->{plain_length} are \n = <br/>,
+			# Tabs = <tab/> and umlauts &ouml;. Therefore the length is longer than utf8
+			# with the following we correct plain length
+			my $new_plain_length;
 			my $insert_content_plain = $change->{insert}->{content};
-			my $new_plain_length = $change->{insert}->{plain_length};
+			$new_plain_length = $change->{insert}->{plain_length};
 			
 			# Special case: <tab/> was replaced by filter
 			# Undo record is already created 
@@ -314,7 +327,7 @@ sub fill_undo_stack {
 			}
 			elsif (defined($insert_content_plain)) {
 				$new_undo->{pos} = $new_pos;
-				$new_undo->{content} = $insert_content_plain;
+				$new_undo->{content} = $insert_content_plain if (defined($insert_content_plain));
 				$new_undo->{plain_length} = $new_plain_length;
 				push @{$current_tune->undo_stack}, $new_undo;
 			}
@@ -398,8 +411,9 @@ sub undo {
 		$entry->cursor_pos_set($undo->{start});
 		my $content = $undo->{content};
 		
-		# $undo->{content} is already saved in utf8 format!!!
+		# $undo->{content} is already saved in utf8 format!!! Really???
 		# $content = pEFL::Elm::Entry::utf8_to_markup($content);
+		$content = pEFL::Elm::Entry::utf8_to_markup($content);
 		
 		$content =~ s/\t/<tab\/>/g; $content =~ s/\n/<br\/>/g;
 		$entry->entry_insert($content);
@@ -458,8 +472,9 @@ sub redo {
 		
 		my $content = $redo->{content};
 		
-		# $redo->{content} is already saved in utf8 format!!!
+		# $redo->{content} is already saved in utf8 format!!! Really????
 		# $content = pEFL::Elm::Entry::markup_to_utf8($content);
+		$content = pEFL::Elm::Entry::markup_to_utf8($content);
 		
 		$content =~ s/\t/<tab\/>/g; $content =~ s/\n/<br\/>/g;
 		$entry->cursor_pos_set($redo->{pos});
@@ -667,6 +682,7 @@ sub get_rehighlight_lines {
 			# .. to the line after the del event
 			$cp2->pos_set($undo->{end});
 			$cp2->paragraph_next;$cp2->paragraph_next;
+			# $cp2->paragraph_char_last;???? see under else...
 			$cp2->line_char_last;
 		}
 		else {
@@ -677,6 +693,7 @@ sub get_rehighlight_lines {
 			
 			$cp2->pos_set($undo->{pos}+$undo->{plain_length});
 			$cp2->paragraph_next;$cp2->paragraph_next;
+			# $cp2->paragraph_char_last;???? see under else...
 			$cp2->line_char_last;
 		}
 	}
@@ -688,7 +705,7 @@ sub get_rehighlight_lines {
 		# .. to the line after the actual cursor position :-)
 		#$cp2->pos_set($entry->cursor_pos_get());
 		$cp2->paragraph_next;
-		$cp2->line_char_last;
+		$cp2->paragraph_char_last;
 	}
 
 	my $text = $cp1->range_text_get($cp2,EVAS_TEXTBLOCK_TEXT_PLAIN);

@@ -15,6 +15,7 @@ use Caecilia::MyElm ":all";
 use YAML('Load', 'Dump');
 use File::HomeDir;
 use File::Path ('make_path');
+use Convert::Color;
 
 use Text::Tabs;
 
@@ -29,6 +30,7 @@ sub new {
 	
 	my $obj = {
 		app => $app,
+		config => load_config(undef),
 		};
 	bless($obj,$class);
 	
@@ -48,7 +50,7 @@ sub show_dialog {
 	
 	my $bg = pEFL::Elm::Bg->add($settings_win);
 	_expand_widget($bg);
-	$settings_win->resize_object_add($bg); $bg->show();
+	$bg->show(); $settings_win->resize_object_add($bg);
 	
 	my $container = pEFL::Elm::Table->add($settings_win);
 	_expand_widget($container);
@@ -105,7 +107,7 @@ sub _add_buttons {
 	my $btn_bx = pEFL::Elm::Box->add($table);
 	_expand_widget_x($btn_bx);
 	$btn_bx->horizontal_set(1);
-	$btn_bx->show(); $table->pack_end($btn_bx);
+	$btn_bx->show(); $table->pack($btn_bx,0,$row,2,1);
 	
 	my $ok_btn = pEFL::Elm::Button->new($btn_bx);
 	$ok_btn->text_set("OK");
@@ -127,35 +129,60 @@ sub _add_buttons {
 sub _settings_appearance_create {
 	my ($self,$parent) = @_;
 	
-	my $config = $self->load_config();
+	my $config = $self->config();
+	
+	my $scroller = pEFL::Elm::Scroller->add($parent);
 	
 	my $box = pEFL::Elm::Box->add($parent);
 	$box->horizontal_set(0);
 	_expand_widget($box);
 	$box->show();
 	
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("Appearance settings");
+	$frame->part_content_set("default",$scroller);
+	_expand_widget($frame);
+	$frame->show();
+	
 	my $table = pEFL::Elm::Table->add($parent);
 	_expand_widget($table);
 	$table->padding_set(10,10);
-	$table->show();
+	$table->show(); $box->pack_end($table);
 	
-	my $frame = pEFL::Elm::Frame->add($parent);
-	$frame->text_set("Appearance settings");
-	$frame->part_content_set("default",$table);
-	_expand_widget($frame);
-	$frame->show();
+	_add_header($table,0,"Color Palette",1);
+	
+	my $palette_combo = pEFL::Elm::Combobox->add($table);
+	_expand_widget_x($palette_combo);
+	my $palette = $config->{color_palette} || "system";
+	$palette_combo->text_set($palette);
+	
+	my $itc = pEFL::Elm::GenlistItemClass->new();
+	$itc->item_style("default");
+	$itc->text_get(sub {return $_[0];});
+	
+	$palette_combo->item_append($itc,"system",undef,ELM_GENLIST_ITEM_NONE,undef,undef);
+	
+	my @palettes = pEFL::Elm::Config::palette_list_pv();
+	foreach my $p (@palettes) {
+		$palette_combo->item_append($itc,$p,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
+	}
+	$palette_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, $frame);
+	$palette_combo->show(); $table->pack($palette_combo,0,1,2,1);
+	
+	_add_header($table,3,"Font Settings",1);
 	
 	my $font_combo = pEFL::Elm::Combobox->add($table);
 	_expand_widget_x($font_combo);
 	my $font = $config->{font} || "Font";
 	$font_combo->text_set($font);
 	
-	my $itc = pEFL::Elm::GenlistItemClass->new();
-	$itc->item_style("default");
-	$itc->text_get(sub {return $_[0];});
+	my $itc2 = pEFL::Elm::GenlistItemClass->new();
+	$itc2->item_style("default_style");
+	$itc2->text_get(sub {return $_[0];});
 	my @fonts = $box->evas_get->font_available_list_pv();
 	my @mono = ();
 	foreach my $font (@fonts) {
+		# is not important in the ABC notation format, isn't it?
 		if ($font =~ m/[mM]ono/) {
 			$font =~ s/:style.*$//;
 			$font =~ s/,.*$//;
@@ -165,18 +192,15 @@ sub _settings_appearance_create {
 	}
 	@mono = sort(@mono);
 	foreach my $f (@mono) {
-		$font_combo->item_append($itc,$f,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
+		my $font = $f;
+		$font =~ s/ //g;
+		$font_combo->item_append($itc2,"<font=$font>$f</font>",undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
-	$font_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
-	$font_combo->show(); $table->pack($font_combo,0,1,4,1);
+	$font_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, $frame);
+	$font_combo->show(); $table->pack($font_combo,0,4,2,1);
 	
-	$font_combo->realized_items_update();
-	$itc->free();
-	
-	my $tabs_label = pEFL::Elm::Label->new($table);
-	$tabs_label->text_set("Font size");
-	$tabs_label->show(); $table->pack($tabs_label,0,2,2,1);
-	
+	_add_label($table,5,"Font Size");
+		
 	my $font_size_spinner = pEFL::Elm::Slider->add($table);
 	$font_size_spinner->size_hint_align_set(EVAS_HINT_FILL,0.5);
 	$font_size_spinner->size_hint_weight_set(EVAS_HINT_EXPAND,0.0);
@@ -185,82 +209,115 @@ sub _settings_appearance_create {
 	$font_size_spinner->min_max_set(6,24);
 	$font_size_spinner->step_set(1);
 	$font_size_spinner->value_set($config->{font_size} || 10.0);
-	$font_size_spinner->show(); $table->pack($font_size_spinner,2,2,2,1);
+	$font_size_spinner->show(); $table->pack($font_size_spinner,1,5,1,1);
+	
+	my $font_color = $config->{font_color} || [157,157,157];
+	_add_color_setting($table,6,{text => "Font Color", color => $font_color, 
+		settings => $self,key => "font_color", win => $self->app->elm_mainwindow()});
+	
+	_add_header($table,7,"Source Highlight",1);
+	
+	my $header_color = $config->{header_color} || [157,157,157];
+	_add_color_setting($table,8,{text => "Headers", color => $header_color, 
+		settings => $self,key => "header_color", win => $self->app->elm_mainwindow()});
+	
+	my $string_color = $config->{string_color} || [157,157,157];
+	_add_color_setting($table,9,{text => "Lyrics/Strings", color => $string_color, 
+		settings => $self,key => "string_color", win => $self->app->elm_mainwindow()});
+	
+	my $notes_color = $config->{notes_color} || [43,173,251];
+	_add_color_setting($table,10,{text => "Notes", color => $notes_color, 
+		settings => $self,key => "notes_color", win => $self->app->elm_mainwindow()});
+	
+	my $slurs_color = $config->{slurs_color} || [43,173,251];
+	_add_color_setting($table,11,{text => "Slurs", color => $slurs_color, 
+		settings => $self,key => "slurs_color", win => $self->app->elm_mainwindow()});
+	
+	my $deco_color = $config->{deco_color} || [203,49,155];
+	_add_color_setting($table,12,{text => "Keywords", color => $deco_color, 
+		settings => $self,key => "deco_color", win => $self->app->elm_mainwindow()});
+	
+	my $dir_color = $config->{directives_color} || [251,153,203];
+	_add_color_setting($table,13,{text => "Directives", color => $dir_color, 
+		settings => $self,key => "directives_color", win => $self->app->elm_mainwindow()});
+	
+	my $comments_color = $config->{comments_color} || [251,153,203];
+	_add_color_setting($table,14,{text => "Comments", color => $comments_color, 
+		settings => $self, key => "comments_color", win => $self->app->elm_mainwindow()});
 		
 	# Save important widgets
+	$self->elm_palette_combo($palette_combo);
 	$self->elm_font_size_slider($font_size_spinner);
 	$self->elm_font_combo($font_combo);
 	
-	$box->pack_end($frame);
-	$self->_add_buttons($box);
+	$self->_add_buttons($table,15);
 	
-	return $box;
+	$scroller->content_set($box);
+	$scroller->show();
+	return $frame;
 }
 
 sub _settings_tabulator_create {
 	my ($self,$parent) = @_;
 	
-	my $config = $self->load_config();
+	my $config = $self->config();
 	
 	my $box = pEFL::Elm::Box->add($parent);
 	$box->horizontal_set(0);
 	_expand_widget($box);
 	$box->show();
 	
-	my $table = pEFL::Elm::Table->add($parent);
-	_expand_widget($table);
-	$table->padding_set(10,10);
-	$table->show();
-	
 	my $frame = pEFL::Elm::Frame->add($parent);
 	$frame->text_set("Tabulator settings");
-	$frame->part_content_set("default",$table);
+	$frame->part_content_set("default",$box);
 	_expand_widget($frame);
 	$frame->show();
 	
+	my $table = pEFL::Elm::Table->add($parent);
+	_expand_widget($table);
+	$table->padding_set(10,10);
+	$table->show(); $box->pack_end($table);
+	
 	my $tabs_label = pEFL::Elm::Label->new($table);
 	$tabs_label->text_set("Tabstops");
-	$tabs_label->show(); $table->pack($tabs_label,0,1,1,1);
+	$tabs_label->show(); $table->pack($tabs_label,0,2,1,1);
 	
 	my $tabs_spinner = pEFL::Elm::Spinner->add($table);
 	$tabs_spinner->value_set($config->{tabstops} || 4);
 	_expand_widget_x($tabs_spinner);
-	$tabs_spinner->show(); $table->pack($tabs_spinner,1,1,3,1);
+	$tabs_spinner->show(); $table->pack($tabs_spinner,1,2,1,1);
 	
 	my $tabmode_combo = pEFL::Elm::Combobox->add($table);
 	_expand_widget_x($tabmode_combo);
 	my $tabmode = $config->{tabmode} || "Tabulator mode";
 	$tabmode_combo->text_set($tabmode);
-	
+	# elm_object_part_content_set(hoversel, "icon", rect);
 	my $itc = pEFL::Elm::GenlistItemClass->new();
 	$itc->item_style("default");
 	$itc->text_get(sub {return $_[0];});
 	$tabmode_combo->item_append($itc,"Add tabulators",undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	$tabmode_combo->item_append($itc,"Add whitespace",undef,ELM_GENLIST_ITEM_NONE,undef,undef);
-	$tabmode_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
-	$tabmode_combo->show(); $table->pack($tabmode_combo,0,2,4,1);
-	
-	$tabmode_combo->realized_items_update();
-	$itc->free();
+	$tabmode_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, $frame);
+	$tabmode_combo->show(); $table->pack($tabmode_combo,0,3,2,1);
 	
 	my $header2 = pEFL::Elm::Label->add($table);
 	$header2->text_set("<b>Customize when opening a file</b>");
 	$header2->size_hint_weight_set(EVAS_HINT_EXPAND,0);
 	$header2->size_hint_align_set(0,0);
 	#$header2->align_set(0.0);
-	$header2->show(); $table->pack($header2,0,3,4,1);
+	$header2->show(); $table->pack($header2,0,4,2,1);
 	
 	my $unexpand_check = pEFL::Elm::Check->add($table);
 	_expand_widget_x($unexpand_check);
 	$unexpand_check->text_set("Unexpand white space to tabs");
 	$unexpand_check->state_set(1) if ($config->{unexpand_tabs});
-	$unexpand_check->show(); $table->pack($unexpand_check,0,4,4,1);
+	$unexpand_check->show(); $table->pack($unexpand_check,0,5,2,1);
 	
 	my $expand_check = pEFL::Elm::Check->add($table);
 	_expand_widget_x($expand_check);
 	$expand_check->text_set("Expand tabs to white space");
 	$expand_check->state_set(1) if ($config->{expand_tabs});
-	$expand_check->show(); $table->pack($expand_check,0,5,4,1);
+	$expand_check->show(); $table->pack($expand_check,0,6,2,1);
 	
 	# Save important widgets
 	$self->elm_tabs_spinner($tabs_spinner);
@@ -268,38 +325,35 @@ sub _settings_tabulator_create {
 	$self->elm_unexpand_check($unexpand_check);
 	$self->elm_expand_check($expand_check);
 	
-	$box->pack_end($frame);
-	$self->_add_buttons($box);
+	$self->_add_buttons($table,7);
 	
-	return $box;
+	return $frame;
 }
 
 sub _settings_abcm2ps_create {
 	my ($self,$parent) = @_;
 	
-	my $config = $self->load_config();
+	my $config = $self->config();
 	
-	my $container = pEFL::Elm::Box->add($parent);
-	_expand_widget($container);
-	$container->padding_set(10,10);
-	$container->horizontal_set(0);
-	$container->show();
+	my $scroller = pEFL::Elm::Scroller->add($parent);
 	
-	my $scroller = pEFL::Elm::Scroller->add($container);
-	$scroller->policy_set(ELM_SCROLLER_POLICY_OFF, ELM_SCROLLER_POLICY_ON);
-	$scroller->region_show(0,0,0,0);
-	_expand_widget($scroller); 
+	my $box = pEFL::Elm::Box->add($parent);
+	$box->horizontal_set(0);
+	_expand_widget($box);
+	$box->show();
 	
-	my $frame = pEFL::Elm::Frame->add($scroller);
+	my $frame = pEFL::Elm::Frame->add($parent);
 	$frame->text_set("abcm2ps settings");
+	#$frame->part_content_set("default",$box);
+	$frame->part_content_set("default",$scroller);
 	_expand_widget($frame);
 	$frame->show();
 	
-	my $table = pEFL::Elm::Table->add($frame);
+	
+	my $table = pEFL::Elm::Table->add($parent);
 	_expand_widget($table);
 	$table->padding_set(10,10);
-	$table->show();
-	$frame->part_content_set("default",$table);
+	$table->show(); $box->pack_end($table);
 	
 	_add_header($table,0,"Path to abcm2ps");
 	
@@ -382,11 +436,11 @@ sub _settings_abcm2ps_create {
 	foreach my $mode (@pagenumberingmodes) {
 		$pagenumbering_combo->item_append($itc,$mode,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
-	$pagenumbering_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, undef);
+	$pagenumbering_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, $frame);
 	$pagenumbering_combo->show(); $table->pack($pagenumbering_combo,0,21,4,1);
 	
-	$pagenumbering_combo->realized_items_update();
-	$itc->free();
+	#$pagenumbering_combo->realized_items_update();
+	#$itc->free();
 	
 	my $onetuneperpage_check = _add_checkoption($table,
 		value => $config->{abcm2ps_onetuneperpage}, label => "Write one tune per page", row => 22);
@@ -428,22 +482,18 @@ sub _settings_abcm2ps_create {
 	$self->elm_numbernbarsboxed_check($numbernbarsboxed_check);
 	$self->elm_flatbeams_check($flatbeams_check);
 	
-	#$container->pack_end($frame);
-	$container->pack_end($scroller);
+	$self->_add_buttons($table,27);
 	
-	$scroller->content_set($frame);
+	$scroller->content_set($box);
 	$scroller->show();
 	
-	$self->_add_buttons($container);
-	
-	return $container;
-	#return $frame;
+	return $frame;
 }
 
 sub save_settings {
 	my ($self, $obj, $ev) = @_;
 	
-	my $config = {};
+	my $config = $self->config();
 	
 	#################
 	# Tabulator settings
@@ -452,10 +502,11 @@ sub save_settings {
 	my $tabmode_combo = $self->elm_tabmode_combo();
 	my $unexpand_check = $self->elm_unexpand_check();
 	my $expand_check = $self->elm_expand_check();
+	my $palette_combo = $self->elm_palette_combo();
 	my $font_size_slider = $self->elm_font_size_slider();
 	my $font_combo = $self->elm_font_combo();
 	
-	$config->{tabstops} = $tabs_spinner->value_get();
+	$config->{tabstops} = sprintf("%.0f",$tabs_spinner->value_get());
 	$config->{tabmode} = $tabmode_combo->text_get();
 	$config->{unexpand_tabs} = $unexpand_check->state_get();
 	$config->{expand_tabs} = $expand_check->state_get();
@@ -468,18 +519,27 @@ sub save_settings {
 	}
 	
 	#################
-	# Font settings
+	# Appareance settings
 	#################
-	my $font = $font_combo->text_get() || "Monospace";
+	my $palette = $palette_combo->text_get() || "system";
+	$config->{color_palette} = $palette;
+	if ($palette ne "system") {
+		pEFL::Elm::Config::palette_set($palette);
+	} 
+	
+	my $font = pEFL::Elm::Entry::markup_to_utf8($font_combo->text_get()) || "Monospace";
 	$font =~ s/ //g;
 	$config->{font} = $font;
 	
-	$config->{font_size} = sprintf("%1.0f", $font_size_slider->value_get());
+	$config->{font_size} = sprintf("%.0f",$font_size_slider->value_get());
 	
 	my $entry = $self->app->entry();
 	my $en = $entry->elm_entry();
 	
 	my $font_size = $config->{font_size} || 10;
+	
+	$config->{font_color} = $config->{font_color} || [157,157,157];
+	my $c = Convert::Color->new("rgb8:" . join(",",@{$config->{font_color}})); my $fcolor = "#".$c->hex;
 	
 	my $user_style = qq(DEFAULT='font=$font:style=Regular font_size=$font_size');
 	my $w = $entry->_calc_em($user_style);
@@ -487,17 +547,27 @@ sub save_settings {
 	$tabstop = $config->{tabstops} || 4;
 	my $tabs = $w * $tabstop;
 	
-	$user_style = qq(DEFAULT='font=$font:style=Regular font_size=$font_size tabstops=$tabs');
+	$user_style = qq(DEFAULT='font=$font:style=Regular font_size=$font_size tabstops=$tabs color=$fcolor');
 	$en->text_style_user_push($user_style);
 	
-	#$self->app->entry->rehighlight_all();
+	$config->{header_color} = $config->{header_color} || [157,157,157];
+	$config->{string_color} = $config->{string_color} || [157,157,157];
+	$config->{notes_color} = $config->{notes_color} || [43,173,251];
+	$config->{slurs_color} = $config->{slurs_color} || [43,173,251];
+	$config->{deco_color} = $config->{deco_color} || [203,49,155];
+	$config->{directives_color} = $config->{directives_color} || [251,153,203];
+	$config->{comments_color} = $config->{comments_color} || [251,153,203];
+	
+	_write_style_file($self, $config);
+	
+	$self->app->entry->rehighlight_all();
 	
 	######################
 	# abcm2ps Settings
 	######################
 	$config->{abcm2ps_path} = $self->elm_abcm2ps_path_en->entry_get();
 	$config->{abcm2ps_autolinebreak} = $self->elm_autolinebreak_check->state_get();
-	$config->{abcm2ps_breaknbars} = _spinner_get($self->elm_breaknbars_spinner);
+	$config->{abcm2ps_breaknbars} = sprintf("%.0f",_spinner_get($self->elm_breaknbars_spinner));
 	$config->{abcm2ps_scalefactor} = _spinner_get($self->elm_scalefactor_spinner);
 	$config->{abcm2ps_staffwidth} = _en_get($self->elm_staffwidth_en);
 	$config->{abcm2ps_leftmargin} = _en_get($self->elm_leftmargin_en);
@@ -512,14 +582,56 @@ sub save_settings {
 	$config->{abcm2ps_pagenumbering} = $self->elm_pagenumberig_combo->text_get();
 	$config->{abcm2ps_onetuneperpage} = $self->elm_onetuneperpage_check->state_get();
 	$config->{abcm2ps_nosluringrace} = $self->elm_nosluringrace_check->state_get();
-	$config->{abcm2ps_numbernbars} = _spinner_get($self->elm_numbernbars_spin);
+	$config->{abcm2ps_numbernbars} = sprintf("%.0f",_spinner_get($self->elm_numbernbars_spin));
 	$config->{abcm2ps_numbernbarsboxed} = $self->elm_numbernbarsboxed_check->state_get();
-	$config->{abcm2ps_flatbeams} = $self->elm_flatbeams_check->state_get();
-	
+	$config->{abcm2ps_flatbeams} = $self->elm_flatbeams_check->state_get();	
 	
 	$self->save_config($config);
 	
 	$self->elm_settings_win()->del();
+	
+	return
+}
+
+sub _write_style_file {
+	my ($self, $conf) = @_;
+	my $userdir = File::HomeDir->my_home . "/.caecilia"; 
+	my $path = File::HomeDir->my_home . "/.caecilia/source-highlight/mystyle.style";
+	
+	# Convert Colors to HTML colors
+	my $c = Convert::Color->new("rgb8:" . join(",",@{$conf->{notes_color}})); my $notes = "#".$c->hex;
+	my $c2 = Convert::Color->new("rgb8:" . join(",",@{$conf->{string_color}}) ); my $string = "#".$c2->hex;
+	my $c3 = Convert::Color->new("rgb8:" . join(",",@{$conf->{deco_color}}) ); my $deco = "#".$c3->hex;
+	my $c4 = Convert::Color->new("rgb8:" . join(",",@{$conf->{comments_color}}) ); my $comments = "#".$c4->hex;
+	my $c5 = Convert::Color->new("rgb8:" . join(",",@{$conf->{slurs_color}}) ); my $slurs = "#".$c5->hex;
+	my $c6 = Convert::Color->new("rgb8:" . join(",",@{$conf->{header_color}}) ); my $header = "#".$c6->hex;
+	my $c7 = Convert::Color->new("rgb8:" . join(",",@{$conf->{directives_color}}) ); my $directives = "#".$c7->hex;
+	
+	# Write style file
+	open my $fh, ">:encoding(utf-8)", "$path" or die "Could not open $path: $!\n";
+	# flock $fh, LOCK_EX;
+	print $fh <<EOF;
+keyword "$notes" ; 
+string "$string" i ;
+specialchar "$deco" b ; 
+comment "$comments" i, noref; 
+preproc "$header" b; 
+symbol "$slurs" b ; 
+function "$directives"; 
+EOF
+
+	close $fh;
+	
+	# Apply new Syntax Highlight
+	my $h1 = Syntax::SourceHighlight->new("$userdir/source-highlight/myhtml.outlang"); 
+	$self->app->entry->sh_obj($h1);
+	$h1->setStyleFile("$userdir/source-highlight/mystyle.style");
+	$h1->setOutputDir("$userdir/source-highlight");
+	$h1->setDataDir("$userdir/source-highlight");
+	$h1->setOptimize(1);
+	
+	my $lm = Syntax::SourceHighlight::LangMap->new("$userdir/source-highlight/lang.map"); 
+	$self->app->entry->sh_langmap($lm);
 	
 	return
 }
@@ -577,7 +689,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/::(app|elm_toolbar|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win)|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
+		unless $AUTOLOAD =~m/::(app|config|elm_toolbar|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win)|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;
