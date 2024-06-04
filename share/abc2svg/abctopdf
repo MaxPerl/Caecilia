@@ -1,0 +1,146 @@
+:;# abctopdf
+# convert ABC to PDF using abc2svg and one of
+#	- a chrome/chromium compatible web browser
+#	  (if not found, you can set its name in the environment variable 'BROWSER')
+#	- weasyprint (https://weasyprint.org/)
+#
+# Note: when weasyprint is used,
+#	this script forces A4 as the paper size.
+#	For an other size, change
+#		'size: A4' and '--pageheight 29.7cm'
+#
+# Copyright (C) 2019-2021 Jean-François Moine - License GPL3+
+
+# set a browser
+if [ "x$BROWSER" = "x" ]; then
+	BROWSER=chromium
+fi
+
+if [ $# -eq 0 ]; then
+	cat << EOF
+ABC to PDF translator using abc2svg
+Usage:
+  abctopdf [options] ABC_file [[options] ABC_file] [options] [-o output_file]
+Arguments:
+  options     ABC options (the last options are moved before the last file)
+  ABC_file    ABC file
+  output_file output file - default is "./abc.pdf"
+EOF
+	exit 1
+fi
+
+# choose a abc2svg batch script with an available JS interpreter
+if [ ${0#./} != $0 ]; then
+	bdir="./"
+else
+	bdir=`dirname $0`
+	if [ $bdir != '.' ]; then
+		bdir="$bdir/"
+	else
+		bdir=''
+	fi
+fi
+# (sorted from fastest to slowest in ARM machines)
+for c in qjs jsc js78 js60 js52 js24 d8 node end; do
+	if [ $c = 'end' ]; then
+		echo "$0: could not find a javascript interpreter - abort"
+		exit 1
+	fi
+	if command -v $c >/dev/null 2>&1; then
+		case $c in
+		(qjs) c=abcqjs;;
+		(jsc) c=abcjsc;;
+		(js24) c=abcmjs;;
+		(js52) c=abcmjs;;
+		(js60) c=abcmjs;;
+		(js78) c=abcmjs;;
+		(d8) c=abcv8;;
+		(node) c=abcnode;;
+		esac
+		if command -v $c >/dev/null 2>&1; then
+			abcscr=$c
+			break
+		fi
+		if command -v $bdir$c >/dev/null 2>&1; then
+			abcscr=$bdir$c
+			break
+		fi
+	fi
+done
+echo "Using $abcscr"
+
+# get the output file name (after '-o')
+# default name
+out='abc.pdf'
+n=0
+for a do
+	if [ "$a" = "-o" ]; then
+		n=1
+	elif [ $n -eq 1 ]; then
+		out=$a
+		n=0
+	else
+		set -- "$@" "$a"
+	fi
+	shift
+done
+
+# check if some chromium-based browser is available
+for c in "$BROWSER" chromium-browser vivaldi opera brave-browser epic google-chrome; do
+	if command -v "$c" >/dev/null 2>&1; then
+		echo "and $c"
+		command $abcscr "$@" > /tmp/o.html
+# --headless=new does not work
+		"$c" --headless --print-to-pdf=$out --no-pdf-header-footer\
+			/tmp/o.html
+		rm /tmp/o.html
+		exit 0
+	fi
+done
+
+# try weasyprint
+if command -v weasyprint >/dev/null 2>&1; then
+	echo "and weasyprint"
+
+	rm -f /tmp/abc*.svg /tmp/abc.html
+
+# generate a (HTML+SVG) file
+# then, extract the SVG images (pages) to /tmp/ and build a file.html
+	touch /tmp/abc.html
+	n=0
+command $abcscr --pageheight 29.7cm --fullsvg 1 --musicfont abc2svg "$@" | while read v; do
+	case "$v" in
+	"<svg"*)
+		n=$(($n+1))
+		fn="/tmp/abc$n.svg"
+		echo $v > $fn
+		echo "<img src=\"/tmp/abc${n}.svg\"/>" >> /tmp/abc.html
+		;;
+	"</svg"*)
+		echo $v >> $fn
+		fn=
+		;;
+	"<body>")
+		echo '<body bgcolor="white">' >> /tmp/abc.html
+		;;
+	"</body"*)
+		break;;
+	*)
+		if [ "X$fn" != "X" ]; then
+			echo $v >> $fn
+		else
+			echo $v >> /tmp/abc.html
+		fi
+		;;
+	esac
+done
+	echo '</body>' >> /tmp/abc.html
+
+echo weasyprint -f pdf /tmp/abc.html $out
+	weasyprint -f pdf /tmp/abc.html $out
+	rm -f /tmp/abc*.svg /tmp/abc.html
+	exit 0
+fi
+
+	echo "$0: no program found for SVG to PDF translation - abort"
+	exit 1

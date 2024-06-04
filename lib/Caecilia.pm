@@ -19,6 +19,9 @@ use File::HomeDir;
 use File::Basename;
 use Cwd qw(abs_path getcwd);
 
+use File::Path qw(make_path);
+use File::Copy;
+
 use Caecilia::Tune;
 use Caecilia::Tunes;
 use Caecilia::Entry;
@@ -26,6 +29,8 @@ use Caecilia::Entry;
 use Caecilia::Settings;
 use Caecilia::Preview;
 use Caecilia::Renderer;
+use Caecilia::MIDI;
+use Caecilia::MyElm ":all";
 
 use Text::Tabs;
 
@@ -64,6 +69,7 @@ sub new {
 		tunes => undef,
 		entry => undef,
 		preview => undef,
+		midi => undef,
 		current_tune => 0,
 		settings => undef,
 		user_dir => File::HomeDir->my_home . "/.caecilia",
@@ -92,7 +98,7 @@ sub init_ui {
 	pEFL::Elm::init($#ARGV, \@ARGV);
 	pEFL::Elm::Config::scroll_accel_factor_set(1);
 	
-	if ($config->{color_palette} ne "system") {
+	if (defined($config->{color_palette}) && $config->{color_palette} ne "system") {
 		pEFL::Elm::Config::palette_set($config->{color_palette});
 	} 
 	
@@ -136,9 +142,12 @@ sub init_ui {
 	$box->pack_end($panes);
 	$panes->show();
 	
-	$self->add_menu($win,$box);
+	my $midi = Caecilia::MIDI->new($self,$box);
+	$self->midi($midi);
 	
 	$self->add_statusbar($box);
+	
+	$self->add_menu($win,$box);
 	
 	if (@ARGV) {
 	
@@ -157,9 +166,190 @@ sub init_ui {
 	$win->resize_object_add($box);
 	$win->resize(900,600);
 	$win->show();
+	
+	if (! -e $self->user_dir . "/config.yaml") {
+		$self->show_first_run_dialog($win);
+	}
 
 	pEFL::Elm::run();
 	pEFL::Elm::shutdown();
+}
+
+sub show_first_run_dialog {
+	my ($self,$win) = @_;
+	
+	my $fr_win = pEFL::Elm::Win->add($win, "Welcome", ELM_WIN_BASIC);
+	$fr_win->title_set("Welcome");
+	$fr_win->focus_highlight_enabled_set(1);
+	
+	my $bg = pEFL::Elm::Bg->add($fr_win);
+	_expand_widget($bg);
+	$bg->show(); $fr_win->resize_object_add($bg);
+	
+	my $table = pEFL::Elm::Table->add($fr_win);
+	_expand_widget($table);
+	$table->padding_set(10,10);
+	$table->show(); 
+	
+	_add_header($table,0,"Welcome to Caecilia",4);
+	
+	_add_label($table, 1, "Caecilia runs first time.\n To work correctly some configuration is needed.\n",4);
+	
+	_add_header($table,2,"Path to abcm2ps",4);
+	
+	my $abcm2ps_path_en = pEFL::Elm::Entry->add($table);
+	$abcm2ps_path_en->entry_set("/usr/bin/abcm2ps");
+	$abcm2ps_path_en->scrollable_set(1);
+	$abcm2ps_path_en->single_line_set(1);
+	$abcm2ps_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
+	_expand_widget($abcm2ps_path_en);
+	$abcm2ps_path_en->show(); $table->pack($abcm2ps_path_en,0,3,4,1);
+	
+	_add_header($table,4,"Where shall Caecilia look for scores",4);
+	
+	my $scores_path_en = pEFL::Elm::Entry->add($table);
+	$scores_path_en->entry_set(File::HomeDir->my_documents);
+	$scores_path_en->scrollable_set(1);
+	$scores_path_en->single_line_set(1);
+	$scores_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
+	_expand_widget($scores_path_en);
+	$scores_path_en->show(); $table->pack($scores_path_en,0,5,4,1);
+	
+	_add_header($table,6,"Install abc2svg music font",4);
+	
+	my $text = "Caecilia needs a music font to render preview. " . 
+		"To install the font copy <br/>" . $self->share_dir . "/abc2svg/abc2svg.ttf<br/>" . 
+		"to a local/systemwide font directory. On Linux you usually can copy it to <br/>" .
+		"\$HOME/.local/share/fonts under the subfolder truetype<br/>" .
+		"If you have the rights to write to a font directory you can install here";
+	my $label = pEFL::Elm::Label->new($table);
+	$label->text_set("$text");
+	$label->line_wrap_set(2);
+	_expand_widget($label);
+	$label->show(); $table->pack($label,0,7,4,1);
+	
+	my $font_path_en = pEFL::Elm::Entry->add($table);
+	$font_path_en->entry_set(File::HomeDir->my_home . "/.local/share/fonts");
+	$font_path_en->scrollable_set(1);
+	$font_path_en->single_line_set(1);
+	$font_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
+	_expand_widget($font_path_en);
+	$font_path_en->show(); $table->pack($font_path_en,0,8,3,1);
+	
+	my $font_btn = pEFL::Elm::Button->add($table);
+	$font_btn->text_set("Install Font");
+	$font_btn->show; $table->pack($font_btn,3,8,1,1);
+	
+	my $btn_bx = pEFL::Elm::Box->add($table);
+	_expand_widget_x($btn_bx);
+	$btn_bx->horizontal_set(1);
+	$btn_bx->show(); $table->pack($btn_bx,0,9,4,1);
+	
+	my $save_btn = pEFL::Elm::Button->new($btn_bx);
+	$save_btn->text_set("Save and Close");
+	_expand_widget($save_btn);
+	$save_btn->show(); $btn_bx->pack_end($save_btn);
+	
+	# Callbacks
+	$font_btn->smart_callback_add("clicked", \&install_font_cb, [$self, $font_path_en, $fr_win]);
+	$save_btn->smart_callback_add("clicked", \&first_run_cb, [$self, $abcm2ps_path_en, $scores_path_en, $fr_win]);
+	
+	$fr_win->resize_object_add($table);
+	$fr_win->resize(600,400);
+	$fr_win->show();
+}
+
+sub font_install {
+	my ($self) = @_;
+	
+	my $f_win = pEFL::Elm::Win->add($self->elm_mainwindow(), "Install Music Font", ELM_WIN_BASIC);
+	$f_win->title_set("Install Music Font");
+	$f_win->focus_highlight_enabled_set(1);
+	$f_win->autodel_set(1);
+	
+	my $bg = pEFL::Elm::Bg->add($f_win);
+	_expand_widget($bg);
+	$bg->show(); $f_win->resize_object_add($bg);
+	
+	my $table = pEFL::Elm::Table->add($f_win);
+	_expand_widget($table);
+	$table->padding_set(10,10);
+	$table->show();
+	
+	_add_header($table,0,"Install abc2svg music font",4);
+	
+	_add_label($table, 1, "Caecilia needs a music font installed to render preview correctely.<br/>" . 
+		"To install the font you habe to copy the file <br/>" . $self->share_dir . "/abc2svg/abc2svg.ttf<br/>" . 
+		"to a local/systemwide font directory <br/>" .
+		"On Linux systems you usually can install it to <br/>" .
+		"\$HOME/.local/share/fonts under the subfolder truetype<br/>" .
+		"If you have the rights to write to a font directory you can install here",4);
+	
+	my $font_path_en = pEFL::Elm::Entry->add($table);
+	$font_path_en->entry_set(File::HomeDir->my_home ."/.local/share/fonts");
+	$font_path_en->scrollable_set(1);
+	$font_path_en->single_line_set(1);
+	$font_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
+	_expand_widget($font_path_en);
+	$font_path_en->show(); $table->pack($font_path_en,0,3,3,1);
+	
+	my $font_btn = pEFL::Elm::Button->add($table);
+	$font_btn->text_set("Install Font");
+	$font_btn->show; $table->pack($font_btn,3,3,1,1);
+	
+	my $btn_bx = pEFL::Elm::Box->add($table);
+	_expand_widget_x($btn_bx);
+	$btn_bx->horizontal_set(1);
+	$btn_bx->show(); $table->pack($btn_bx,0,4,4,1);
+	
+	my $close_btn = pEFL::Elm::Button->new($btn_bx);
+	$close_btn->text_set("Close");
+	_expand_widget($close_btn);
+	$close_btn->show(); $btn_bx->pack_end($close_btn);
+	
+	# Callbacks
+	$font_btn->smart_callback_add("clicked", \&install_font_cb, [$self, $font_path_en, $f_win]);
+	$close_btn->smart_callback_add("clicked", sub {$f_win->del()}, undef);
+	
+	$f_win->resize_object_add($table);
+	$f_win->resize(600,200);
+	$f_win->show();
+}
+
+sub install_font_cb {
+	my ($args, $b, $evinfo) = @_;
+	my $self = $args->[0];
+	my $font_path = $args->[1]->entry_get();
+	my $font_file = $self->share_dir . "/abc2svg/abc2svg.ttf";
+	print "\nCreate font path, if it doesn't exist..."; 
+	if (! -e "$font_path/truetype") {
+		make_path("$font_path/truetype") or die "Path creation failed: $!\n";
+	}
+	print "\t\t[Done]\n";
+	print "Copy abc2svg.ttf to $font_path...\n";
+	copy("$font_file","$font_path/truetype/abc2svg.ttf") or die "Copy failed: $!";
+	print "\t[Done]\n\n";
+	
+	my $popup = pEFL::Elm::Popup->add($args->[2]);
+	$popup->text_set("Font abc2svg.ttf installed to $font_path/truetype");
+	
+	my $btn = pEFL::Elm::Button->add($popup);
+	$btn->text_set("Close");
+	$popup->part_content_set("button1",$btn);
+	$btn->smart_callback_add("clicked",sub {$popup->del()});
+	
+	$popup->show();
+}
+
+sub first_run_cb {
+	my ($args,$btn,$event_info) = @_;
+	
+	my %config = ();
+	$config{abcm2ps_path} = $args->[1]->entry_get();
+	$config{scores_path} = $args->[2]->entry_get();
+	$args->[0]->settings->save_config(\%config);
+	
+	$args->[3]->del();
 }
 
 
@@ -198,6 +388,7 @@ sub add_menu {
 	$menu->item_add($edit_it,"edit-copy","Copy",sub {$self->entry->elm_entry->selection_copy()},undef);
 	$menu->item_add($edit_it,"edit-paste","Paste",sub {$self->entry->elm_entry->selection_paste()},undef);
 	$menu->item_add($edit_it,"preferences-other","Settings",sub {my $s = $self->settings(); $s->show_dialog($self)},undef);
+	$menu->item_add($edit_it,"preferences-desktop-font","Install Music Font",\&font_install,$self);
 	
 	
 	my $doc_it = $menu->item_add(undef,undef,"View",undef, undef);
@@ -262,12 +453,28 @@ sub add_toolbar {
 	$tabsbar->item_append("view-restore","Preview",\&preview_cb,$self);
 	$self->{prev_btn} = $tabsbar->item_append("go-previous","Previous Page",\&previous_page_cb,$self);
 	$self->{next_btn} = $tabsbar->item_append("go-next","Next Page",\&next_page_cb,$self);
-	my $it_sep3 = $tabsbar->item_append(undef,undef,undef,undef);
-	$it_sep3->separator_set(1);
+	#my $it_sep3 = $tabsbar->item_append(undef,undef,undef,undef);
+	#$it_sep3->separator_set(1);
+	#$tabsbar->item_append("media-playback-start","Show/Hide MIDI",\&midi_cb,$self);
+	my $it_sep4 = $tabsbar->item_append(undef,undef,undef,undef);
+	$it_sep4->separator_set(1);
 	$tabsbar->item_append("preferences-other","Settings",sub {my $s = $self->settings(); $s->show_dialog($self)},undef);
 	
 	$self->elm_toolbar($tabsbar);
 	$tabsbar->show();
+}
+
+sub midi_cb {
+    my ($self) = @_;
+    
+    my $midi = $self->midi();
+    my $midibar = $midi->elm_midibar();
+    if ($midibar->visible_get()) {
+        $midibar->hide();
+    }
+    else {
+        $midibar->show();
+    }
 }
 
 sub next_page_cb {
@@ -299,9 +506,9 @@ sub preview_cb {
 	}
 	
 	my $r = $self->renderer();
-	$r->render(outfile => "$tmpdir/preview", outformat => '.svg (one page per file)', mode => 'preview');
+	$r->render_preview(outfile => "$tmpdir/preview");
 
-	if (-e "$tmpdir/preview001.svg") {
+	if (-e "$tmpdir/preview-1.svg") {
 		my @filelist = <"$tmpdir/preview*.svg">;
 		my $number_of_pages = @filelist;
 		$self->preview->page(1) unless $self->preview->page();
@@ -309,7 +516,7 @@ sub preview_cb {
 		$self->preview->render_preview("$tmpdir/preview");
 	}
 	else {
-		warn "$tmpdir/preview001.svg doesn*t exist\n";
+		warn "$tmpdir/preview-1.svg doesn*t exist\n";
 	}
 	
 }
@@ -408,9 +615,13 @@ sub file_cb {
 	my $fs = pEFL::Elm::Fileselector->add($fs_win);
 	
 	my $path; my $filename;
+	my $config = $self->settings->load_config();
 	if ($self->current_tune->filename) { 
 		(undef, $path, undef) = fileparse( $self->current_tune->filename );
 		$filename = $self->current_tune->filename;
+	}
+	elsif ($config->{scores_path} ) {
+		$path = $config->{scores_path};
 	}
 	else { 
 		$path = getcwd || File::HomeDir->my_home;
@@ -697,7 +908,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~ m/tunes|entry|settings|renderer|user_dir|share_dir|tmpdir|current_tune|preview|elm_mainwindow|elm_menu|elm_toolbar|elm_src_highlight_check|elm_linewrap_check|elm_linecolumn_label/;
+		unless $AUTOLOAD =~ m/tunes|entry|settings|renderer|midi|user_dir|share_dir|tmpdir|mpv|current_tune|preview|elm_mainwindow|elm_menu|elm_toolbar|elm_src_highlight_check|elm_linewrap_check|elm_linecolumn_label/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

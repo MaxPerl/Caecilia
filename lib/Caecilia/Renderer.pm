@@ -37,23 +37,148 @@ our @EXPORT = qw(
 	
 );
 
-
 # Preloaded methods go here.
 
 sub new {
 	my ($class, $app, %config) = @_;
 	
-	my $renderer_object = {app => $app};
+	# TODO: abc2svg_path should be an option in app not in renderer or midi
+	my $renderer_object = {app => $app, 
+	    abc2svg_path => $app->share_dir . "/abc2svg/",
+	    notes => {}};
 	bless $renderer_object,$class;
-	
-	# Sharedir
-	#my $sharedir = dist_dir('Caecilia');
-	my $share = ('../share');
 	
 	return $renderer_object;
 }
 
-sub render {
+sub render_preview {
+	my ($self, %opts) = @_;
+	
+	my $app = $self->app();
+	my $dir = $app->tmpdir;
+	
+	my $config = $app->settings->load_config();
+	
+	my $outfile = $opts{outfile};
+	my $pageheight_cm = $config->{preview_pageheight} || 29.7;
+	my $pagewidth_cm = $config->{preview_pagewidth} || 21.0;
+    my $pageheight = $pageheight_cm * 37.795;
+    my $pagewidth = $pagewidth_cm * 37.795;
+    my $topmargin = 10*3.77;
+    my $bgcolor = "white";
+    my $preview_scale = $config->{preview_scale} || 1;
+	
+	# Get the text of the entry and add a white background to the preview.abc
+	my $text = $self->app->entry->elm_entry->entry_get();
+	# convert $text to utf8
+	$text = pEFL::Elm::Entry::markup_to_utf8($text);	
+	$text = Encode::decode("utf-8",$text);
+	
+	# Scale stylesheet directives aren't supported in preview
+	warn "Directive \%\%scale is not supported in preview\n" if ($text =~ s/\%\%scale/%% ..../g);
+	warn "Directive \%\%pagescale is not supported in preview\n" if ($text =~ s/\%\%pagescale/%% ......../g);
+	warn "Directive \%\%staffscale is not supported in preview\n" if ($text =~ s/\%\%staffscale/%% ........./g);
+	warn "Directive \%\%voicescale is not supported in preview\n" if ($text =~ s/\%\%voicescale/%% ........./g);
+	
+	# create new files for preview	
+	open my $fh, ">:encoding(utf8)", "$dir/render.abc";
+	print $fh "$text";
+	close $fh;
+	
+	my $header = "\%\%fullsvg 1\n\%\%musicfont abc2svg\n\%\%pageheight $pageheight_cm"."cm\n\%\%pagewidth $pagewidth_cm"."cm\n\%\%pagescale $preview_scale\n";
+	$self->preview_beginabc_length(length($header));
+	
+	my $val = JavaScript::QuickJS->new()
+    ->set_globals(path => $self->abc2svg_path(), abc_file => "$dir/render.abc", pageheight => $pageheight, pagewidth => $pagewidth, bgcolor => $bgcolor, topmargin => $topmargin, header => $header )
+    ->os()->std()->helpers()->eval(js());
+    
+    my @pages = @{ $val->{pages} };
+    
+    # Print SVG
+    my $i = 1;
+    foreach my $svg (@pages) {
+        open my $fh, ">:utf8", "$outfile-$i.svg";
+        print $fh $svg;
+        close $fh;
+        $i++;
+    }
+    
+    # Print Notes
+    my @notes = @{ $val->{notes} };
+    my @offsets2correctpages = @{ $val->{lastoffsets2correct_pages} };
+    open my $fh2, ">:utf8", "$outfile.notes";
+    
+    my %notes;
+    foreach my $line (@notes) {
+        $line= correct_pages($line, @offsets2correctpages);
+        print $fh2 $line;
+        
+	    ### Fill note hash for MIDI play
+	    if ($line =~ m!<abc type=".*" start_offset="(.*)" stop_offset="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)" svg_offset="(.*)" page_nr="(.*)"/>!) {
+			my %note = (
+					'istart' => $1,
+					'iend' => $2,
+					'x' => $3,
+					'y' => $4,
+					'width' => $5,
+					'height' => $6,
+					'svg_offset' => $7,
+					'page_nr' => $8,
+					);
+			$notes{$1} = \%note;
+		}
+	}
+	close $fh; 
+	
+	$self->app->preview->{notes} = \%notes;
+	
+	my @error_messages = @{ $val->{errors} };
+	my $error_message = "";
+	foreach my $error (@error_messages) {
+		$error =~ s/.*?\://;
+		$error =~ m/(\d+),\d+$/;
+		# We have to correct the added abc lines (see above)
+		# The first Line is in Caecilia 1 (not 0)!! TODO: Perhaps change the behaviour / same behaviour as abc2svg
+		my $line_nr = $1-4;
+		$error =~ s/\d+,(\d+)$/$line_nr,$1/;
+		$error_message = $error_message . "<br/>" . $error;
+	}
+	
+	print "ERROR MSG $error_message\n";
+	if ($error_message) {
+		# TODO:
+		# if generating preview doesn't work, show an error dialog
+		my $popup = pEFL::Elm::Popup->add($app->elm_mainwindow());
+		$popup->part_text_set("default", "<b>Error occured while running abcm2ps:</b><br/><br/>". $error_message );
+		
+		my $btn = pEFL::Elm::Button->add($popup);
+		$btn->text_set("Close");
+		$popup->part_content_set("button1",$btn);
+		$btn->smart_callback_add("clicked",sub {$_[0]->del},$popup);
+	
+		# popup show should be called after adding all the contents and the buttons
+		# of popup to set the focus into popup's contents correctly.
+		$popup->show();
+		
+	}
+}
+
+sub correct_pages {
+    my ($line, @offsets) = @_;
+    $line =~ m!<abc type="note" start_offset=".*" stop_offset=".*" x=".*" y=".*" width=".*" height=".*" svg_offset="(.*)" page_nr="(.*)"/>!;
+    
+    my $svg_offset=$1;
+    my $page = $2;
+    
+    if ($svg_offset == $offsets[$page-1]) {
+        my $np = $page+1;
+        $line =~ s/page_nr="$page"/page_nr="$np"/;
+        $line =~ s/svg_offset="$svg_offset"/svg_offset="0"/;
+    }
+    return $line;
+}
+
+sub render_abcm2ps {
 	my ($self, %opts) = @_;
 	
 	my $app = $self->app();
@@ -253,7 +378,7 @@ sub render_cb {
 	my $firstmeasure_spin = $self->elm_firstmeasure_spin();
 	my $firstmeasure_spinvar = $firstmeasure_spin->disabled_get ? "" : $firstmeasure_spin->value_get();
 	
-	$self->render(outfile => $filename, outformat => $formatsvar, firstmeasure => $firstmeasure_spinvar, mode => '');
+	$self->render_abcm2ps(outfile => $filename, outformat => $formatsvar, firstmeasure => $firstmeasure_spinvar, mode => '');
 	
 	$self->elm_render_win->del();
 }
@@ -309,7 +434,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|elm_render_win|elm_out_en|elm_fmt_combo|elm_firstmeasure_spin|elm_pattern_en|/;
+		unless $AUTOLOAD =~m/app|elm_render_win|elm_out_en|elm_fmt_combo|elm_firstmeasure_spin|elm_pattern_en|preview_beginabc_length|preview_scale|/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;
@@ -320,6 +445,142 @@ sub AUTOLOAD {
 		#print "Highlight set to $newval\n" if $newval;
 	}
 	return $oldval;
+}
+
+sub js {
+return <<'EOF';
+
+var abc, core = "abc2svg-1.js",
+	out = [],			// output without SVG container
+	yo = 0,				// offset of the next SVG
+	w = pagewidth,				// max width
+	page_nr = 1;
+
+std.loadScript(path + core);
+
+// let header = "%%fullsvg 1\n%%musicfont abc2svg\n";
+// let beginsvg = std.loadFile(path + "abc2svg.abc");
+let content = std.loadFile(abc_file);
+let context = "";
+
+// fix the problem about the text coordinates in librsvg
+function bug(p) {
+    var	i, t, r, x, y, c, o, j = 0;
+
+	while (1) {
+		i = p.indexOf("<text x=", j);
+		if (i < 0)
+			return p;
+		j = p.indexOf("</text", i);
+		t = p.slice(i, j);
+
+		r = t.match(/x="([^"]+)"\s+y="([^"]+)"[^>]*>(.+)/);
+			// r[1] = x list, r[2] = y list, r[3] = characters
+
+		if (r[1].indexOf(",") < 0)
+			continue;
+		x = r[1].split(",");
+		y = r[2].split(",");
+		let k = 0;
+		o = "<text x=\"" + x[0] + "\" y=\"" + y[0] + "\">" + r[3][0];
+		while (++k < x.length)
+			o += "\n<tspan x=\"" + x[k] + "\" y=\"" + y[k] + "\">" + r[3][k] + "</tspan>";
+		p = p.replace(t, o);
+	}
+	// not reached
+} //bug()
+
+let value = {
+    pages: [],
+    notes: [],
+    errors: [],
+    lastoffsets2correct_pages: [],
+};
+
+let user = {
+    anno_stop: function(music_type, start, stop_offset, x, y, w, h, s) {
+        if (music_type == "note" || music_type == "rest") {
+            // std.printf("note found on Voice %d at position %d on Time %.3f\n", s.v, s.istart, s.time);
+            let line = "<abc type=\"" + music_type + "\" start_offset=\"" + start + "\" stop_offset=\"" + stop_offset + "\" x=\"" + abc.sx(x) + "\" y=\"" + abc.sy(y) + "\" width=\"" + w + "\" height=\"" + h + "\" svg_offset=\"" + yo + "\" page_nr=\"" + page_nr + "\"/>\n";
+            value.notes.push(line);
+            out.push(line);
+        }
+        else if (music_type == "bar") {
+            std.printf("Bar found on Voice %d at position %d on Time %.3f\n", s.v, s.istart, s.ptim);
+        }
+	},
+    img_out: function(p) {
+		    switch (p.slice(0, 4)) {
+		    case "<svg":
+			    let h = p.match(/width=\"(\d+)px\" height=\"(\d+)px\"/);
+			    // if (pagewidth > 0) {
+			    //    w = pagewidth;
+			    // } else if (w < h[1]) {
+				//    w = h[1];	// max width
+			    //}
+			    w = pagewidth;
+			    let yoh = Number(yo) + Number(h[2]);
+			    p = bug(p);
+		        if (Number(yoh) > Number(pageheight)) {
+			        
+			        std.printf("Offset %.4f !!! Page limit exceeded\n", yo);
+			        value.lastoffsets2correct_pages.push(yo);
+		            let page = "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\"\n\
+                            xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n\
+                            width=\"" + w + "px\" height=\"" + pageheight + "px\">\n"
+                            + "<rect width=\"100\%\" height=\"100\%\" fill=\"" +bgcolor + "\"/>"
+		                    + out.join("\n") 
+		                    + "\n</svg>";
+		            
+		            value.pages.push(page);
+		            
+	                if (user.errtxt)
+		                tm.printErr(user.errtxt);
+                    
+                    yo = 0; 
+                    
+                    page_nr = page_nr + 1;
+                    // std.printf("Start new page %d with offset %.4f and height %4.f\n",page_nr+1,yo, h[2]);
+                    out = [];
+                    var	i = p.indexOf(">");
+                    out.push(p.slice(0, i) + "\n y=\"" + yo + "\"" + p.slice(i));
+                    yo = Number(yo) + Number(h[2]);
+		            
+		        } else {
+		            // std.printf("New line in page %d with offset %.4f and height %4.f\n",page_nr, yo, h[2]);
+		            var	i = p.indexOf(">");
+			        out.push(p.slice(0, i) + "\n y=\"" + yo + "\"" + p.slice(i));
+			        yo = Number(yo) + Number(h[2]); // offset
+		        }
+		        
+			    break;
+		    }
+	    },
+    errmsg: function(message, line_number, column_number) {
+        console.log("Error: " + message + " at "+ line_number + "," + column_number);
+        value.errors.push(message + " at "+ line_number + "," + column_number);
+        
+    },
+    read_file: std.loadFile,
+    //page_format: true,
+    //imagesize: "width=\"794px\" height=\"1190px\"",
+};
+
+abc = new abc2svg.Abc(user);
+abc.tosvg(abc_file,header+content);
+
+let page = "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\"\n\
+            xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n\
+            width=\"" + w + "px\" height=\"" + pageheight + "px\">\n" 
+            + "<rect width=\"100\%\" height=\"100\%\" fill=\"" + bgcolor +"\"/>" 
+            + out.join("\n")
+            + "\n</svg>";
+
+value.pages.push(page);
+
+value;
+
+EOF
 }
 
 sub DESTROY {}

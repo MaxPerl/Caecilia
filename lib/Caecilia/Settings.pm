@@ -72,6 +72,12 @@ sub show_dialog {
 	_expand_widget($naviframe);
 	$container->pack($naviframe,1,0,4,5); $naviframe->show();
 	
+	my $settings_general_it = $naviframe->item_push("",undef,undef,$self->_settings_general_create($naviframe),undef);
+	$settings_general_it->title_enabled_set(0,0);
+	my $settings_preview_it = $naviframe->item_push("",undef,undef,$self->_settings_preview_create($naviframe),undef);
+	$settings_preview_it->title_enabled_set(0,0);
+	my $settings_midi_it = $naviframe->item_push("",undef,undef,$self->_settings_midi_create($naviframe),undef);
+	$settings_midi_it->title_enabled_set(0,0);
 	my $settings_appearance_it = $naviframe->item_push("",undef,undef,$self->_settings_appearance_create($naviframe),undef);
 	$settings_appearance_it->title_enabled_set(0,0);
 	my $settings_abcm2ps_it =$naviframe->item_push("",undef,undef,$self->_settings_abcm2ps_create($naviframe),undef);
@@ -79,11 +85,14 @@ sub show_dialog {
 	my $settings_tabulator_it = $naviframe->item_push("",undef,undef,$self->_settings_tabulator_create($naviframe),undef);
 	$settings_tabulator_it->title_enabled_set(0,0);
 	
-	my $tab_item = $tb->item_append("preferences-desktop-font","Appearance",\&_settings_category_cb, $settings_appearance_it);
-	my $tab_item2 = $tb->item_append("media-playback-start","abcm2ps Options",\&_settings_category_cb, $settings_abcm2ps_it);
-	my $tab_item3 = $tb->item_append("applications-development","Tabulator",\&_settings_category_cb, $settings_tabulator_it);
+	my $tab_item0 = $tb->item_append("preferences-other","General",\&_settings_category_cb, $settings_general_it);
+	my $tab_item1 = $tb->item_append("view-restore","Preview",\&_settings_category_cb, $settings_preview_it);
+	my $tab_item2 = $tb->item_append("media-playback-start","Midi",\&_settings_category_cb, $settings_midi_it);
+	my $tab_item3 = $tb->item_append("preferences-desktop-font","Appearance",\&_settings_category_cb, $settings_appearance_it);
+	my $tab_item4 = $tb->item_append("applications-multimedia","abcm2ps Options",\&_settings_category_cb, $settings_abcm2ps_it);
+	my $tab_item5 = $tb->item_append("applications-development","Tabulator",\&_settings_category_cb, $settings_tabulator_it);
 
-	$tab_item->selected_set(1);
+	$tab_item0->selected_set(1);
 	
 	$naviframe->show();
 	$settings_win->resize(600,400);
@@ -102,12 +111,13 @@ sub _settings_category_cb {
 }
 
 sub _add_buttons {
-	my ($self,$table,$row) = @_;
+	my ($self,$table,$row, $width) = @_;
 	
+	$width = $width || 2;
 	my $btn_bx = pEFL::Elm::Box->add($table);
 	_expand_widget_x($btn_bx);
 	$btn_bx->horizontal_set(1);
-	$btn_bx->show(); $table->pack($btn_bx,0,$row,2,1);
+	$btn_bx->show(); $table->pack($btn_bx,0,$row,$width,1);
 	
 	my $ok_btn = pEFL::Elm::Button->new($btn_bx);
 	$ok_btn->text_set("OK");
@@ -124,6 +134,201 @@ sub _add_buttons {
 	$ok_btn->smart_callback_add("clicked", \&save_settings, $self);
 	
 	return $btn_bx;
+}
+
+sub _settings_general_create {
+	my ($self,$parent) = @_;
+	
+	my $config = $self->config();
+	
+	my $scroller = pEFL::Elm::Scroller->add($parent);
+	
+	my $box = pEFL::Elm::Box->add($parent);
+	$box->horizontal_set(0);
+	_expand_widget($box);
+	$box->show();
+	
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("General settings");
+	$frame->part_content_set("default",$scroller);
+	_expand_widget($frame);
+	$frame->show();
+	
+	my $table = pEFL::Elm::Table->add($parent);
+	_expand_widget($table);
+	$table->padding_set(10,10);
+	$table->show(); $box->pack_end($table);
+	
+	_add_header($table,0,"Path to abcm2ps", 1);
+	
+	my $abcm2ps_path_en = pEFL::Elm::Entry->add($table);
+	$abcm2ps_path_en->entry_set($config->{abcm2ps_path} || "abcm2ps");
+	$abcm2ps_path_en->scrollable_set(1);
+	$abcm2ps_path_en->single_line_set(1);
+	$abcm2ps_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
+	_expand_widget($abcm2ps_path_en);
+	$abcm2ps_path_en->show(); $table->pack($abcm2ps_path_en,0,1,2,1);
+	
+	_add_header($table,2,"Path to scores",1);
+	
+	my $scores_path_en = pEFL::Elm::Entry->add($table);
+	$scores_path_en->entry_set($config->{scores_path} || File::HomeDir->my_documents);
+	$scores_path_en->scrollable_set(1);
+	$scores_path_en->single_line_set(1);
+	$scores_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
+	_expand_widget($scores_path_en);
+	$scores_path_en->show(); $table->pack($scores_path_en,0,3,2,1);
+	
+	my $sep = pEFL::Elm::Separator->add($table);
+	_expand_widget($sep);
+	$sep->show(); $table->pack($sep,0,4,2,4);
+
+
+	# Save important widgets
+	$self->elm_abcm2ps_path_en($abcm2ps_path_en);
+	$self->elm_scores_path_en($scores_path_en);
+	
+	$self->_add_buttons($table,8);
+	
+	$scroller->content_set($box);
+	$scroller->show();
+	return $frame;
+}
+
+sub _settings_preview_create {
+	my ($self,$parent) = @_;
+	
+	my $config = $self->config();
+	
+	my $scroller = pEFL::Elm::Scroller->add($parent);
+	
+	my $box = pEFL::Elm::Box->add($parent);
+	$box->horizontal_set(0);
+	_expand_widget($box);
+	$box->show();
+	
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("Preview settings");
+	$frame->part_content_set("default",$scroller);
+	_expand_widget($frame);
+	$frame->show();
+	
+	my $table = pEFL::Elm::Table->add($parent);
+	_expand_widget($table);
+	$table->padding_set(10,10);
+	$table->show(); $box->pack_end($table);
+	
+	_add_header($table,0,"Page format", 1);
+	
+	my $pageheight_label = pEFL::Elm::Label->new($table);
+	$pageheight_label->text_set("Page height (cm)");
+	$pageheight_label->show(); $table->pack($pageheight_label,0,1,1,1);
+	
+	my $pageheight_spinner = pEFL::Elm::Spinner->add($table);
+	$pageheight_spinner->label_format_set("%1.1f");
+	$pageheight_spinner->min_max_set(0,1000); $pageheight_spinner->interval_set(10);
+	$pageheight_spinner->editable_set(1);
+	$pageheight_spinner->value_set($config->{preview_pageheight} || 29.7);
+	_expand_widget_x($pageheight_spinner);
+	$pageheight_spinner->show(); $table->pack($pageheight_spinner,1,1,1,1);
+	
+	my $pagewidth_label = pEFL::Elm::Label->new($table);
+	$pagewidth_label->text_set("Page width (cm)");
+	$pagewidth_label->show(); $table->pack($pagewidth_label,0,2,1,1);
+	
+	my $pagewidth_spinner = pEFL::Elm::Spinner->add($table);
+	$pagewidth_spinner->label_format_set("%1.1f");
+	$pagewidth_spinner->min_max_set(0,1000); $pagewidth_spinner->interval_set(10);
+	$pagewidth_spinner->editable_set(1);
+	$pagewidth_spinner->value_set($config->{preview_pagewidth} || 21.0);
+	_expand_widget_x($pagewidth_spinner);
+	$pagewidth_spinner->show(); $table->pack($pagewidth_spinner,1,2,1,1);
+	
+	_add_header($table,3,"Scaling", 1);
+	
+	my $pscale_label = pEFL::Elm::Label->new($table);
+	$pscale_label->text_set("Page scale");
+	$pscale_label->show(); $table->pack($pscale_label,0,4,1,1);
+	
+	my $preview_scale_spinner = pEFL::Elm::Spinner->add($table);
+	$preview_scale_spinner->label_format_set("%1.2f");
+	$preview_scale_spinner->step_set(0.05); $preview_scale_spinner->interval_set(0.2);
+	$preview_scale_spinner->min_max_set(0.00,10.00);
+	$preview_scale_spinner->value_set($config->{preview_scale} || 1.0);
+	_expand_widget_x($preview_scale_spinner);
+	$preview_scale_spinner->show(); $table->pack($preview_scale_spinner,1,4,1,1);
+	
+	# Save important widgets
+	$self->elm_pageheight_spinner($pageheight_spinner);
+	$self->elm_pagewidth_spinner($pagewidth_spinner);
+	$self->elm_preview_scale_spinner($preview_scale_spinner);
+	
+	
+	$self->_add_buttons($table,15);
+	
+	$scroller->content_set($box);
+	$scroller->show();
+	return $frame;
+
+}
+
+sub _settings_midi_create {
+	my ($self,$parent) = @_;
+	
+	my $config = $self->config();
+	
+	my $scroller = pEFL::Elm::Scroller->add($parent);
+	
+	my $box = pEFL::Elm::Box->add($parent);
+	$box->horizontal_set(0);
+	_expand_widget($box);
+	$box->show();
+	
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("Preview settings");
+	$frame->part_content_set("default",$scroller);
+	_expand_widget($frame);
+	$frame->show();
+	
+	my $table = pEFL::Elm::Table->add($parent);
+	_expand_widget($table);
+	$table->padding_set(10,10);
+	$table->show(); $box->pack_end($table);
+	
+	_add_header($table, 0, "MIDI tuning",1);
+	
+	my $text = "The MIDI part of Caecilia is in an early, rudimentary state. One problem is time sync". 
+		"with the follow-midi-bars. The follow mid function works on base of a time-position event handling" .
+		"If there are problems you can try to change the tick value for the Abc to MIDI process".
+		"higher values lead to a faster playback, whereas lower values slow down the playback" .
+		"The default value is 50 which seems a fitting setting for Midi files created with abc2svg";
+	my $label = pEFL::Elm::Label->new($table);
+	$label->text_set("$text");
+	$label->line_wrap_set(2);
+	_expand_widget_x($label);
+	$label->show(); $table->pack($label,0,1,3,1);
+	
+	_add_label($table,2,"MIDI ticks", 1);
+		
+	my $midi_ticks_spinner = pEFL::Elm::Slider->add($table);
+	$midi_ticks_spinner->size_hint_align_set(EVAS_HINT_FILL,0.5);
+	$midi_ticks_spinner->size_hint_weight_set(EVAS_HINT_EXPAND,0.0);
+	$midi_ticks_spinner->unit_format_set("%1.0f");
+	$midi_ticks_spinner->indicator_format_set("%1.0f");
+	$midi_ticks_spinner->min_max_set(0,100);
+	$midi_ticks_spinner->step_set(1);
+	$midi_ticks_spinner->value_set($config->{midi_ticks} || 50);
+	$midi_ticks_spinner->show(); $table->pack($midi_ticks_spinner,1,2,2,1);
+	
+	# Save important widgets
+	$self->elm_midi_ticks_slider($midi_ticks_spinner);
+	
+	$self->_add_buttons($table,4,3);
+	
+	$scroller->content_set($box);
+	$scroller->show();
+	return $frame;
+	
 }
 
 sub _settings_appearance_create {
@@ -355,76 +560,66 @@ sub _settings_abcm2ps_create {
 	$table->padding_set(10,10);
 	$table->show(); $box->pack_end($table);
 	
-	_add_header($table,0,"Path to abcm2ps");
-	
-	my $abcm2ps_path_en = pEFL::Elm::Entry->add($table);
-	$abcm2ps_path_en->entry_set($config->{abcm2ps_path} || "abcm2ps");
-	$abcm2ps_path_en->scrollable_set(1);
-	$abcm2ps_path_en->single_line_set(1);
-	$abcm2ps_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
-	_expand_widget($abcm2ps_path_en);
-	$abcm2ps_path_en->show(); $table->pack($abcm2ps_path_en,0,1,4,2);
-	
-	_add_header($table,4,"Linebreak Options");
+	_add_header($table,0,"Linebreak Options");
 		
 	my $autolinebreak_check = _add_checkoption($table,label => "Auto line break", 
-		value => $config->{abcm2ps_autolinebreak}, row => 5);
+		value => $config->{abcm2ps_autolinebreak}, row => 1);
 	
 	my ($breaknbars_check, $breaknbars_spinner) = _add_spin_with_check($table,
-		value => $config->{abcm2ps_breaknbars}, label => "Break every n bars", row => 6, 
+		value => $config->{abcm2ps_breaknbars}, label => "Break every n bars", row => 2, 
 		min => 0, max => 100, step => 1, fmt => "%1.0f");
 	
 	##################
 	# Output formatting
 	###################
-	_add_header($table,7,"Output formating");
+	_add_header($table,3,"Output formating");
 	
 	my ($scalefactor_check,$scalefactor_spinner) = _add_spin_with_check($table,
-			value => $config->{abcm2ps_scalefactor}, label => "Set Scale Factor", row => 8,
+			value => $config->{abcm2ps_scalefactor}, label => "Set Scale Factor", row => 4,
 			min => 0, max => 100, step => 0.1, fmt => "%1.2f");
 	
 	my ($staffwidth_check, $staffwidth_en) = _add_entry_with_check($table,
-		value => $config->{abcm2ps_staffwidth}, label => "Set staff width (cm/in/pt)", row => 9,);
+		value => $config->{abcm2ps_staffwidth}, label => "Set staff width (cm/in/pt)", row => 5,);
 	
 	my ($leftmargin_check, $leftmargin_en) = _add_entry_with_check($table,
-		value => $config->{abcms2ps_leftmargin}, label => "Set left margin (cm/in/pt)", row => 10);
+		value => $config->{abcms2ps_leftmargin}, label => "Set left margin (cm/in/pt)", row => 6);
 	
 	my ($staffseparation_check, $staffseparation_en) = _add_entry_with_check($table,
-		value => $config->{abcms2ps_staffseperation}, label => "Set staff separation (cm/in/pt)", row => 11);
+		value => $config->{abcms2ps_staffseperation}, label => "Set staff separation (cm/in/pt)", row => 7);
 	
 	my ($maxshrink_check,$maxshrink_spinner) = _add_spin_with_check($table,
-			value => $config->{abcm2ps_maxshrink}, label => "Set maximal shrinkage to", row => 12,
+			value => $config->{abcm2ps_maxshrink}, label => "Set maximal shrinkage to", row => 8,
 			min => 0, max => 1, step => 0.1, fmt => "%1.2f");
 	
 	my ($fmtfile_check, $fmtfile_en) = _add_entry_with_check($table,
-		value => $config->{abcms2ps_formatfile}, label => "Read format file \"foo.fmt\"", row => 13);
+		value => $config->{abcms2ps_formatfile}, label => "Read format file \"foo.fmt\"", row => 9);
 	
 	my ($fmtdir_check, $fmtdir_en) = _add_entry_with_check($table,
-		value => $config->{abcms2ps_formatdirectory}, label => "Read format directory \"foo.fmt\"", row => 14);
+		value => $config->{abcms2ps_formatdirectory}, label => "Read format directory \"foo.fmt\"", row => 10);
 		
 	###############
 	# Output Options
 	###############
 	
-	_add_header($table, 15, "Output Options");
+	_add_header($table, 11, "Output Options");
 	
 	my $landscape_check = _add_checkoption($table,
-		value => $config->{abcm2ps_landscape}, label => "landscape mode", row => 16);
+		value => $config->{abcm2ps_landscape}, label => "landscape mode", row => 12);
 	
 	my ($indentfirstline_check, $indentfirstline_en) = _add_entry_with_check( $table,
-		value => $config->{abcm2ps_intentfirstline}, label => "indent first line (cm/in/pt)", row => 17);
+		value => $config->{abcm2ps_intentfirstline}, label => "indent first line (cm/in/pt)", row => 13);
 	
 	my $xrefnumbers_check = _add_checkoption($table,
-		value => $config->{abcm2ps_xrefnumbers}, label => "Add xrefnumbers in titles", row => 18);
+		value => $config->{abcm2ps_xrefnumbers}, label => "Add xrefnumbers in titles", row => 14);
 		
 	my $nolyrics_check = _add_checkoption($table,
-		value => $config->{abcm2ps_nolyrics}, label => "Don't output lyrics", row => 19);
+		value => $config->{abcm2ps_nolyrics}, label => "Don't output lyrics", row => 15);
 		
 	# PAGE NUMBERING OPTIONS
 	my $pnlabel = pEFL::Elm::Label->new($table);
 	$pnlabel->text_set("Page numbering mode");
 	$pnlabel->size_hint_align_set(0,0);
-	$pnlabel->show(); $table->pack($pnlabel,0,20,2,1);
+	$pnlabel->show(); $table->pack($pnlabel,0,16,2,1);
 	
 	my @pagenumberingmodes = ('off', 'left','right','even left, odd right','even right, odd left');
 	my $pagenumbering_combo = pEFL::Elm::Combobox->add($table);
@@ -437,31 +632,30 @@ sub _settings_abcm2ps_create {
 		$pagenumbering_combo->item_append($itc,$mode,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
 	$pagenumbering_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, $frame);
-	$pagenumbering_combo->show(); $table->pack($pagenumbering_combo,0,21,4,1);
+	$pagenumbering_combo->show(); $table->pack($pagenumbering_combo,0,17,4,1);
 	
 	#$pagenumbering_combo->realized_items_update();
 	#$itc->free();
 	
 	my $onetuneperpage_check = _add_checkoption($table,
-		value => $config->{abcm2ps_onetuneperpage}, label => "Write one tune per page", row => 22);
+		value => $config->{abcm2ps_onetuneperpage}, label => "Write one tune per page", row => 18);
 		
 	my $nosluringrace_check = _add_checkoption($table,
-		value => $config->{abcm2ps_nosluringrace}, label => "no slur in grace notes", row => 23);
+		value => $config->{abcm2ps_nosluringrace}, label => "no slur in grace notes", row => 19);
 	
 	
 	my ($numbernbars_check, $numbernbars_spin) =_add_spin_with_check($table,
-		value => $config->{abcm2ps_numbernbars}, label => "Number measures every n bars", row => 24,
+		value => $config->{abcm2ps_numbernbars}, label => "Number measures every n bars", row => 20,
 		min => 0, max => 100, step => 1, fmt => "%1.0f"); 
 		
 	# ggf. TODO: toggle numbernbarsboxed_check, too, if numbernbars_check is changed
 	my $numbernbarsboxed_check = _add_checkoption($table,
-		value => $config->{abcm2ps_numbernbarsboxed}, label => "Display measures in a box", row => 25);
+		value => $config->{abcm2ps_numbernbarsboxed}, label => "Display measures in a box", row => 21);
 	
 	my $flatbeams_check = _add_checkoption($table,
-		value => $config->{abcm2ps_flatbeams}, label => "have fleatbeams", row => 26);
+		value => $config->{abcm2ps_flatbeams}, label => "have fleatbeams", row => 22);
 	
 	# Save important widgets
-	$self->elm_abcm2ps_path_en($abcm2ps_path_en);
 	$self->elm_autolinebreak_check($autolinebreak_check);
 	$self->elm_breaknbars_spinner($breaknbars_spinner);
 	$self->elm_scalefactor_spinner($scalefactor_spinner);
@@ -494,6 +688,29 @@ sub save_settings {
 	my ($self, $obj, $ev) = @_;
 	
 	my $config = $self->config();
+	
+	################
+	# General
+	#################
+	$config->{abcm2ps_path} = $self->elm_abcm2ps_path_en->entry_get();
+	$config->{scores_path} = $self->elm_scores_path_en->entry_get();
+	
+	################
+	# Preview
+	#################
+	my $pageheight_spinner = $self->elm_pageheight_spinner();
+	my $pagewidth_spinner = $self->elm_pagewidth_spinner();
+	my $preview_scale_spinner = $self->elm_preview_scale_spinner();
+	
+	$config->{preview_pageheight} = sprintf("%.1f",$pageheight_spinner->value_get());
+	$config->{preview_pagewidth} = sprintf("%.1f",$pagewidth_spinner->value_get());
+	$config->{preview_scale} = sprintf("%.2f",$preview_scale_spinner->value_get());
+	
+	################
+	# MIDI
+	#################
+	my $midi_ticks_slider = $self->elm_midi_ticks_slider();
+	$config->{midi_ticks} = sprintf("%.0f",$midi_ticks_slider->value_get());
 	
 	#################
 	# Tabulator settings
@@ -565,7 +782,6 @@ sub save_settings {
 	######################
 	# abcm2ps Settings
 	######################
-	$config->{abcm2ps_path} = $self->elm_abcm2ps_path_en->entry_get();
 	$config->{abcm2ps_autolinebreak} = $self->elm_autolinebreak_check->state_get();
 	$config->{abcm2ps_breaknbars} = sprintf("%.0f",_spinner_get($self->elm_breaknbars_spinner));
 	$config->{abcm2ps_scalefactor} = _spinner_get($self->elm_scalefactor_spinner);
@@ -689,7 +905,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/::(app|config|elm_toolbar|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win)|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
+		unless $AUTOLOAD =~m/::(app|config|elm_toolbar|elm_scores_path_en|elm_pageheight_spinner|elm_pagewidth_spinner|elm_preview_scale_spinner|elm_midi_ticks_slider|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win)|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

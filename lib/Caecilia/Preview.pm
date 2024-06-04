@@ -33,7 +33,9 @@ sub new {
 		elm_viewer => undef,
 		number_of_pages => undef,
 		page => undef,
-		notes => [],
+		notes => {},
+		notes_rect => [],
+		visible => [],
 		};
 	
 	bless($obj,$class);
@@ -62,22 +64,34 @@ sub init_preview {
 sub move_notes {
 	my ($self,$scroller,$ev) = @_;
 	
-	my @notes = @{$self->{notes}};
+	my $config = $self->app->settings->load_config();
+	my $scale_factor = $config->{preview_scale};
+	
+	return unless (ref($self->{notes_rect}) eq "ARRAY");
+	my @notes = @{$self->{notes_rect}};
 	
 	my ($vx,$vy,$vw,$vh) = $self->elm_viewer->geometry_get();
 	my ($sx,$sy,$sh) = $self->elm_scroller->geometry_get();
 	foreach my $note (@notes) { 
-		my $x = $note->{x} + $vx;
-		my $y = $note->{y} + $vy;
+		my $x = ($scale_factor * $note->{x}) + $vx;
+		my $y = ($scale_factor *$note->{y}) + $note->{svg_offset} +$vy;
 		my $n = $note->{evas_object};
 		if ($x<$sx || $y < $sy) {
 			$n->hide();
 		}
 		else {
 			$n->show();	
-			$n->move($note->{x}+$vx, $note->{y}+$vy);
+			$n->move( ($scale_factor*$note->{x}) + $vx, ($scale_factor * $note->{y} ) + $note->{svg_offset} +$vy);
 		}	
 	}
+	
+	return unless (ref($self->app->midi->{voice_pointers}) eq "ARRAY");
+	my @voice_pointers = @{$self->app->midi->{voice_pointers}};
+	
+	foreach my $vp (@voice_pointers) { 
+			$vp->hide() if (defined($vp));	
+	}
+	
 }
 
 sub load_tune {
@@ -87,88 +101,79 @@ sub load_tune {
 	$self->clear_viewer();
 	
 	my $viewer = $self->elm_viewer();
-	my $canvas = $self->elm_scroller->evas_get();
 	
 	# Creating tune and notes
 	# estimate dimensions of the svg
 	my $info = image_info("$file");
-	my ($w,$h) = dim($info);
+	my ($w,$h) = dim($info); 
 	$w =~ s/px$//;$h =~ s/px$//;
-	# In older versions of abcm2ps the dimensions are 
-	# in inch
-	if ($w =~ s/in$//) {
-		$w = $w *96;
-	}
-	if ($h =~ s/in$//) {
-		$h = $h * 96;
-	 }
 	
 	# create image
 	$viewer->file_set(undef,"");
-	$viewer->size_hint_min_set($w,$h);
+    $viewer->size_hint_min_set($w,$h);
 	$viewer->file_set($file,"");
 	
-	my ($vx,$vy,$vw,$vh) = $viewer->geometry_get();
-	
-	my @notes = parse_abc("$file");
-	foreach my $note (@notes) { 
-		my $col = $note->{col};
-		# We added %%beginsvg bg white to preview.abc
-		# and line starts at 0
-		my $row = $note->{row}-2;
-		my $n = pEFL::Evas::Rectangle->new($canvas);
-		$n->move($note->{x}+$vx, $note->{y}+$vy);
-		$n->resize($note->{width},$note->{height});
-		$n->color_set(24,68,91,0);
-		$n->show();
+	#my @notes = parse_abc("$file");
+	my %notes = %{ $self->{notes} };
+	#foreach my $note (@notes) {
+	while ( my ($key, $value) = each(%notes) ) {
+	    my $note = $value; 
+	    next if ($note->{page_nr} != $self->page());
+		
+		my $n = $self->create_note_rect($note,[24,68,91,0],$scale_factor);
 		
 		$n->event_callback_add(EVAS_CALLBACK_MOUSE_IN, sub {$_[0]->color_set(24,68,91,150)}, $n);
-		$n->event_callback_add(EVAS_CALLBACK_MOUSE_OUT, sub {$_[0]->color_set(24,68,91,0)}, $n);
-		
-		# Dirty Workaround: On wheel event we hide, so that the scroller can retrieve the wheel event
-		$n->event_callback_add(EVAS_CALLBACK_MOUSE_WHEEL, sub {$_[0]->hide()}, $n);
-		
-		$n->event_callback_add(EVAS_CALLBACK_MOUSE_DOWN, sub {jump_to_note($self->app->entry->elm_entry, $row,$col);}, undef);
+	    $n->event_callback_add(EVAS_CALLBACK_MOUSE_OUT, sub {$_[0]->color_set(24,68,91,0)}, $n);
+	    
+	    # Dirty Workaround: On wheel event we hide, so that the scroller can retrieve the wheel event
+	    $n->event_callback_add(EVAS_CALLBACK_MOUSE_WHEEL, sub {$_[0]->hide()}, $n);
+	    
+	    my $renderer = $self->app->renderer;
+	    my $istart = $note->{istart} - $renderer->preview_beginabc_length();
+		my $iend = $note->{iend} - $renderer->preview_beginabc_length();
+	    $n->event_callback_add(EVAS_CALLBACK_MOUSE_DOWN, sub {jump_to_note($self->app->entry->elm_entry, $istart, $iend);}, undef);
+	
 		$note->{evas_object} = $n;
 		
-		
-		push @{$self->{notes}},$note;
+		push @{$self->{notes_rect}},$note;
+		$self->{notes}->{$key}->{evas_object} = $n;
 	}
 }
 
+sub create_note_rect {
+    my ($self, $note, $color, $scale_factor) = @_;
+    
+    my $viewer = $self->elm_viewer();
+    my $canvas = $self->elm_scroller->evas_get();
+    
+    my ($vx,$vy,$vw,$vh) = $viewer->geometry_get();
+    
+    my $n = pEFL::Evas::Rectangle->new($canvas);
+	$n->move(($scale_factor*$note->{x})+$vx, ($scale_factor*$note->{y})+$note->{svg_offset}+$vy);
+	$n->resize($scale_factor*$note->{width},$scale_factor*$note->{height});
+	$n->color_set(@$color);
+	$n->show();
+	
+	return $n;
+}
+
 sub jump_to_note {
-	my ($en,$row,$col) = @_;
+	my ($en,$start_offset, $stop_offset) = @_;
 	
 	my $textblock = $en->textblock_get();
 	my $cp1 = pEFL::Evas::TextblockCursor->new($textblock);
-	$cp1->pos_set(0);
-	my $i;
-	for ($i=0;$i<$row;$i++) {
-		$cp1->paragraph_next();
-	}
-	my $lpos = $cp1->pos_get();
-	$cp1->pos_set($lpos + $col);
+	#$cp1->pos_set(0);
+	#my $i;
+	#for ($i=0;$i<$row;$i++) {
+	#	$cp1->paragraph_next();
+	#}
+	#my $lpos = $cp1->pos_get();
+	$cp1->pos_set($start_offset);
 	my $cp2 = pEFL::Evas::TextblockCursor->new($textblock);
-	$cp2->pos_set($lpos);
-	$cp2->paragraph_char_last();
+	$cp2->pos_set($stop_offset);
 	
-	my $line = $textblock->range_text_get($cp1,$cp2,EVAS_TEXTBLOCK_TEXT_PLAIN);
-	$line = Encode::decode("UTF-8",$line);
-	
-	my $end;
-	if ($line =~ m/^\[/) {
-		$line =~ m/\[.+?\][0-9\/]*/gc;
-		$end = pos($line) + $col;
-	}
-	else {
-		$line =~ m/[_=^]*[abcdefgxzABCDEFGXZ][,'-]*[0-9\/]*/gc;
-		$end = pos($line) + $col;
-	}
-	$cp2->paragraph_char_first();
-	$cp2->pos_set($cp2->pos_get() + $end);
 	my $start = $cp1->pos_get();
 	my $e = $cp2->pos_get();
-	
 	$en->cursor_pos_set($start);
 	$en->select_region_set($start,$e);
 	
@@ -176,19 +181,24 @@ sub jump_to_note {
 	$cp2->free();
 }
 
+# TODO: This function isn't used anymore
 sub parse_abc {
 	my ($file) = @_;
+	$file =~ s/-.*.svg//;
+	$file = "$file.notes";
 	my @notes;
 	open my $fh, "<", $file;
 	while (my $line = <$fh>) {
-		if ($line =~ m!<abc type="[NR]".* row="(.*)" col="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)"/>!) {
+		if ($line =~ m!<abc type=".*" start_offset="(.*)" stop_offset="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)" svg_offset="(.*)" page_nr="(.*)"/>!) {
 			my %note = (
-					'row' => $1,
-					'col' => $2,
+					'start_offset' => $1,
+					'stop_offset' => $2,
 					'x' => $3,
 					'y' => $4,
 					'width' => $5,
-					'height' => $6
+					'height' => $6,
+					'svg_offset' => $7,
+					'page_nr' => $8,
 					);
 			push @notes, \%note;
 		}
@@ -211,14 +221,15 @@ sub show_logo {
 sub clear_notes {
 	my ($self) = @_;
 	
-	my @notes = @{$self->{notes}};
+	my @notes = ();
+	@notes = @{$self->{notes_rect}} if (defined($self->{notes_rect}));
 	
 	foreach my $note (@notes) { 
 		my $n = $note->{evas_object};
 		$n->del();
 	}
 	
-	undef($self->{notes});
+	undef($self->{notes_rect});
 }
 
 sub clear_viewer {
@@ -237,18 +248,20 @@ sub render_preview {
 	$page = $number_of_pages if ($page > $number_of_pages);
 	$filename =~ s/\.abc$//;
 	$filename =~ s/\d{3}$//;
-	if ($page < 10) {
-		$filename = $filename . "00" . $page . ".svg";
-	}
-	elsif ($page < 100) {
-		$filename = $filename . "0" . $page . ".svg";
-	}
-	else {
-		$filename = $filename . $page . ".svg";
-	}
+	#if ($page < 10) {
+	#	$filename = $filename . "00" . $page . ".svg";
+	#}
+	#elsif ($page < 100) {
+	#	$filename = $filename . "0" . $page . ".svg";
+	#}
+	#else {
+	#	$filename = $filename . $page . ".svg";
+	#}
+	my $config = $self->app->settings->load_config();
+	$filename = "$filename-$page.svg";
 	if (-e $filename) {
 		$self->{filename} = $filename;
-		$self->load_tune($filename, 1);#scale_factor not used at moment
+		$self->load_tune($filename, $config->{preview_scale});#scale_factor not used at moment
 	}
 }
 
