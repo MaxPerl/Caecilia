@@ -20,3 +20,4 @@ Therefore you need the following libraries and perl modules:
 * Image::Info
 * File::ShareDir
 * Javascript::QuickJS
+* MIDI
