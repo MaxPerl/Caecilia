@@ -15,7 +15,7 @@ sudo make install
 
 Therefore you need the following libraries and perl modules:
 
-* pEFL
+* pEFL (at the moment you need the newest version of github. The version on CPAN doesn't work!)
 * Source::SyntaxHighlight
 * Image::Info
 * File::ShareDir
