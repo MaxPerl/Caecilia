@@ -135,7 +135,7 @@ sub render_preview {
 	my @error_messages = @{ $val->{errors} };
 	my $error_message = "";
 	foreach my $error (@error_messages) {
-		$error =~ s/.*?\://;
+		$error =~ s/.*\://;
 		$error =~ m/(\d+),\d+$/;
 		# We have to correct the added abc lines (see above)
 		# The first Line is in Caecilia 1 (not 0)!! TODO: Perhaps change the behaviour / same behaviour as abc2svg
@@ -150,7 +150,7 @@ sub render_preview {
 		# if generating preview doesn't work, show an error dialog
 		my $popup = pEFL::Elm::Popup->add($app->elm_mainwindow());
 		$popup->part_text_set("default", "<b>Error occured while running abcm2ps:</b><br/><br/>". $error_message );
-		
+		$popup->scrollable_set(1);
 		my $btn = pEFL::Elm::Button->add($popup);
 		$btn->text_set("Close");
 		$popup->part_content_set("button1",$btn);
@@ -504,9 +504,6 @@ let user = {
             let line = "<abc type=\"" + music_type + "\" start_offset=\"" + start + "\" stop_offset=\"" + stop_offset + "\" x=\"" + abc.sx(x) + "\" y=\"" + abc.sy(y) + "\" width=\"" + w + "\" height=\"" + h + "\" svg_offset=\"" + yo + "\" page_nr=\"" + page_nr + "\"/>\n";
             value.notes.push(line);
             out.push(line);
-        }
-        else if (music_type == "bar") {
-            std.printf("Bar found on Voice %d at position %d on Time %.3f\n", s.v, s.istart, s.ptim);
         }
 	},
     img_out: function(p) {

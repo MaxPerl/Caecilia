@@ -296,7 +296,6 @@ sub to_midi {
         
         if ($line =~ m/ v:\d+\s+MIDI program (\d+) (\d+)/ ) {
             $n = $1-1; $i = $2;
-            print "N $n, I $i\n";
             $instruments{"channel$n"} = "$i";
         }
         next if $line =~ m/^#/;
