@@ -19,3 +19,4 @@ Therefore you need the following libraries and perl modules:
 * Source::SyntaxHighlight
 * Image::Info
 * File::ShareDir
+* Javascript::QuickJS
