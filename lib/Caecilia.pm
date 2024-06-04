@@ -221,7 +221,8 @@ sub show_first_run_dialog {
 		"To install the font copy <br/>" . $self->share_dir . "/abc2svg/abc2svg.ttf<br/>" . 
 		"to a local/systemwide font directory. On Linux you usually can copy it to <br/>" .
 		"\$HOME/.local/share/fonts under the subfolder truetype<br/>" .
-		"If you have the rights to write to a font directory you can install here";
+		"Then you have to build font information cache files with the command <br/>´fc-cache´. ".
+		"If you have the rights to write to a font directory you can easily install the abc2svg font here";
 	my $label = pEFL::Elm::Label->new($table);
 	$label->text_set("$text");
 	$label->line_wrap_set(2);
@@ -276,14 +277,19 @@ sub font_install {
 	$table->padding_set(10,10);
 	$table->show();
 	
-	_add_header($table,0,"Install abc2svg music font",4);
+	_add_header($table,0,"Install abc2svg music font",2);
 	
-	_add_label($table, 1, "Caecilia needs a music font installed to render preview correctely.<br/>" . 
-		"To install the font you habe to copy the file <br/>" . $self->share_dir . "/abc2svg/abc2svg.ttf<br/>" . 
-		"to a local/systemwide font directory <br/>" .
-		"On Linux systems you usually can install it to <br/>" .
+	my $text = "Caecilia needs a music font to render preview. " . 
+		"To install the font copy <br/>" . $self->share_dir . "/abc2svg/abc2svg.ttf<br/>" . 
+		"to a local/systemwide font directory. On Linux you usually can copy it to <br/>" .
 		"\$HOME/.local/share/fonts under the subfolder truetype<br/>" .
-		"If you have the rights to write to a font directory you can install here",4);
+		"Then you have to build font information cache files with the command <br/>´fc-cache´. ".
+		"If you have the rights to write to a font directory you can easily install the abc2svg font here";
+	my $label = pEFL::Elm::Label->new($table);
+	$label->text_set("$text");
+	$label->line_wrap_set(2);
+	_expand_widget($label);
+	$label->show(); $table->pack($label,0,1,4,1);
 	
 	my $font_path_en = pEFL::Elm::Entry->add($table);
 	$font_path_en->entry_set(File::HomeDir->my_home ."/.local/share/fonts");
@@ -291,11 +297,11 @@ sub font_install {
 	$font_path_en->single_line_set(1);
 	$font_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
 	_expand_widget($font_path_en);
-	$font_path_en->show(); $table->pack($font_path_en,0,3,3,1);
+	$font_path_en->show(); $table->pack($font_path_en,0,2,3,1);
 	
 	my $font_btn = pEFL::Elm::Button->add($table);
 	$font_btn->text_set("Install Font");
-	$font_btn->show; $table->pack($font_btn,3,3,1,1);
+	$font_btn->show; $table->pack($font_btn,3,2,1,1);
 	
 	my $btn_bx = pEFL::Elm::Box->add($table);
 	_expand_widget_x($btn_bx);
@@ -312,7 +318,7 @@ sub font_install {
 	$close_btn->smart_callback_add("clicked", sub {$f_win->del()}, undef);
 	
 	$f_win->resize_object_add($table);
-	$f_win->resize(600,200);
+	$f_win->resize(490,200);
 	$f_win->show();
 }
 
@@ -328,6 +334,9 @@ sub install_font_cb {
 	print "\t\t[Done]\n";
 	print "Copy abc2svg.ttf to $font_path...\n";
 	copy("$font_file","$font_path/truetype/abc2svg.ttf") or die "Copy failed: $!";
+	print "\t[Done]\n";
+	print "Run fc-cache...\n";
+	system("fc-cache");
 	print "\t[Done]\n\n";
 	
 	my $popup = pEFL::Elm::Popup->add($args->[2]);
