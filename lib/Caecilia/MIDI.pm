@@ -67,19 +67,25 @@ sub init_ui {
     # basic tutorial code
     # basic text button
     my $rewind_b = pEFL::Elm::Button->new($box);
-    $rewind_b->text_set("Rewind");
+    my $icon_backward = pEFL::Elm::Icon->add($rewind_b);
+	$icon_backward->standard_set("media-seek-backward");
+	$rewind_b->part_content_set("icon",$icon_backward);
     $box->pack_end($rewind_b);$rewind_b->show();
 
     # basic tutorial code
     # basic text button
     my $play_b = pEFL::Elm::Button->new($box);
-    $play_b->text_set("Play");
+    my $icon_play = pEFL::Elm::Icon->add($play_b);
+	$icon_play->standard_set("media-playback-start");
+	$play_b->part_content_set("icon",$icon_play);
     $box->pack_end($play_b);$play_b->show();
 
     # basic tutorial code
     # basic text button
     my $forward_b = pEFL::Elm::Button->new($box);
-    $forward_b->text_set("Forward");
+    my $icon_forward = pEFL::Elm::Icon->add($forward_b);
+	$icon_forward->standard_set("media-seek-forward");
+	$forward_b->part_content_set("icon",$icon_forward);
     $box->pack_end($forward_b);$forward_b->show();
 
     my $progress_spinner = pEFL::Elm::Slider->add($box);
@@ -130,6 +136,10 @@ sub generate_mid {
 	open my $fh, ">:encoding(utf8)", $self->abc_file() or die "Could not open abc file: $!\n";
 	print $fh "$text";
 	close $fh;
+    
+    my $preview = $self->app->preview;
+    $preview->page(1);
+    $preview->render_preview();
     
     my $config = $self->app->settings->load_config();
     $self->preview_scale_factor($config->{preview_scale});
