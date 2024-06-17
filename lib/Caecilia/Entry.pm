@@ -653,9 +653,10 @@ sub rehighlight_all {
 	# therefore check, whether there is a text
 	if ($text) {
 
-		$self->is_rehighlight("yes");
-		$entry->select_all();
-		$entry->entry_insert($text);
+		#$self->is_rehighlight("yes");
+		#$entry->select_all();
+		$entry->entry_set($text);
+		#$entry->entry_insert($text);
 	}
 	else {
 		$self->rehighlight("yes");

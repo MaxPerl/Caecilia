@@ -28,7 +28,6 @@ sub new {
 		app => $app,
 		abc_file => $app->tmpdir . "/midi.abc",
 		midi_file => $app->tmpdir . "/out.mid",
-		wav_file => $app->tmpdir . "/out.wav",
 		# TODO: abc2svg_path should be an option in app not in renderer or midi
 		abc2svg_path => $app->share_dir . "/abc2svg/",
 		elm_video => undef,
@@ -124,6 +123,25 @@ sub _playback_finished_cb {
 
 sub generate_mid {
     my ($self) = @_;
+    
+    # Clear old-files
+	if (-e $self->midi_file) {
+		unlink $self->midi_file or die "Coud not unlink MIDI File\n";
+    }
+    
+    if (-e $self->abc_file) {
+    	unlink $self->abc_file or die "Coud not unlink ABC File\n";
+    }
+    
+    if (-e $self->app->tmpdir . "/preview.notes") {
+    	unlink ($self->app->tmpdir . "/preview.notes") or die "Coud not unlink Notes File\n";
+    }
+    undef %{ $self->events };
+    foreach my $pointer (@{ $self->voice_pointers }) {
+    	$pointer->del();
+    }
+    undef @{ $self->voice_pointers };
+    
     # Get the text of the entry and add a white background to the preview.abc
 	my $text = $self->app->entry->elm_entry->entry_get();
 	# convert $text to utf8
@@ -149,8 +167,9 @@ sub generate_mid {
     $self->to_midi($notes);
 
     my $video = $self->elm_video;
+    $video->stop();
+    $video->file_set("");
     $video->file_set($self->midi_file);
-    $video->pause();
     $video->play_position_set(0);
     $self->elm_progress_spinner->value_set(0);
 }
@@ -341,7 +360,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|abc_file|midi_file|wav_file|abc2svg_path|preview_scale_factor|elm_midibar|elm_video|elm_progress_spinner/;
+		unless $AUTOLOAD =~m/app|abc_file|events|midi_file|abc2svg_path|preview_scale_factor|voice_pointers|elm_midibar|elm_video|elm_progress_spinner/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;
@@ -466,8 +485,6 @@ function do_file(fn) {
 } // do_file()
 
 let abc = new abc2svg.Abc(user);
-	if (typeof global == 'object' && !global.abc)
-		global.abc = abc;
 		
 do_file(abc_file);
 

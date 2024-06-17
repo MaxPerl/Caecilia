@@ -106,12 +106,12 @@ sub render_preview {
     # Print Notes
     my @notes = @{ $val->{notes} };
     my @offsets2correctpages = @{ $val->{lastoffsets2correct_pages} };
-    open my $fh2, ">:utf8", "$outfile.notes";
+    #open my $fh2, ">:utf8", "$outfile.notes";
     
     my %notes;
     foreach my $line (@notes) {
         $line= correct_pages($line, @offsets2correctpages);
-        print $fh2 $line;
+        #print $fh2 $line;
         
 	    ### Fill note hash for MIDI play
 	    if ($line =~ m!<abc type=".*" start_offset="(.*)" stop_offset="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)" svg_offset="(.*)" page_nr="(.*)"/>!) {
@@ -128,7 +128,7 @@ sub render_preview {
 			$notes{$1} = \%note;
 		}
 	}
-	close $fh; 
+	#close $fh; 
 	
 	$self->app->preview->{notes} = \%notes;
 	
@@ -500,7 +500,6 @@ let value = {
 let user = {
     anno_stop: function(music_type, start, stop_offset, x, y, w, h, s) {
         if (music_type == "note" || music_type == "rest") {
-            // std.printf("note found on Voice %d at position %d on Time %.3f\n", s.v, s.istart, s.time);
             let line = "<abc type=\"" + music_type + "\" start_offset=\"" + start + "\" stop_offset=\"" + stop_offset + "\" x=\"" + abc.sx(x) + "\" y=\"" + abc.sy(y) + "\" width=\"" + w + "\" height=\"" + h + "\" svg_offset=\"" + yo + "\" page_nr=\"" + page_nr + "\"/>\n";
             value.notes.push(line);
             out.push(line);
