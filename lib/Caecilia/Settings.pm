@@ -582,20 +582,20 @@ sub _settings_abcm2ps_create {
 		value => $config->{abcm2ps_staffwidth}, label => "Set staff width (cm/in/pt)", row => 5,);
 	
 	my ($leftmargin_check, $leftmargin_en) = _add_entry_with_check($table,
-		value => $config->{abcms2ps_leftmargin}, label => "Set left margin (cm/in/pt)", row => 6);
+		value => $config->{abcm2ps_leftmargin}, label => "Set left margin (cm/in/pt)", row => 6);
 	
 	my ($staffseparation_check, $staffseparation_en) = _add_entry_with_check($table,
-		value => $config->{abcms2ps_staffseperation}, label => "Set staff separation (cm/in/pt)", row => 7);
+		value => $config->{abcm2ps_staffseparation}, label => "Set staff separation (cm/in/pt)", row => 7);
 	
 	my ($maxshrink_check,$maxshrink_spinner) = _add_spin_with_check($table,
 			value => $config->{abcm2ps_maxshrink}, label => "Set maximal shrinkage to", row => 8,
 			min => 0, max => 1, step => 0.1, fmt => "%1.2f");
 	
 	my ($fmtfile_check, $fmtfile_en) = _add_entry_with_check($table,
-		value => $config->{abcms2ps_formatfile}, label => "Read format file \"foo.fmt\"", row => 9);
+		value => $config->{abcm2ps_formatfile}, label => "Read format file \"foo.fmt\"", row => 9);
 	
 	my ($fmtdir_check, $fmtdir_en) = _add_entry_with_check($table,
-		value => $config->{abcms2ps_formatdirectory}, label => "Read format directory \"foo.fmt\"", row => 10);
+		value => $config->{abcm2ps_formatdirectory}, label => "Read format directory \"foo.fmt\"", row => 10);
 		
 	###############
 	# Output Options

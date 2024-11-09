@@ -321,27 +321,60 @@ sub to_midi {
 
     my @lines = split(/\n/, $notes);
     
+    my %channels = ("0" => 0);
+    my $last_channel = 0;
+    my %voices = ();
+    
+    foreach my $line (@lines) {
+    	if ($line =~ m/ v:\d+\s+MIDI program (\d+) (\d+)/ ) {
+            my $voice = $1-1; my $program = $2;
+            
+            $voice =~ s/\..\d//;
+            # Hack: Channel 10 ist for percussion only
+        	$voice = $voice+1 if ($voice == 9);
+            
+            foreach my $channel (keys %channels) {
+            	if ($program == $channels{$channel}) {
+            		$voices{$voice} = $channel;
+            		last;
+            	}
+            }
+            
+            if (!defined($voices{$voice})) {
+            
+            	# Hack: Channel 10 (=9) ist for percussion only
+            	$last_channel = $last_channel+1;
+            	$last_channel = 10 if ($last_channel == 9);
+            
+            	$voices{$voice} = $last_channel; 
+            	$channels{$last_channel} = $program;
+            }
+        }
+    }
+    
+    foreach my $channel (keys %channels) {
+        push @{ $tracks{"$n"} }, ['patch_change', 0, $channel, $channels{$channel}];
+    }
+    
     foreach my $line (@lines) {
         
-        if ($line =~ m/ v:\d+\s+MIDI program (\d+) (\d+)/ ) {
-            $n = $1-1; $i = $2;
-            $instruments{"channel$n"} = "$i";
-        }
         next if $line =~ m/^#/;
         next if $line =~ m/^ v:/;
         my ($time, $instr, $pitch, $duration, $voice, $istart) = split(/\t/,$line);
-        $voice = "undef" if (!defined($voice));
-        $voice =~ s/.\d//; chomp($istart);
+        next if (!defined($voice));
+        $voice =~ s/\..\d$//;
+        chomp($istart);
+        
+        # Hack: Channel 10 ist for percussion only
+        $voice = $voice+1 if ($voice == 9);
         
         if ( !defined($tracks{"$voice"} ) ) {
             $tracks{"$voice"} = [];
-            my $key = "channel$voice";
-            my $i = $instruments{"$key"};
-            push @{ $tracks{"$voice"} }, ['patch_change', 0, $voice, $i];
         }
         
+        my $channel = $voices{$voice};
         push @{ $tracks{"$voice"} }, ['text_event', $time, "T:$time V:$voice ISTART:$istart"];
-        push @{ $tracks{"$voice"} }, ['note', $time, $duration, $voice,$pitch, 64];
+        push @{ $tracks{"$voice"} }, ['note', $time, $duration, $channel, $pitch, 64];
     }
 
     my @tracks; $n = 1;

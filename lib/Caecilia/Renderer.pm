@@ -264,28 +264,63 @@ sub render_abcm2ps {
 	my ($stdin,$stdout, $stderr);
 	my $abcm2ps = $config->{abcm2ps_path} || "abcm2ps";
 	my $pid = open3(\*IN, \*OUT, \*ERR, $abcm2ps, @cmd);
-	my $error_message ='';
-		while(my $line = <ERR>) {
-			$error_message .= $line
-		}
+	my $error_message =''; my $out = '';
+	while(my $line = <ERR>) {
+			$line =~ s/^\/.*render.abc\://;
+			$error_message = $error_message. $line . "<br/>";
+	}
+	
+	while(my $l = <OUT>) {
+			$out = $l if ($l =~m/^Output written on/);
+			$out =~ s/Output written on/\<b\>Output written on... \<\/b\>\<br\/\>/;
+	}
+	
 	close IN; close OUT; close ERR;
 	waitpid($pid,0);
-	if ($?) {
-		# TODO:
-		# if generating preview doesn't work, show an error dialog
-		my $popup = pEFL::Elm::Popup->add($app->elm_mainwindow());
-		$popup->part_text_set("default", "Error occured while running abcm2ps:<br/><br/>$error_message");
-		
-		my $btn = pEFL::Elm::Button->add($popup);
-		$btn->text_set("Close");
-		$popup->part_content_set("button1",$btn);
-		$btn->smart_callback_add("clicked",sub {$_[0]->del},$popup);
+	my $child_exit_status = $? >> 8;
+	print "abcm2ps exits with error status: $child_exit_status\n";
 	
-		# popup show should be called after adding all the contents and the buttons
-		# of popup to set the focus into popup's contents correctly.
-		$popup->show();
-		
+	# TODO:
+	# if generating preview doesn't work, show an error dialog
+	my $popup = pEFL::Elm::Win->add($app->elm_mainwindow(), "Render abc", ELM_WIN_BASIC);
+	$popup->title_set("Render completed");
+	$popup->focus_highlight_enabled_set(1);
+	$popup->autodel_set(1);
+	
+	my $bg = pEFL::Elm::Bg->add($popup);
+	_expand_widget($bg);
+	$bg->show(); $popup->resize_object_add($bg);
+	
+	my $box = pEFL::Elm::Box->add($popup);
+	$box->horizontal_set(0);
+	_expand_widget($box);
+	$box->show();
+	$popup->resize_object_add($box);
+
+	my $label = pEFL::Elm::Label->new($box);
+	my $message = ''; 
+	if ($out) {
+		$message = $out . "<br/>";
 	}
+	if ( $child_exit_status != 0 ) {
+		$message = $message . "<br/><b>Errors occured while running abcm2ps:</b><br/>$error_message";
+	} 
+	$label->text_set("$message");
+	$label->line_wrap_set(ELM_WRAP_MIXED);
+	$label->wrap_width_set(400);
+	$label->size_hint_weight_set(EVAS_HINT_EXPAND,EVAS_HINT_EXPAND);
+	$label->size_hint_align_set(EVAS_HINT_FILL,EVAS_HINT_FILL);
+	$label->show(); $box->pack_end($label);
+	
+	my $btn = pEFL::Elm::Button->new($box);
+	$btn->text_set("Close");
+	$box->pack_end($btn);
+	$btn->smart_callback_add("clicked",sub {$_[0]->del},$popup);
+	_expand_widget($btn);
+	$btn->show();
+	
+	$popup->show();
+	
 }
 
 
@@ -346,7 +381,7 @@ sub show_dialog {
 	foreach my $format (@outformats) {
 		$format_combo->item_append($itc,$format,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
-	$format_combo->smart_callback_add("item,pressed",\&_combobox_item_pressed_cb, undef);
+	$format_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, $frame);
 	$format_combo->show(); $table->pack($format_combo,2,0,2,1);
 	
 	my ($pattern_check, $pattern_en) = _add_entry_with_check($table,

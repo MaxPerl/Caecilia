@@ -379,7 +379,7 @@ sub add_menu {
 	
 	my $file_it = $menu->item_add(undef,undef,"File",undef, undef);
 	
-	$menu->item_add($file_it,"document-new","New",sub {$self->tunes->_new_tune_cb},undef);
+	$menu->item_add($file_it,"document-new","New",sub {$self->tunes->_new_tune},undef);
 	$menu->item_add($file_it,"document-open","Open",\&_open_cb,$self);
 	$menu->item_add($file_it,"document-save","Save",\&save,$self);
 	$menu->item_add($file_it,"document-save-as","Save as",\&save_as,$self);
@@ -450,7 +450,7 @@ sub add_toolbar {
 	$tabsbar->icon_size_set(14);
 	$f->content_set($tabsbar);
 	
-	$tabsbar->item_append("document-new","New",sub {$self->tunes->_new_tune_cb},undef);
+	$tabsbar->item_append("document-new","New",sub {$self->tunes->_new_tune},undef);
 	$tabsbar->item_append("document-open","Open",\&_open_cb,$self);
 	$tabsbar->item_append("document-save","Save",\&save,$self);
 	$tabsbar->item_append("document-save-as","Save as",\&save_as,$self);
@@ -537,7 +537,7 @@ sub key_down {
 	my $modifiers = $e->modifiers();
 	
 	if ($modifiers == 2 && $keyname eq "n") {
-		$self->tunes->_new_tune_cb();
+		$self->tunes->_new_tune();
 	}
 	elsif ($modifiers == 2 && $keyname eq "o") {
 		_open_cb($self);
