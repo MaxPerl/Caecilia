@@ -8,8 +8,6 @@ require Exporter;
 use pEFL::Elm;
 use pEFL::Evas;
 
-use Caecilia::Settings;
-
 our @ISA = qw(Exporter);
 
 # Items to export into callers namespace by default. Note: do not export
