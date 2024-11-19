@@ -905,7 +905,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/::(app|config|elm_toolbar|elm_scores_path_en|elm_pageheight_spinner|elm_pagewidth_spinner|elm_preview_scale_spinner|elm_midi_ticks_slider|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win)|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
+		unless $AUTOLOAD =~m/app|config|elm_toolbar|elm_scores_path_en|elm_pageheight_spinner|elm_pagewidth_spinner|elm_preview_scale_spinner|elm_midi_ticks_slider|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

@@ -138,7 +138,7 @@ sub generate_mid {
     }
     undef %{ $self->events };
     foreach my $pointer (@{ $self->voice_pointers }) {
-    	$pointer->del();
+    	$pointer->del() if (defined($pointer));
     }
     undef @{ $self->voice_pointers };
     
