@@ -19,6 +19,8 @@ our @ISA = qw(Exporter);
 
 our $AUTOLOAD;
 
+my $region_old_y = 0;
+
 sub new {
 	my ($class, $app, $box) = @_;
 	
@@ -179,6 +181,7 @@ sub change_pos {
     
     $video->pause();
     my $pos = $spinner->value_get();
+    $region_old_y = 0;
     $video->play_position_set($pos);
     $video->play();
 }
@@ -195,12 +198,16 @@ sub _pos_update {
 	$progress_spinner->value_set($position);
 	
 	my $key = sprintf("%.1f",$position);
+	
 	if ( defined( $self->{events}->{$key} ) ) {
 	    
 	    my $preview = $self->app->preview();
 	    my $scale_factor = $self->preview_scale_factor();;
 	    
 	    my $events = $self->{events}->{$key};
+	    my $viewer = $preview->elm_viewer();
+	    my ($vx,$vy,$vw,$vh) = $viewer->geometry_get();
+	    my $region_x=0; my $region_y=0; my $region_w=0; my $first_pointer_per_pos_y=undef; 
 	    foreach my $event (@$events) {
 	        # We added the ABC file some commands (e.g. %%fullsvg 1, %%musicfont etc)
 	        # TODO: Save the added value as istart?
@@ -214,16 +221,30 @@ sub _pos_update {
 	        	#$self->elm_video->pause();
 	        	$self->app->preview->page($note->{page_nr});
 	        	$self->app->preview->render_preview($self->app->tmpdir . "/preview");
+	        	$region_old_y = 0;
 	        	#$self->elm_video->play();
 	        }
 	        
-	        my $viewer = $preview->elm_viewer();
             my $canvas = $preview->elm_scroller->evas_get();
             
-            my ($vx,$vy,$vw,$vh) = $viewer->geometry_get();
+            
 	        my ($sx,$sy,$sh) = $preview->elm_scroller->geometry_get();
 	        my $x = ($scale_factor*$note->{x}) + $vx-2;
 			my $y = ($scale_factor*$note->{y}) + $note->{svg_offset} +$vy;
+			
+			$region_x = $x-$vx-($vw/4) if ($x>$region_x);
+			# This is tricky: We don't want that the pointer jumps up and down on multiple voices
+			# so never jump up 
+			$region_y = $y-$vy-($vh/4) if ($y>$region_y);
+			if ($region_y < $region_old_y) {
+				$region_y = $region_old_y;
+			}
+			
+			# and use only the first pointer per position as anchor to center scrolling
+			unless (defined($first_pointer_per_pos_y)) {				
+				$first_pointer_per_pos_y = $region_y;
+			}
+			
 	        if ($pointers[$voice]) {
 	            my $p = $self->{voice_pointers}->[$voice];
 	            if ($x<$sx || $y < $sy) {
@@ -242,6 +263,9 @@ sub _pos_update {
 	            $self->{voice_pointers}->[$voice]=$n;
 	        }
 	    }
+	    
+	    $region_old_y = $first_pointer_per_pos_y;
+	    $preview->elm_scroller->region_show($region_x, $first_pointer_per_pos_y, $vw/2,$vh/2);
 	}
 }
 
