@@ -107,7 +107,7 @@ sub init_entry {
 	$en->markup_filter_append(\&tabs_to_whitespaces, $self);
 	
 	$en->event_callback_add(EVAS_CALLBACK_KEY_DOWN, \&on_key_down, $self);
-	$en->event_callback_add(EVAS_CALLBACK_MOUSE_UP, \&line_column_get_mouse, $self);
+	$en->event_callback_add(EVAS_CALLBACK_MOUSE_DOWN, \&line_column_get_mouse, $self);
 	#$en->smart_callback_add("selection,paste" => \&paste_selection, $self);
 	$en->smart_callback_add("changed,user" => \&changed, $self);
 	$en->smart_callback_add("text,set,done" => \&text_set_done, $self);

@@ -30,6 +30,7 @@ WriteMakefile(
 							HTML::Entities => 0,
 							MIDI => 0,
 							MIDI::Util => 0,
+							Music::Tempo => 0,
 							JavaScript::QuickJS => 0,
 							YAML => 0,
 							}, # e.g., Module::Name => 1.1

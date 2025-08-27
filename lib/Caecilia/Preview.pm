@@ -65,7 +65,7 @@ sub move_notes {
 	my ($self,$scroller,$ev) = @_;
 	
 	my $config = $self->app->settings->load_config();
-	my $scale_factor = $config->{preview_scale};
+	my $scale_factor = $config->{preview_scale} || 1;
 	
 	return unless (ref($self->{notes_rect}) eq "ARRAY");
 	my @notes = @{$self->{notes_rect}};

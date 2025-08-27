@@ -1,5 +1,8 @@
 Revision history for Perl extension Caecilia.
 
+0.22
+	- Minor fixes
+	- Add Music::Tempo to Makefile.PL
 0.21
 	- Fix undo/redo issues
 	- Code cleanup
