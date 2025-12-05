@@ -13,13 +13,13 @@ use pEFL::Evas::Rectangle;
 
 use JavaScript::QuickJS;
 use MIDI;
-use MIDI::Util;
 
 our @ISA = qw(Exporter);
 
 our $AUTOLOAD;
 
 my $region_old_y = 0;
+our $play_length = 0;
 
 sub new {
 	my ($class, $app, $box) = @_;
@@ -159,7 +159,7 @@ sub generate_mid {
     
     my $preview = $self->app->preview;
     $preview->page(1);
-    $preview->render_preview();
+    $preview->render_preview($self->app->tmpdir . "/preview");
     
     my $config = $self->app->settings->load_config();
     $self->preview_scale_factor($config->{preview_scale});
@@ -168,6 +168,11 @@ sub generate_mid {
     $self->generate_events($notes);
     $self->to_midi($notes);
 
+    my $opus = MIDI::Opus->new({'from_file' => $self->midi_file});
+    my $track = ($opus->tracks)[0];
+    my ($score, $end_time) = MIDI::Score::events_r_to_score_r($track->events_r);
+    $play_length = $end_time / 100;
+    
     my $video = $self->elm_video;
     $video->stop();
     $video->file_set("");

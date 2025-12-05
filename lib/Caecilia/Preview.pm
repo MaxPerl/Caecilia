@@ -131,7 +131,7 @@ sub load_tune {
 	    my $renderer = $self->app->renderer;
 	    my $istart = $note->{istart} - $renderer->preview_beginabc_length();
 		my $iend = $note->{iend} - $renderer->preview_beginabc_length();
-	    $n->event_callback_add(EVAS_CALLBACK_MOUSE_DOWN, sub {jump_to_note($self->app->entry->elm_entry, $istart, $iend);}, undef);
+	    $n->event_callback_add(EVAS_CALLBACK_MOUSE_DOWN, \&jump_to_note, [$self,$note]);
 	
 		$note->{evas_object} = $n;
 		
@@ -158,8 +158,15 @@ sub create_note_rect {
 }
 
 sub jump_to_note {
-	my ($en,$start_offset, $stop_offset) = @_;
+	my ($data, $evas, $obj, $event_info) = @_;
+	my $event = pEFL::ev_info2obj($event_info, "pEFL::Evas::Event::MouseDown");
+	my ($self, $note) = @$data;
+	my $istart = $note->{istart};
+	my $start_offset = $note->{istart} - $self->app->renderer->preview_beginabc_length(); 
+	my $stop_offset = $note->{iend} - $self->app->renderer->preview_beginabc_length();
+	if ($event->button == 1) {
 	
+	my $en = $self->app->entry->elm_entry;
 	my $textblock = $en->textblock_get();
 	my $cp1 = pEFL::Evas::TextblockCursor->new($textblock);
 	#$cp1->pos_set(0);
@@ -179,6 +186,19 @@ sub jump_to_note {
 	
 	$cp1->free();
 	$cp2->free();
+	}
+	elsif ($event->button == 3) {
+		my $midi_position = $self->{notes}->{$istart}->{midi_position};
+		my $midi = $self->app->midi;
+		my $spinner = $midi->elm_progress_spinner;
+		my $video = $midi->elm_video();
+		my $emotion = $video->emotion_get();
+		
+		$video->pause() if ($emotion->play_get());
+		$video->play_position_set($midi_position);
+		$video->play();
+	}
+	
 }
 
 # TODO: This function isn't used anymore
