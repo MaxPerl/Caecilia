@@ -29,6 +29,7 @@ rule jsc
 	v=`cat version.txt`;$
    fi;$
    cp core/license $out;$
+   head -qn1 $in >> $out;$
    if [ "x$$NOMIN" = "x" ]; then $
       if command -v jsmin >/dev/null 2>&1; then $
 	cat $in | jsmin >> $out;$
@@ -47,6 +48,7 @@ rule jsc
 
 rule jscu
   command = cp core/license $out;$
+   head -qn1 $in >> $out;$
    if [ "x$$NOMIN" = "x" ]; then $
       if command -v jsmin >/dev/null 2>&1; then $
 	cat $in | jsmin >> $out;$
@@ -104,6 +106,7 @@ build clip-$MAJOR.js: jscu modules/clip.js
 build combine-$MAJOR.js: jscu modules/combine.js
 build diag-$MAJOR.js: jscu modules/diag.js
 build equalbars-$MAJOR.js: jscu modules/equalbars.js
+build fit2box-$MAJOR.js: jscu modules/fit2box.js
 build gamelan-$MAJOR.js: jscu modules/gamelan.js
 build grid-$MAJOR.js: jscu modules/grid.js
 build grid2-$MAJOR.js: jscu modules/grid2.js
@@ -122,7 +125,9 @@ build soloffs-$MAJOR.js: jscu modules/soloffs.js
 build sth-$MAJOR.js: jscu modules/sth.js
 build strtab-$MAJOR.js: jscu modules/strtab.js
 build temper-$MAJOR.js: jscu modules/temper.js
+build tempo-$MAJOR.js: jscu modules/tempo.js
 build tropt-$MAJOR.js: jscu modules/tropt.js
+build tunhd-$MAJOR.js: jscu modules/tunhd.js
 
 build edit-$MAJOR.css: cp editor/edit.css
 
@@ -142,14 +147,15 @@ build all: phony abc2svg-$MAJOR.js abcdoc-$MAJOR.js $
  abcweb-$MAJOR.js abcweb1-$MAJOR.js $
  snd-$MAJOR.js psvg-$MAJOR.js $
  ambitus-$MAJOR.js break-$MAJOR.js capo-$MAJOR.js $
- chordnames-$MAJOR.js clair-$MAJOR.js clip-$MAJOR.js $
- combine-$MAJOR.js diag-$MAJOR.js equalbars-$MAJOR.js gamelan-$MAJOR.js $
+ chordnames-$MAJOR.js clair-$MAJOR.js clip-$MAJOR.js combine-$MAJOR.js $
+ diag-$MAJOR.js equalbars-$MAJOR.js fit2box-$MAJOR.js gamelan-$MAJOR.js $
  grid-$MAJOR.js grid2-$MAJOR.js grid3-$MAJOR.js jianpu-$MAJOR.js $
  jazzchord-$MAJOR.js  mdnn-$MAJOR.js MIDI-$MAJOR.js $
  nns-$MAJOR.js page-$MAJOR.js pedline-$MAJOR.js perc-$MAJOR.js psvg-$MAJOR.js $
  roman-$MAJOR.js soloffs-$MAJOR.js sth-$MAJOR.js strtab-$MAJOR.js $
- temper-$MAJOR.js tropt-$MAJOR.js edit-$MAJOR.css edit-$MAJOR.js edit-$MAJOR.xhtml $
- abckbd-$MAJOR.js abckbd2-$MAJOR.js
+ temper-$MAJOR.js tempo-$MAJOR.js tropt-$MAJOR.js tunhd-$MAJOR.js $
+ edit-$MAJOR.css edit-$MAJOR.js $
+ edit-$MAJOR.xhtml abckbd-$MAJOR.js abckbd2-$MAJOR.js
 
 default all
 

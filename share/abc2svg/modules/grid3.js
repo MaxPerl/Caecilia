@@ -1,6 +1,6 @@
 // grid3.js - module to insert a manual chords
 //
-// Copyright (C) 2020-2023 Jean-Francois Moine
+// Copyright (C) 2020-2024 Jean-Francois Moine
 //
 // This file is part of abc2svg.
 //
@@ -20,7 +20,7 @@
 // This module is loaded when "%%begingrid" appears in a ABC source.
 //
 // Parameters
-//	%%begingrid [ chord-define [ noprint ] ]
+//	%%begingrid [ chord-define [ noprint ] ] [ lm=<left margin> ] [ width=<width> ]
 //	    list of chords, '-' or '.', measure bars ('|') and ':' for repeat
 //	%%endgrid
 //
@@ -30,6 +30,8 @@
 // the chords are used to define the chord symbols that are displayed
 // above the staff system.
 // When 'noprint' is also present, the grid itself is not displayed.
+//
+// The left margin may be '-1' to center the grid (default).
 
 if (typeof abc2svg == "undefined")
     var	abc2svg = {}
@@ -122,12 +124,21 @@ abc2svg.grid3 = {
 		hr = font.size * 2.1
 		if (wc < hr * 1.4)
 			wc = hr * 1.4			// cell width
-		w = wc * nc				// grid width
+		if (s.width) {
+			w = s.width
+			wc = w / nc
+		} else {
+			w = wc * nc			// grid width
+		}
+		x0 = s.lm < 0
+			? (img.width / cfmt.scale - w) / 2	// center
+			: s.lm + 1
+		if ((s.fmt || cfmt).trimsvg)		// adjust the SVG width
+			img.wx = x0 + w - img.lm - img.rm
 
 		// generate the cells
 		yl = posy + 3
 		y = posy + 3 - font.size * .7
-		x0 = (img.width / cfmt.scale - w) / 2
 		while (1) {
 			cl = cells.shift()
 			if (!cl)
@@ -269,7 +280,9 @@ abc2svg.grid3 = {
 
 // handle %%begingrid
     do_begin_end: function(of, type, opt, txt) {
-    var	vt = this.get_voice_tb()
+    var	i, s, v,
+	lm = -1,		// left margin - default: center the grid
+	width			// grid width - default: computed
 
 	if (type != "grid") {
 		of(type, opt, txt)
@@ -287,24 +300,54 @@ abc2svg.grid3 = {
 			return "\u266d"
 		})
 
-	if (opt.indexOf("chord-define") >= 0)
-		this.cfmt().csdef = txt
-	if (opt.indexOf("noprint") < 0) {
+	opt = opt.trim().split(/\s+/)
+	while (1) {
+		i = opt.shift()
+		if (!i)
+			break
+		switch (i[0]) {
+		case 'c':			// chord-define
+			this.cfmt().csdef = txt
+			break
+		case 'n':			// noprint
+			type = ""
+			break
+		case 'l':			// lm=..
+		case 'w':			// width=..
+			v = i.match(/-?[\d.]+.?.?/)
+			if (v) {
+				v = this.get_unit(v[0])
+				if (!isNaN(v)) {
+					if (i[0] == 'l')
+						lm = v
+					else
+						width = v
+				}
+			}
+			break
+		}
+	}
+
+	if (type) {
 		type += "3"
 		if (this.parse.state >= 2) {
 			s = this.new_block(type)
 			s.text = txt
+			s.lm = lm
+			s.width = width
 		} else {
 			abc2svg.grid3.block_gen.call(this, null, {
 						subtype: type,
-						text: txt
+						text: txt,
+						lm: lm,
+						width: width
 						})
 		}
 	}
     }, // do_begin_end()
 
     output_music: function(of) {
-    var	ln, i, dt, ss, ntim, p_vc, s3,
+    var	ln, i, dt, ss, ntim, p_vc, s3, cl,
 	C = abc2svg.C,
 	abc = this,
 	s = abc.get_tsfirst(),
@@ -439,9 +482,8 @@ abc2svg.grid3 = {
 						notes: [{
 							pit: 18
 						}],
-						next: s,
 						ts_next: s,
-						prev: s.prev,
+						prev: p_vc.last_sym,
 						ts_prev: s.ts_prev
 					}
 					if (!s)
@@ -453,8 +495,8 @@ abc2svg.grid3 = {
 					}
 					ss.prev.next =
 						ss.ts_prev.ts_next =
-						s.prev =
 							s.ts_prev = ss
+					p_vc.last_sym = ss
 					cs = []
 				} else {
 					cs.push(cl)

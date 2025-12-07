@@ -1,6 +1,6 @@
 // abc2svg - tohtml.js - HTML+SVG generation
 //
-// Copyright (C) 2014-2023 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-François Moine
 //
 // This file is part of abc2svg.
 //
@@ -88,6 +88,7 @@ function header_footer(str) {
 			break
 		default:
 			d = ''
+			i--
 			break
 		}
 		str = str.replace('$' + c, d)

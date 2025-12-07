@@ -1,4 +1,4 @@
-:;# simple build of abc2svg as a shell script
+# simple shell script for building the abc2svg scripts
 
 MAJOR=1
 
@@ -51,6 +51,7 @@ gen modules/clip.js > clip-$MAJOR.js
 gen modules/combine.js > combine-$MAJOR.js
 gen modules/diag.js > diag-$MAJOR.js
 gen modules/equalbars.js > equalbars-$MAJOR.js
+gen modules/fit2box.js > fit2box-$MAJOR.js
 gen modules/gamelan.js > gamelan-$MAJOR.js
 gen modules/grid.js > grid-$MAJOR.js
 gen modules/grid2.js > grid2-$MAJOR.js
@@ -70,6 +71,7 @@ gen modules/sth.js > sth-$MAJOR.js
 gen modules/strtab.js > strtab-$MAJOR.js
 gen modules/temper.js > temper-$MAJOR.js
 gen modules/tropt.js > tropt-$MAJOR.js
+gen modules/tunhd.js > tunhd-$MAJOR.js
 
 cp editor/edit.css edit-$MAJOR.css
 

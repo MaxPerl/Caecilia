@@ -1,6 +1,6 @@
 // abc2svg - deco.js - decorations
 //
-// Copyright (C) 2014-2024 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg-core.
 //
@@ -57,7 +57,7 @@ var	dd_tb = {},		// definition of the decorations
 
 // decorations - populate with standard decorations
 var decos = {
-	dot: "0 stc 6 1.5 1",
+	dot: "0 stc 6 .7 1",
 	tenuto: "0 emb 6 4 3",
 	slide: "1 sld 10 7 1",
 	arpeggio: "2 arp 12 10 3",
@@ -65,8 +65,8 @@ var decos = {
 	lowermordent: "3 lmrd 6,5 4 6",
 	uppermordent: "3 umrd 6,5 4 6",
 	trill: "3 trl 14 5 8",
-	upbow: "3 upb 10,2 3 7",
-	downbow: "3 dnb 9 4 6",
+	upbow: "3 upb 12,2 3 7",
+	downbow: "3 dnb 8,2 4 6",
 	gmark: "3 grm 7 4 6",
 	wedge: "0 wedge 8 1.5 1",		// (staccatissimo or spiccato)
 	longphrase: "5 lphr 0 1 16",
@@ -185,12 +185,13 @@ var decos = {
 		d_arp		// 2 - arpeggio
 	],
 	f_note = [
-		null, null, null,
-		d_upstaff,	// 3 - tied to note
+		null, null, null, null,
 		d_upstaff	// 4 (below the staff)
 	],
 	f_staff = [
-		null, null, null, null, null,
+		null, null, null,
+		d_upstaff,	// 3 - tied to note
+		null,
 		d_upstaff,	// 5 (above the staff)
 		d_upstaff,	// 6 - tied to staff (dynamic marks)
 		d_upstaff	// 7 (below the staff)
@@ -266,6 +267,9 @@ function up3(s, pos) {
 	case C.SL_BELOW:
 		return 0	// false
 	}
+	if (!s.multi		// if voice alone in the staff
+	 && !s.invis)		// but not invisible symbol of a secondary voice
+		return 1 //true
 //	if (s.multi)
 //		return s.multi > 0
 //	return 1		// true
@@ -341,8 +345,16 @@ function d_near(de) {
 		y = (((y + 9) / 6) | 0) * 6 - 6	// between lines
 	}
 	if (up) {
-		y += dd.hd
-		s.ymx = y + dd.h
+		if (s.ys > 27
+		 && dd.name[0] == 'd'		// if dot (staccato)
+		 && s.a_dd[0].name == "dot"	// as the first decoration
+		 && s.stem > 0 && s.nflags >= 0
+		 && s.beam_st && s.beam_end)
+			y -= 6			// put the dot a bit lower
+		else
+			y += dd.hd
+		if (s.ymx < y + dd.h)
+			s.ymx = y + dd.h
 	} else if (dd.name[0] == 'w') {		// wedge (no descent)
 		de.inv = true
 		y -= dd.h
@@ -355,25 +367,6 @@ function d_near(de) {
 	de.y = y
 	if (s.type == C.NOTE)
 		de.x += s.notes[s.stem >= 0 ? 0 : s.nhd].shhd
-	if (dd.name[0] == 'd') {		// if dot (staccato)
-	    if (!(s.beam_st && s.beam_end)) {	// if in a beam sequence
-		if (up) {
-			if (s.stem > 0)
-				de.x += 3.5	// stem_xoff
-		} else {
-			if (s.stem < 0)
-				de.x -= 3.5
-		}
-	    } else {
-		if (up && s.stem > 0) {
-			y = s.y + (y - s.y) * .6
-			if (y >= 27) {
-				de.y = y	// put the dot a bit lower
-				s.ymx = de.y + dd.h
-			}
-		}
-	    }
-	}
 }
 
 /* 1: special case for slide */
@@ -800,6 +793,9 @@ function do_ctie(nm, s, nt1) {
 		error(1, s, "Conflict on !$1!", nm)
 		return
 	}
+	if (nt1.tie_ty)			// if normal '-'
+		curvoice.tie_s = null
+
 	nt1.s = s
 	nt2 = cross[nm2]
 	if (!nt2) {
@@ -812,10 +808,11 @@ function do_ctie(nm, s, nt1) {
 	}
 	cross[nm2] = null
 	if (nt1.midi != nt2.midi
-	 || nt1.s.time + nt1.s.dur != nt2.s.time) {
+	 || nt1.s.time + nt1.dur != nt2.s.time) {
 		error(1, s, "Bad tie")
 	} else {
-		nt1.tie_ty = C.SL_AUTO
+		if (!nt1.tie_ty)		// if not normal '-'
+			nt1.tie_ty = C.SL_AUTO
 		nt1.tie_e = nt2
 		nt2.tie_s = nt1
 		nt1.s.ti1 = nt2.s.ti2 = true
@@ -1551,7 +1548,6 @@ function draw_deco_near() {
 					up = up3(s, pos)
 					break
 				case 6:
-				case 7:
 					up = up6(s, pos)
 					break
 				}
@@ -2154,7 +2150,7 @@ function draw_measnb() {
 /* -- draw the parts and the tempo information -- */
 // (unscaled delayed output)
 function draw_partempo() {
-    var	s, s2, some_part, some_tempo, h, w, y, st,
+    var	s, s2, some_part, some_tempo, h, w, y, st, p,
 	sy = cur_sy
 
 	// search the top staff
@@ -2186,7 +2182,10 @@ function draw_partempo() {
 		}
 		if (s2.x == undefined)
 			s2.x = s.x - 10
-		w = strwh(s2.text)[0]
+		p = s2.text
+		if (cfmt.partname)
+			s2.ntxt = p = partname(p)[2]
+		w = strwh(p)[0]
 		y = y_get(st, true, s2.x, w + 3)
 		if (ymin < y)
 			ymin = y
@@ -2198,7 +2197,8 @@ function draw_partempo() {
 			s2 = s.part
 			if (!s2 || s2.invis)
 				continue
-			w = strwh(s2.text)[0]
+			p = s2.ntxt || s2.text
+			w = strwh(p)[0]
 			if (user.anno_start || user.anno_stop) {
 				s2.wl = 0
 				s2.wr = w
@@ -2207,12 +2207,12 @@ function draw_partempo() {
 				anno_start(s2)
 			}
 			xy_str(s2.x,
-				ymin + 2 + gene.curfont.pad + gene.curfont.size * .22,
-				s2.text)
+				ymin + gene.curfont.pad + gene.curfont.size * .22,
+				p)
 			y_set(st, 1, s2.x, w + 3,
-				(ymin + 2 + h) / staff_tb[st].staffscale)
+				(ymin + h) / staff_tb[st].staffscale)
 			if (s2.x < 0)
-				yn = ymin + 2 + h
+				yn = ymin + h
 			anno_stop(s2)
 		}
 	}

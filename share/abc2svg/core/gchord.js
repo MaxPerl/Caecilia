@@ -1,6 +1,6 @@
 // abc2svg - gchord.js - chord symbols
 //
-// Copyright (C) 2014-2023 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg-core.
 //
@@ -227,11 +227,16 @@ function csan_add(s) {
 		}
 	}
 
-	if (curvoice.tr_sco) {
+	if (curvoice.tr_sco
+	 || curvoice.tr_snd) {
 		for (i = 0; i < a_gch.length; i++) {
 			gch = a_gch[i]
-			if (gch.type == 'g')
-				gch.text = gch_tr1(gch.text, curvoice.tr_sco)
+			if (gch.type == 'g') {
+				if (curvoice.tr_snd40)
+					gch.otext = gch_tr1(gch.text, curvoice.tr_snd40)
+				if (curvoice.tr_sco)
+					gch.text = gch_tr1(gch.text, curvoice.tr_sco)
+			}
 		}
 	}
 

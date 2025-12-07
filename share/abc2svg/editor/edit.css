@@ -13,6 +13,7 @@ svg {display:block;background-color:#ffffff}
 		background-color:#faf0e6;
 		overflow: auto;
 	}
+	#dleft:hover {z-index: 10 !important}
 	#nav {
 		position:relative;
 		padding: 0;
@@ -43,11 +44,11 @@ svg {display:block;background-color:#ffffff}
 		width: 80%;
 		max-width: 840px;
 		position: absolute; top: 0; bottom:0; right:0;
+		z-index: 2;
 		background-color:#faf0e6;
 		overflow: auto
 	}
 	#dright:hover {z-index: 10 !important}
-	#dright:active {z-index: 10 !important}
 	textarea {background-color:#ffffff}
 	.popup {
 		position: absolute; top: 0; right: 20px;

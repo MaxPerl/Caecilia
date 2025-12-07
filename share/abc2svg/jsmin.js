@@ -1,4 +1,5 @@
-// jsmin.js
+// jsmin.js - script to minify JS files
+// using QuickJS (https://bellard.org/quickjs/)
 //
 // Copyright (C) 2020 Jean-François Moine
 //

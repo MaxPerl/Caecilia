@@ -1,6 +1,6 @@
 // snd-1.js - file to include in html pages with abc2svg-1.js for playing
 //
-// Copyright (C) 2015-2021 Jean-Francois Moine
+// Copyright (C) 2015-2024 Jean-Francois Moine
 //
 // This file is part of abc2svg.
 //
@@ -81,7 +81,8 @@ function AbcPlay(i_conf) {
 
 	// if set, out contains an array of the MIDI output ports
 	function play2(out) {
-	    var o
+	    var o,
+		n = window.sessionStorage && sessionStorage.getItem("audio")
 
 		if (!out)
 			out = []
@@ -96,6 +97,12 @@ function AbcPlay(i_conf) {
 		if (out.length == 1) {
 			o = 0			// only one port
 		} else {
+			if (n) {		// if port selected in a previous page
+				for (o = 0; o < out.length; o++)
+					if (out[o] == n)
+						break
+			}
+		    if (!n || o >= out.length) {
 			o = -1			// ask which port?
 			var pr = "Use"
 			for (var i = 0; i < out.length; i++)
@@ -111,6 +118,11 @@ function AbcPlay(i_conf) {
 					conf.onend()
 				return
 			}
+
+			// memorize the output port for the next pages of the same session
+			if (window.sessionStorage)
+				sessionStorage.setItem("audio", out[o])
+		    }
 		}
 
 		// set the current output changing the play functions

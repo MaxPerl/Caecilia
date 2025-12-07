@@ -1,6 +1,6 @@
 // MIDI.js - module to handle the %%MIDI parameters
 //
-// Copyright (C) 2019-2023 Jean-Francois Moine
+// Copyright (C) 2019-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg.
 //
@@ -19,7 +19,7 @@
 //
 // This module is loaded when "%%MIDI" appears in a ABC source.
 //
-// Parameters (see abcMIDI for details)
+// Parameters (see abcMIDI - https://abcmidi.sourceforge.io/ - for details)
 //	%%MIDI channel n
 //	%%MIDI program [channel] n
 //	%%MIDI control k v
@@ -28,6 +28,7 @@
 //	%%MIDI chordname <chord_type> <list of MIDI pitches>
 //	%%MIDI chordprog <#MIDI program> [octave=<n>]
 //	%%MIDI chordvol <volume>
+//	%%MIDI gchord <string>
 //	%%MIDI gchordon
 //	%%MIDI gchordoff
 
@@ -56,7 +57,7 @@ abc2svg.MIDI = {
 	n1 = [2,25, 8,31,14,37,20, 3,26, 9,32,15,38,21, 4,27,10,33,16,39],
 //	      C  F _B _E _A _D _G _C _F__B__E__A__D__G__C__F
 	n2 = [0,19,36,13,30, 7,24, 1,18,35,12,29, 6,23, 0,17],
-	da = 21 - 3 * qs		// 21 = 12 (octave) + 9 (A)
+	da = 21 - 3 * qs,		// 21 = 12 (octave) + 9 (A)
 	b = new Float32Array(40)
 
 	for (i = 0; i < n1.length; i++)
@@ -112,7 +113,7 @@ abc2svg.MIDI = {
 		}
 		if (!cfmt.chord)
 			cfmt.chord = {}
-		cfmt.chord.vol = v / 127
+		cfmt.chord.vol = v
 		break
 //	case "drone":		// %%MIDI drone <#prog> <pit_1> <pit_2> <vol_1> <vol_2>
 //				//	default: 70 45 33 80 80
@@ -121,17 +122,20 @@ abc2svg.MIDI = {
 //		break
 //	case "droneoff":	// %%MIDI droneoff
 //		break
-//	case "gchord":		// %%MIDI gchord <list of letters and repeat numbers>
+	case "gchord":		// %%MIDI gchord <list of letters and repeat numbers>
 //				//	z rest
 //				//	c chord
 //				//	f fundamental
 //				//	b fundamental + chord
+//				//	G/H/I/J/K	individual notes starting
+//				//		from the lowest note of the chord
+//				//	g/h/i/j/k	an octave above these
 //				// defaults:
 //				//	M:2/4 or 4/4	fzczfzcz
 //				//	M:3/4	fzczcz
 //				//	M:6/8	fzcfzc
 //				//	M:9/8	fzcfzcfzc
-//		break
+		// fall thru
 	case "gchordon":	// %%MIDI gchordon
 	case "gchordoff":	// %%MIDI gchordoff
 		if (!cfmt.chord)
@@ -140,9 +144,14 @@ abc2svg.MIDI = {
 		 && curvoice) {
 			s = abc.new_block("midigch")
 			s.play = s.invis = 1 //true
-			s.on = a[1][7] == 'n'
-		} else {
+			if (a[1][6] == 'o')
+				s.on = a[1][7] == 'n'
+			else
+				s.rhy = a[2]		// chord rhythm
+		} else if (a[1][6] == 'o') {
 			cfmt.chord.gchon = a[1][7] == 'n'
+		} else {
+			cfmt.chord.rhy = a[2]
 		}
 		break
 	case "channel":
@@ -155,7 +164,7 @@ abc2svg.MIDI = {
 			if (abc.parse.state == 3) {
 				s = abc.new_block("midiprog")
 				s.play = s.invis = 1 //true
-				curvoice.chn = s.chn = v
+				s.chn = v
 			} else {
 				abc.set_v_param("channel", v)
 			}
@@ -180,24 +189,30 @@ abc2svg.MIDI = {
 		abc.set_v_param("mididrum", "MIDIdrum")
 		break
 	case "program":
-		if (a[3] != undefined) {	// with a channel
-			abc2svg.MIDI.do_midi.call(abc, "MIDI channel " + a[2])
-			v = a[3]
+		a.shift()
+		v = []
+		if (a[2]) {
+			v[0] = +a[2]		// program
+			v[1] = +a[1]		// channel
 		} else {
-			v = a[2];
+			v[0] = +a[1]
+			v[1] = 0
 		}
-		v = parseInt(v)
-		if (isNaN(v) || v < 0 || v > 127) {
+		if (isNaN(v[0]) || v[0] < 0 || v[0] > 127
+		 || (v[1]
+		  && (isNaN(v[1]) || v[1] <= 0 || v[1] > 16))) {
 			abc.syntax(1, abc.errs.bad_val, "%%MIDI program")
 			break
 		}
 		if (abc.parse.state == 3) {
 			s = abc.new_block("midiprog");
 			s.play = s.invis = 1 //true
-			s.instr = v
-			s.chn = curvoice.chn
+			s.instr = v[0]
+			s.chn = v[1] > 0
+				? (v[1] - 1)
+				: curvoice.v < 9 ? curvoice.v : curvoice.v + 1
 		} else {
-			abc.set_v_param("instr", v)
+			abc.set_v_param("instr", a.slice(1).join(' '))
 		}
 		break
 	case "control":
@@ -228,27 +243,45 @@ abc2svg.MIDI = {
 		}
 
 		// define the Turkish accidentals (53-TET)
-		if (n == 53) {
-			s = abc.get_glyphs()
-
+		s = abc.get_glyphs()
+		if (n == 53
+		 && !s.acc12_53) {		// do not redefine the glyphs
 // #1
 			s.acc12_53 = '<text id="acc12_53" x="-1">&#xe282;</text>'
 
 // #2
 			s.acc24_53 = '<text id="acc24_53" x="-1">&#xe282;\
-	<tspan x="0" y="-10" style="font-size:8px">2</tspan></text>'
+	<tspan x="0" y="-9" style="font-size:9px">2</tspan></text>'
 
 // #3
 			s.acc36_53 = '<text id="acc36_53" x="-1">&#xe262;\
-	<tspan x="0" y="-10" style="font-size:8px">3</tspan></text>'
+	<tspan x="0" y="-9" style="font-size:9px">3</tspan></text>'
 
 // #4
 			s.acc48_53 = '<text id="acc48_53" x="-1">&#xe262;</text>'
 
 // #5
 			s.acc60_53 = '<g id="acc60_53">\n\
-	<text style="font-size:1.2em" x="-1">&#xe282;</text>\n\
-	<path class="stroke" stroke-width="1.6" d="M-2 1.5l7 -3"/>\n\
+	<text style="font-size:1.1em" x="-1">&#xe282;</text>\n\
+	<path class="stroke" stroke-width="1.6" d="M-2 1l7 -2.2"/>\n\
+</g>'
+
+// #8
+			s.acc96_53 = '<g id="acc96_53">\n\
+	<text style="font-size:1.1em" x="-2">&#xe262;</text>\n\
+	<path class="stroke" stroke-width="1.6" d="M-2.8 1.4l8.5 -2.8"/>\n\
+</g>'
+
+// #9
+			s.acc108_53 = '<text id="acc108_53" x="-3">&#xe263;</text>'
+
+// b9
+			s["acc-108_53"] = '<text id="acc-108_53" x="-3">&#xe264;</text>'
+
+// b8
+			s["acc-96_53"] = '<g id="acc-96_53">\n\
+	<text x="-1">&#xe260;</text>\n\
+	<path class="stroke" stroke-width="1.3" d="M-3 -7l5 -2m0 3l-5 2"/>\n\
 </g>'
 
 // b5
@@ -257,19 +290,19 @@ abc2svg.MIDI = {
 // b4
 			s["acc-48_53"] = '<g id="acc-48_53">\n\
 	<text x="-1">&#xe260;</text>\n\
-	<path class="stroke" stroke-width="1" d="M-3 -5.5l5 -2"/>\n\
+	<path class="stroke" stroke-width="1.3" d="M-3 -5.5l5 -2"/>\n\
 </g>'
 
 // b3
 			s["acc-36_53"] = '<g id="acc-36_53">\n\
 	<text x="-1">&#xe260;\
-		<tspan x="0" y="-10" style="font-size:8px">3</tspan></text>\n\
-	<path class="stroke" stroke-width="1" d="M-3 -5.5l5 -2"/>\n\
+		<tspan x="0" y="-12" style="font-size:9px">3</tspan></text>\n\
+	<path class="stroke" stroke-width="1.3" d="M-3 -5.5l5 -2"/>\n\
 </g>'
 
 // b2
 			s["acc-24_53"] = '<text id="acc-24_53" x="-2">&#xe280;\
-	<tspan x="0" y="-10" style="font-size:8px">2</tspan></text>'
+	<tspan x="0" y="-12" style="font-size:9px">2</tspan></text>'
 
 // b1
 			s["acc-12_53"] = '<text id="acc-12_53" x="-2">&#xe280;</text>'
@@ -306,18 +339,19 @@ abc2svg.MIDI = {
 		case "channel=":		// %%MIDI channel
 			s = abc.new_block("midiprog")
 			s.play = s.invis = 1 //true
-			s.chn = curvoice.chn = a[++i]
+			s.chn = +a[++i]
 			break
 		case "instr=":			// %%MIDI program
 			s = abc.new_block("midiprog")
 			s.play = s.invis = 1 //true
-			s.instr = a[++i]
-			if (curvoice.chn == undefined) {
-				curvoice.chn = curvoice.v < 9 ?
+			s.instr = a[++i].split(' ')
+			if (s.instr[1])
+				s.chn = s.instr.shift() - 1
+			else
+				s.chn = curvoice.v < 9 ?
 						curvoice.v :
 						curvoice.v + 1
-			}
-			s.chn = curvoice.chn
+			s.instr = +s.instr[0]
 			break
 		case "midictl=":		// %%MIDI control
 			if (!curvoice.midictl)

@@ -193,7 +193,7 @@ sub render_abcm2ps {
 	push @cmd, '-s' if ($opts{mode} eq 'preview');
 	push @cmd, '0.75' if ($opts{mode} eq 'preview');
 	
-	push @cmd, "-B$Caecilia::Settings::ABCM2PS_BREAKNBARS" if ($config->{abcm2ps_breaknbars});
+	push @cmd, "-B".$config->{abcm2ps_breaknbars} if ($config->{abcm2ps_breaknbars});
 	push @cmd, "-e$opts{pattern}" if ($opts{pattern});
 	
 	# no scale in preview

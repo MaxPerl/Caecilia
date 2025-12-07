@@ -1,6 +1,6 @@
-:;# abc2svg with a Mozilla JavaScript interpreter
+# abc2svg with a Mozilla JavaScript interpreter
 
-for c in js78 js68 js60 js52 js24 end; do
+for c in js128 js115 js102 end; do
 	if [ $c = 'end' ]; then
 		echo "$0: could not find a javascript interpreter - abort"
 		exit 1

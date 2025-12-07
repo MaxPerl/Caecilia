@@ -1,6 +1,6 @@
 // edit.js - file used in the abc2svg editor
 //
-// Copyright (C) 2014-2023 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg.
 //
@@ -45,6 +45,7 @@ var	abc_images,			// image buffer
 	selx = [0, 0],			// selected source indexes
 	selx_sav = [],			// (saved while playing/printing)
 	play = {},			// play data
+	tunes,				// tune list, updated on rendering refresh
 	pop,				// current popup message
 	texts = {},			// language specific texts
 	chg = 0,			// > 0 when the textarea is modified
@@ -161,10 +162,8 @@ function popshow(area, visible) {
 // load the (ABC source or include) file in the textarea
 function loadtune() {
 	var files = document.getElementById("abcfile").files
-//	if (!files.length) {
-//		alert('Please select a file!')
-//		return
-//	}
+	if (!files.length)
+		return
 	abc_fname[srcidx] = files[0].name
 
 	var reader = new FileReader();
@@ -338,7 +337,7 @@ function selsvg(evt) {
 	v = cl && cl.substr(0, 4) == 'abcr' ? Number(cl.slice(6, -1)) : 0
 	s.setSelectionRange(v, v)	// just a cursor
 	s.focus()
-	if (v)
+	if (v && syms[v].iend > v)
 		s.setSelectionRange(v, syms[v].iend)
 }
 
@@ -413,7 +412,8 @@ function seltxt(evt) {
 			if (!s) {
 				if (is >= start)
 					s = is
-			} else if (sym.iend <= end) {
+			} else if (sym.iend > s		// (case element in s: line)
+				&& sym.iend <= end) {
 				e = is
 			}
 		})
@@ -486,7 +486,7 @@ function set_sfu(v) {
 // set_speed value = 1..20, 10 = no change
 function set_speed(iv) {
     var	spvl = document.getElementById("spvl"),
-	v = Math.pow(3,			// max 3 times lower/faster
+	v = Math.pow(3,			// max 3 times slower/faster
 			(iv - 10) * .1);
 	play.abcplay.set_speed(v);
 	spvl.innerHTML = v
@@ -538,8 +538,7 @@ function play_tune(what) {
 	if (!abc)
 		return			// no generation yet
     var	i, si, ei, elt,
-	C = abc2svg.C,
-	tunes = abc.tunes
+	C = abc2svg.C
 
 	if (play.playing) {
 		if (!play.stop) {
@@ -661,13 +660,12 @@ function play_tune(what) {
 	ctxMenu.style.display = "none";	// remove the play menu
 
 	play.playing = true;
-	if (tunes.length) {		// if new display
+	if (tunes != abc.tunes) {		// if new display
+		tunes = abc.tunes
 
 		// generate the play data of all tunes
-		while (1) {
-			elt = tunes.shift()
-			if (!elt)
-				break
+		for (i = 0; i < tunes.length; i++) {
+			elt = tunes[i]
 			play.abcplay.add(elt[0], elt[1], elt[3])
 		}
 
@@ -699,13 +697,20 @@ function play_tune(what) {
 		ei = get_ee(selx[1])
 	} else {				// no selection => tune
 		elt = play.click.svg		// (dummy)
-		si = elt.getElementsByClassName('abcr') // symbols in the SVG
-		if (!si.length) {
-			play.playing = false
-			return			// not in a tune!
+		si = elt.getAttribute('class')
+		si = /tune(\d*)/.exec(si)
+		if (!si) {
+			play.playing = 0 //false
+			return			// no tune here
 		}
-		i = Number(si[0].getAttribute('class').slice(6, -1))
-		si = gsot(i)
+		si = tunes[si[1]][0]		// first symbol of the tune
+		ei = si
+		while (ei && !ei.dur)
+			ei = ei.ts_next
+		if (!ei) {
+			play.playing = 0 //false
+			return			// nothing to play
+		}
 		ei = null
 	}
 
@@ -870,6 +875,16 @@ function edit_init() {
 		e.oncontextmenu = show_menu
 	}
 	set_pref()	// set the preferences from local storage
+
+	// create a hidden span for string width computation
+	e = document.createElement("span")
+	e.style.position = "absolute"
+	e.style.top =
+		e.style.padding = 0
+	e.style.visibility = "hidden"
+	e.style.lineHeight = 1
+	document.body.appendChild(e)
+	abc2svg.el = e
 }
 
 // drag and drop

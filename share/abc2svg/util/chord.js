@@ -1,6 +1,6 @@
 // chord.js - generation of accompaniment
 //
-// Copyright (C) 2020-2022 Jean-Francois Moine and Seymour Shlien
+// Copyright (C) 2020-2025 Jean-Francois Moine and Seymour Shlien
 //
 // This file is part of abc2svg.
 //
@@ -18,128 +18,137 @@
 // along with abc2svg.  If not, see <http://www.gnu.org/licenses/>.
 
 // -- chord table --
+// from https://en.wikipedia.org/wiki/Chord_(music)
 // index = chord symbol type
-// value: array of strings
+// value: array of MIDI pitch / root
 //	index = inversion
-//	string = list of 2 characters
-//		1st character = note (see abc2svg.letmid)
-//		2nd character = octave ('+', ' ', '-')
-abc2svg.ch_names = {
-	'':	["C-E G C+", "E-C G C+", "G-C E G "],
-	m:	["C-e G C+", "e-C G C+", "G-C e G "],
-	'7':	["C-b-E G ", "E-C G b ", "G-E b C+", "b-E G C+"],
-	m7:	["C-b-e G ", "e-C G b ", "G-e b C+", "b-e G C+"],
-	m7b5:	["C-b-e g ", "e-C g b ", "g-e b C+", "b-e g C+"],
-	M7:	["C-B-E G ", "E-C G B ", "G-E B C+", "B-E G C+"],
-	'6':	["C-A-E G ", "E-C A B ", "A-E B C+", "B-E A C+"],
-	m6:	["C-A-e G ", "e-C A B ", "A-e B C+", "B-e A C+"],
-	aug:	["C-E a C+", "E-C a C+", "a-C E a "],
-//	plus:	["C-E a C+", "E-C a C+", "a-C E a "],
-	aug7:	["C-b-E a ", "E-C a b ", "a-E b C+", "b-E a C+"],
-	dim:	["C-e g C+", "e-C g C+", "g-C e g "],
-	dim7:	["C-e g A ", "e-C g A ", "g-e A C+", "A-C e G "],
-	'9':	["C-b-E G D+", "E-C G b D+", "G-E b C+D+", "b-E G C+D+", "D-G-C E b "],
-	m9:	["C-b-e G D+", "e-C G b D+", "G-e b C+D+", "b-e G C+D+", "D-G-C e b "],
-	maj9:	["C-B-E G D+", "E-C G B D+", "G-E B C+D+", "B-E G C+D+", "D-G-C E B "],
-	M9:	["C-B-E G D+", "E-C G B D+", "G-C E B D+", "B-E G C+D+", "D-G-C E B "],
-	'11':	["C-b-E G D+F+", "E-C G b D+F+", "G-E b C+D+F+", "b-E G C+D+F+",
-						"D-G-C E b F+", "F-D-G-C E b D+"],
-	dim9:	["C-A-e g d+", "e-C g A d+", "g-C e A d+", "A-C e g d+", "D-g-C e A "],
-	sus4:	["C-F G C+", "F-C G C+", "G-C F G "],
-	sus9:	["C-D G C+", "D-C G C+", "G-C D G "],
-	'7sus4': ["C-b-F G ", "F-C G b ", "G-F b C+", "b-C F G "],
-	'7sus9': ["C-b-D G ", "D-C G b ", "G-D b C+", "b-C D G "],
-	'5':	["C-G C+", "G-G C+"]
-} // ch_names
+abc2svg.chnm = {
+	'': [0, 4, 7],
+	'6': [0, 4, 7, 9],
+	'7': [0, 4, 7, 10],
+	M7: [0, 4, 7, 11],
+	aug: [0, 4, 8],
+	aug7: [0, 4, 8, 10],
+	m: [0, 3, 7],
+	m6: [0, 3, 7, 9],
+	m7: [0, 3, 7, 10],
+	mM7: [0, 3, 7, 11],
+	dim: [0, 3, 6],
+	dim7: [0, 3, 6, 9],
+	m7b5: [0, 3, 6, 10],
+	'9': [0, 4, 7, 10, 14],
+//	m9:
+//	maj9:
+//	M9:
+	'11': [0, 4, 7, 10, 14, 17],
+	sus4: [0, 5, 7]
+//	sus9:
+//	'7sus4':
+//	'7sus9':
+//	'5':
+}
 
-abc2svg.midlet = "CdDeEFgGaAbB"		// MIDI pitch -> letter
 abc2svg.letmid = {			// letter -> MIDI pitch
 	C: 0,
-	d: 1,
 	D: 2,
-	e: 3,
 	E: 4,
 	F: 5,
-	g: 6,
 	G: 7,
-	a: 8,
 	A: 9,
-	b: 10,
 	B: 11
 } // letmid
 
 abc2svg.chord = function(first,		// first symbol in time
 			 voice_tb,	// table of the voices
 			 cfmt) {	// tune parameters
-    var	chnm, i, k, vch, s, gchon,
+    var	chnm, i, k, vch, s, gchon, s_ch, rhy, ti, dt,
+	md = first.p_v.meter.wmeasure,	// measure duration
+	nextim = 0,
 	C = abc2svg.C,
 	trans = 48 + (cfmt.chord.trans ? cfmt.chord.trans * 12 : 0)
 
 	// create a chord according to the bass note
 	function chcr(b, ch) {
-	    var	i, v,
-		r = []
+	    var	j,
+		r = ch.slice(),
+		i = r.length
 
-		b = abc2svg.midlet[b]
-		i = ch.length
-		while (--i > 0) {
-			if (ch[i][0] == b)	// search the bass in the chord
-				break
-		}
-		ch = ch[i]
-		for (i = 0; i < ch.length; i += 2) {
-			v = abc2svg.letmid[ch[i]]
-			switch (ch[i + 1]) {
-			case '+': v += 12; break
-			case '-': v -= 12; break
+		if (b) {
+			while (--i > 0) {
+				if (r[i] == b)		// search the bass in the chord
+					break
 			}
-			r.push(v)
+			if (i > 0)
+				for (j = 0; j < r.length; j++)
+					r[j] = ch[(j + i) % r.length]
+			else
+				r.unshift(b)
 		}
+		r[0] -= 12			// bass one octave lower
 		return r
 	} // chcr()
 
-	// get the playback part of the first chord symbol
-	function filter(a_cs) {
-	    var	i, cs, t
+	// return a new chord rhythm from a meter (M:)
+	function meterhy(s) {
+	    var	r,
+		t = s.a_meter[0].top,
+		b = s.a_meter[0].bot
 
-		for (i = 0; i < a_cs.length; i++) {
-			cs = a_cs[i]
-			if (cs.type != 'g')
-				continue
-			t = cs.otext
-			if (t.slice(-1) == ')')		// if alternate chord
-				t = t.replace(/\(.*/, '') // remove it
-			return t.replace(/\(|\)|\[|\]/g,'') // remove ()[]
+		switch (b) {
+		case '2':
+			b = 4
+			t *= 2
+			// fall thru
+		case undefined:
+			if (t[0] == 'C')
+				t = 4, b = 4
+			// fall thru
+		case '4':
+			if (t == '3')
+				return "fzczcz"
+			return "fzczfzczfzcz".slice(0, t * 2)
+		case '8':
+			return "fzcfzcfzcfzc".slice(0, t)
 		}
-	} // filter()
+		return 'z'			// no chord
+	} // meterhy()
+
+	// build a chord rhythm
+	function bld_rhy(p) {
+	    var	i, c,
+		j = 0
+
+		rhy = p[0]
+		for (i = 1; i < p.length; i++) {
+			c = p[i]
+			if (c >= '1' && c <= '9') {
+				while (--c > 0)
+					rhy += '+'	// continue playing
+				continue
+			}
+			rhy += c
+		}
+
+		dt = md / rhy.length		// delta time
+	} // bld_rhy()
 
 	// generate a chord
-	function gench(sb) {
-	    var	r, ch, b, m, n, not,
-		a = filter(sb.a_gch),
-		s = {
-			v: vch.v,
-			p_v: vch,
-			type: C.NOTE,
-			time: sb.time,
-			notes: []
-		}
+	function gench(sb, i) {
+	    var	r, ch, b, m, n, nt,
+		a = sb.a_gch[i].otext
 
-		if (!a)
-			return
-		a = a.match(/([A-GN])([#♯b♭]?)([^/]*)\/?(.*)/)
+		if (a.slice(-1) == ')')			// if alternate chord
+			a = a.replace(/\(.*/, '')	// remove it
+		a = a.replace(/\(|\)|\[|\]/g,'')	// remove ()[]
+		a = a.match(/([A-G])([#♯b♭]?)([^/]*)\/?(.*)/)
 			// a[1] = note, a[2] = acc, a[3] = type, a[4] = bass
 		if (!a)
 			return
 
 		r = abc2svg.letmid[a[1]]		// root
-		if (r == undefined) {
-			if (a[1] != "N")
-				return
-			s.type = C.REST			// ("N") = no chord
-			ch = [0]
-			r = 0
-		} else {
+		if (r == undefined)			// "N" or no chord
+			return
+
 			switch (a[2]) {
 			case "#":
 			case "♯": r++; break
@@ -166,55 +175,128 @@ abc2svg.chord = function(first,		// first symbol in time
 					case "b":
 					case "♭": b--;  if (b < 0) b = 11; break
 					}
+					b = b - r
+					if (b < 0)
+						b += 12
 				}
 			}
-		}
-		if (b == undefined)
-			b = 0
 		ch = chcr(b, ch)
 
 		// generate the notes of the chord
 		n = ch.length
 		r += trans
-		if (sb.p_v.tr_snd)
-			r += sb.p_v.tr_snd
 		for (m = 0; m < n; m++) {
-			not = {
-				midi: r + ch[m]
-			}
-			s.notes.push(not)
+			nt = s_ch.notes[m]
+			if (!nt)
+				s_ch.notes[m] = nt = []
+			nt.midi = r + ch[m]
 		}
-		s.nhd = n - 1
-
-		// insert the chord in the chord voice and in the tune
-		s.prev = vch.last_sym
-		vch.last_sym.next = s
-		s.ts_next = sb.ts_next
-		sb.ts_next = s
-		s.ts_prev = sb
-		if (s.ts_next)
-			s.ts_next.ts_prev = s
-		vch.last_sym = s
+		s_ch.nhd = n - 1
 	} // gench()
+
+	// stop the previous chord by setting its duration
+	function set_dur(s2, tim) {			// previous chord
+		if (s2.dur
+		 || tim == s2.time
+		 || s2.nhd == undefined)	// no chord yet
+			return
+		s2.dur = tim - s2.time
+		for (var m = 0; m <= s2.nhd; m++)
+			s2.notes[m].dur = s2.dur
+	} // set_dur()
+
+	// insert a chord in the chord voice
+	function insch(s_next, tim) {
+		if (s_ch.nhd == undefined)
+			return			// no defined chord yet
+	    var	s, m,
+		s2 = vch.last_sym,
+		i = rhy[ti++]
+
+		switch (i) {
+		case '+':			// same chord
+			if (rhy != '+')
+				return
+			i = 'b'			// no rhythm
+			ti = 0
+			break
+		case undefined:
+		case 'z':
+			set_dur(s2, tim)	// stop the previous chord
+			return
+		}
+
+		s = {
+			v: vch.v,
+			p_v: vch,
+			type: C.NOTE,
+			notes: []
+		}
+		s.time = tim
+		switch (i) {
+		case 'c':
+			s.nhd = s_ch.nhd - 1		// remove the root note
+			for (m = 0; m <= s.nhd; m++)
+				s.notes[m] = {
+					midi: s_ch.notes[m + 1].midi
+				}
+			break
+		default:
+			i = "GHIJKghijk".indexOf(i)
+			if (i < 0			// bad character
+			 || (i % 5) > s_ch.nhd)
+				return
+			s.notes[0] = {
+				midi: s_ch.notes[i % 5].midi
+			}
+			if (i >= 5)
+				s.notes[0].midi += 12	// upper octave
+			s.nhd = 0			// just one note
+			break
+		case 'f':
+			s.notes[0] = {
+				midi: s_ch.notes[0].midi
+			}
+			s.nhd = 0		// keep the chord root
+			break
+		case 'b':
+			s.nhd = s_ch.nhd
+			for (m = 0; m <= s.nhd; m++)
+				s.notes[m] = {
+					midi: s_ch.notes[m].midi
+				}
+			break
+		}
+		s.prev = s2			// previous chord
+		s2.next = s
+		set_dur(s2, tim)		// stop the last chord
+		
+		vch.last_sym = s
+
+		if (s_next) {				// if not last symbol of the tune
+			s.ts_next = s_next		// insert before a bar
+			s.ts_prev = s_next.ts_prev
+			s_next.ts_prev = s
+//			if (s.ts_prev)
+				s.ts_prev.ts_next = s
+		} else {				// no bar at end of tune
+			while (s2.ts_next)
+				s2 = s2.ts_next
+			s2.ts_next = s
+			s.ts_prev = s2
+		}
+	} // insch()
 
 	// -- chord() --
 
 	// set the chordnames defined by %%MIDI chordname
+	chnm = abc2svg.chnm
 	if (cfmt.chord.names) {
-		chnm = Object.create(abc2svg.ch_names)
 		for (k in cfmt.chord.names) {
-			vch = ""
-			for (i = 0; i < cfmt.chord.names[k].length; i++) {
-				s = cfmt.chord.names[k][i]
-				vch += abc2svg.midlet[s % 12]
-				vch += i == 0 ? "-" :
-					(s >= 12 ? "+" : " ")
-			}
-//fixme: no inversion
-			chnm[k] = [ vch ]
+			chnm[k] = []
+			for (i = 0; i < cfmt.chord.names[k].length; i++)
+				chnm[k].push(+cfmt.chord.names[k][i])
 		}
-	} else {
-		chnm = abc2svg.ch_names
 	}
 
 	// define the MIDI channel
@@ -223,7 +305,7 @@ abc2svg.chord = function(first,		// first symbol in time
 		if (k < voice_tb[i].chn)
 			k = voice_tb[i].chn
 	}
-	if (k == 8)
+	if (k == 9)
 		k++			// skip the channel 10
 
 	// create the chord voice
@@ -237,44 +319,101 @@ abc2svg.chord = function(first,		// first symbol in time
 			chn: k + 1,
 			instr: cfmt.chord.prog || 0,
 			time: 0,
-			ts_prev: first,
-			ts_next: first.ts_next
-		},
-		vol: cfmt.chord.vol || .6	// (external default 76.2)
+			dur: 0,
+			next: {
+				type: C.BLOCK,
+				subtype: "midictl",
+				time:0,
+				dur: 0,
+				ctrl: 7,		// volume
+				val: cfmt.chord.vol || 75
+			}
+		}
 	}
 	vch.sym.p_v = vch
 	vch.sym.v = vch.v
-	vch.last_sym = vch.sym
+	vch.sym.next.p_v = vch
+	vch.sym.next.v = vch.v
+	vch.sym.next.prev = vch.sym
+	vch.last_sym = vch.sym.next
 	voice_tb.push(vch)
-	first.ts_next = vch.sym
+
+	s = first
+	bld_rhy(cfmt.chord.rhy			// chord rhythm
+		|| meterhy(s.p_v.meter))
+
+	// insert the MIDI program and the volume of the chord voice after the tempo
+	while (s.type != C.TEMPO
+	 && s.ts_next && !s.ts_next.dur)	// but before the first note
+		s = s.ts_next
+	vch.sym.ts_prev = s
+	vch.sym.ts_next = vch.sym.next
+	vch.sym.next.ts_prev = vch.sym
+	vch.sym.next.ts_next = s.ts_next
+	if (s.ts_next)
+		s.ts_next.ts_prev = vch.sym.next
+	s.ts_next = vch.sym
+
+	s_ch = {				// chord template
+//		v: vch.v,
+//		p_v: vch,
+//		type: C.NOTE,
+		notes: []
+	}
 
 	// loop on the symbols and add the accompaniment chords
 	gchon = cfmt.chord.gchon
-	s = first
+	ti = 0					// time index in rhy
+//	s = first
 	while (1) {
-		if (!s.ts_next) {
-			if (gchon)
-				vch.last_sym.dur = s.time - vch.last_sym.time
-			break
-		}
-		s = s.ts_next
-		if (!s.a_gch) {
-			if (s.subtype == "midigch") {
-				if (gchon && !s.on)
-					vch.last_sym.dur = s.time - vch.last_sym.time
-				gchon = s.on
+		if (gchon) {
+			while (s.time > nextim) {
+				insch(s, nextim)	// generate the rhythm
+				nextim += rhy == '+' ? 100000 : dt
 			}
-			continue
+			if (s.bar_type == "|"		// if a normal measure bar
+			 && rhy != '+'
+			 && nextim != s.time) {		// and wrong times
+//fixme: measure error
+				nextim = s.time		// resynchronize
+				ti = 0
+			}
 		}
-		if (!gchon)
-			continue
-		for (i = 0; i < s.a_gch.length; i++) {
-			gch = s.a_gch[i]
-			if (gch.type != 'g')
-				continue
-			vch.last_sym.dur = s.time - vch.last_sym.time
-			gench(s)
+		if (gchon && s.a_gch) {
+			for (i = 0; i < s.a_gch.length; i++) {
+				if (s.a_gch[i].type != 'g')
+					continue
+				gench(s, i)
+				if (rhy == '+')
+					nextim = s.time
+				break
+			}
+		}
+		if (!s.dur) {
+			if (s.bar_num) {		// if measure bar
+				ti = 0			// reset the time index
+			} else if (s.wmeasure) {	// if meter
+				md = s.wmeasure
+				if (rhy != '+')
+					bld_rhy(meterhy(s))
+			} else if (s.subtype == "midigch") {
+				if (s.on != undefined)
+					gchon = s.on
+				if (gchon && s.rhy)
+					bld_rhy(s.rhy)	// new rhythm
+			}
+		}
+		if (!s.ts_next)
 			break
-		}
+		s = s.ts_next
+	}
+	if (gchon)  {
+			while (s.time + (s.dur || 0) > nextim) {
+				insch(s.dur ? null : s, nextim)
+				if (rhy == '+')
+					break
+				nextim += dt
+			}
+		set_dur(vch.last_sym, s.time + (s.dur || 0))
 	}
 } // chord()

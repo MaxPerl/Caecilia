@@ -1,6 +1,6 @@
 // abcweb-1.js file to include in html pages
 //
-// Copyright (C) 2014-2024 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg.
 //
@@ -91,7 +91,7 @@ if (typeof abc2svg == "undefined")
 
 // function called when abcweb-1.js is fully loaded
 function dom_loaded() {
-    var	abc, src, outb, err,
+    var	abc, src, outb, err, e,
 	a_inc = {},
 	tune_lst = [],	// array of [tsfirst, voice_tb, info, cfmt] per tune
 			// created on playback start
@@ -107,17 +107,17 @@ function dom_loaded() {
 	// check which <div> became visible
 	// if yes, generate it
 	function visible() {
-	    var	mu, r,
+	    var	i, r,
 		wh = window.innerHeight || document.documentElement.clientHeight
 
 		while (1) {
-			mu = abc2svg.alldiv[0]
-			if (!mu)
+			i = abc2svg.alldiv[0]
+			if (i == undefined)
 				break
-			r = mu.d.getBoundingClientRect()
+			r = abc2svg.music[i].d.getBoundingClientRect()
 			if (r.top > wh)
 				break
-			musgen(mu)
+			musgen(i)
 			abc2svg.alldiv.shift()
 		}
 		if (abc2svg.alldiv.length) {
@@ -143,13 +143,16 @@ function dom_loaded() {
 		if (c) {
 			c = '.' + c				// selector
 			for (i = 0; i < sh.length; i++) {
-				r = sh[i].rules
+			    try {			// (the css may be protected)
+				r = sh[i].cssRules
 				for (j = 0; j < r.length; j++) {
 					if (r[j].selectorText == c)
 						break
 				}
 				if (j < r.length)
 					break
+			    } catch(e) {
+			    }
 			}
 			if (i < sh.length) {
 				r = r[j]			// rule
@@ -287,6 +290,7 @@ Printing may be bad because the file contains pure HTML and %%pageheight\
 					t: c + s.innerHTML,
 					d: div
 				})
+				div.addEventListener('click', abc2svg.playseq)
 			}
 			s.parentNode.replaceChild(div, s)
 		}
@@ -294,8 +298,9 @@ Printing may be bad because the file contains pure HTML and %%pageheight\
 
 	// generate a music sequence
 	// @mu = object { t: music source, d: <div> }
-	function musgen(mu) {
-	    var	t = mu.t
+	function musgen(ix) {
+	    var	mu = abc2svg.music[ix],
+		t = mu.t
 
 		if (busy) {
 			mu.w = 1 //true
@@ -305,51 +310,41 @@ Printing may be bad because the file contains pure HTML and %%pageheight\
 
 		// render a music sequence
 		function render() {
-		    var	i, j, e
+		    var	i, j, e, o,
+			f = abc.cfmt().with_source
 
 			// start the generation
 			outb = err = ""
 			abc.tosvg(mu.n, t)	// music source
 
-			abc2svg.abc_end()	// close the page if %%pageheight
-
 			// mu.d can be null when parameters in query string
 			// and no ABC script with global parameters
 		    if (mu.d) {
-
+			abc2svg.abc_end(ix)	// end of page (for %%pageheight, abcweb)
 			if (err)
 				outb += '<pre class="nop" style="background:#ff8080">'
 					+ err + "</pre>\n"
 
-			if (abc.cfmt().with_source && outb)
-				outb = '<pre class="source">'
+			if (f && outb) {
+				o = f.indexOf('edit') > 0
+					? " contentEditable>" : ">"
+				outb = '<pre class="source"'
+					+ o
 					+ clean_txt(t)
 					+ '</pre>\n\
 <div class="source">\n'
 					+ outb
 					+ '</div>\n'
+			}
 			
 			mu.d.innerHTML = outb	// update the browser
-
-			mu.d.addEventListener('click', abc2svg.playseq)
-			e = mu.d.getElementsByTagName('svg')
-			for (i = 0; i < e.length; i++) {
-				j = e[i].getAttribute('class')
-				if (!j)
-					continue	// (page formatting)
-				j = j.match(/tune(\d+)/)
-				if (!j)
-					continue
-				j = j[1]		// tune number
-				tune_lst[j] = null	// get new play references
-			}
 		    } // if (mu.d)
 
 			// if some generation waiting, start it
 			mu.w = busy = 0 //false
 			for (i = 1; i < abc2svg.music.length; i++) {
 				if (abc2svg.music[i].w) {
-					musgen(abc2svg.music[i])
+					musgen(i)
 					break
 				}
 			}
@@ -395,6 +390,9 @@ Printing may be bad because the file contains pure HTML and %%pageheight\
 			}
 			r.send()
 		} // include()
+
+		// musgen entry
+		abc = abc2svg.abc	// reload the Abc instance after edition
 
 		// load the required modules and the include files before rendering
 		if (abc2svg.modules.load(t, include))
@@ -510,6 +508,16 @@ function clean_txt(txt) {
 		return
 	}
 
+	// create a hidden span for string width computation
+	e = document.createElement("span")
+	e.style.position = "absolute"
+	e.style.top =
+		e.style.padding = 0
+	e.style.visibility = "hidden"
+	e.style.lineHeight = 1
+	document.body.appendChild(e)
+	abc2svg.el = e
+
 	if (src.indexOf('type="text/vnd.abc"') < 0)
 		move_music(src)
 
@@ -521,12 +529,12 @@ function clean_txt(txt) {
 	if (typeof follow == "function")	// if snd-1.js loaded
 		follow(abc, user, playconf)	// initialize the play follow
 	if (abc2svg.music[0].t)
-		musgen(abc2svg.music[0])	// global definitions
+		musgen(0)			// global definitions
 
 	// create a list of all <div>'s
 	abc2svg.alldiv = []
 	for (var i = 1; i < abc2svg.music.length; i++)
-		abc2svg.alldiv.push(abc2svg.music[i])
+		abc2svg.alldiv.push(i)
 	visible()
 } // dom_loaded()
 
@@ -545,13 +553,36 @@ abc2svg.get_music = function(d) {
 
 // set the music source of a <div> element and redisplay it
 abc2svg.set_music = function(d, t) {
-    var	i, mu
+    var	i, mu, tunes
 
-	for (var i = 1; i < abc2svg.music.length; i++) {
+	// remove the tune data that will not be used anymore
+	function tune_purge(mu) {
+	    var	svg, cl, i,
+		e = mu.d.getElementsByTagName('svg')
+
+		for (i = 0; i < e.length; i++) { // look at the SVGs of the sequence
+			cl = e[i].getAttribute("class")		// SVG class
+			if (cl)
+				cl = cl.match(/tune(\d+)/)	// tune number
+			if (!cl)
+				continue
+			tunes[cl[1]] = null
+		}
+	} // tune_purge()
+
+	for (i = 1; i < abc2svg.music.length; i++) {
 		mu = abc2svg.music[i]
 		if (mu.d == d) {
 			mu.t = t
-			abc2svg.musgen(mu)
+			tunes = abc2svg.abc.tunes
+			tune_purge(mu)
+			abc2svg.abc = new abc2svg.Abc(user) // use a new Abc instance
+
+			// copy the old tunes to the new instance
+			abc2svg.abc.tunes.push.apply(abc2svg.abc.tunes, tunes)
+			if (abc2svg.music[0].t)
+				abc2svg.musgen(0)	// global definitions
+			abc2svg.musgen(i)
 			break
 		}
 	}

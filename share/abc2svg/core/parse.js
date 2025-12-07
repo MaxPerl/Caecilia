@@ -1,6 +1,6 @@
 // abc2svg - parse.js - ABC parse
 //
-// Copyright (C) 2014-2024 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg-core.
 //
@@ -173,14 +173,12 @@ function nt_trans(nt,
 	if (!d) {				// if not a microtonal accidental
 		if (an == -3)			// if triple sharp/flat
 			return an
+		if (a && !an)
+			an = 3			// needed for %%map
 		a = an
-		if (nt.acc) {			// if old accidental
-			if (!a)
-				a = 3		// required natural
-		} else {
-			if (!curvoice.ckey.k_none) // if normal key
-				a = 0		// no accidental
-		}
+		if (!nt.acc			// if no old accidental
+		 && !curvoice.ckey.k_none)	// and normal key
+			a = 0			// no accidental
 		nt.acc = a
 		return an
 	}
@@ -531,10 +529,6 @@ Abc.prototype.set_vp = function(a) {
 			curvoice.tacet = val || undefined
 			break
 		case "transpose=":		// (abcMIDI compatibility)
-			if (cfmt.nedo) {
-				syntax(1, errs.notransp)
-				break
-			}
 			val = get_transp(a.shift())
 			if (val == undefined) {
 				syntax(1, errs.bad_transp)
@@ -588,6 +582,7 @@ Abc.prototype.set_vp = function(a) {
 							// semi-tone interval
 		else if (curvoice.tr_snd)
 			curvoice.tr_snd = 0
+		curvoice.tr_snd40 = tr_p		// (for play chords)
 	}
 } // set_vp()
 
@@ -771,8 +766,8 @@ function new_key(param) {
 		? abc2svg.keys[9]		// implicit F# and C#
 		: abc2svg.keys[sf + 7]
 	if (s.k_a_acc) {
-		s.k_map = new Int8Array(s.k_map)
-		i = s.k_a_acc.length
+		s.k_map = Array.prototype.slice.call(s.k_map)	// simple Array
+		i = s.k_a_acc.length			// (for micro-accidentals)
 		while (--i >= 0) {
 			note = s.k_a_acc[i]
 			s.k_map[(note.pit + 19) % 7] = note.acc
@@ -903,7 +898,7 @@ function new_meter(p) {
 						break
 					meter.top += p[i++]
 				}
-				m1 = eval(meter.top)
+				m1 = eval(meter.top.replace(/ /g, '+'))
 				break
 			}
 			if (!in_parenth) {
@@ -1748,7 +1743,8 @@ function parse_acc_pit(line) {
 // - normal = ABC note
 // - octave = 'o' + ABC note in C..B interval
 // - key    = 'k' + scale index
-// - all    = 'all'
+// - tonic  = 't' + mode index
+// - any    = '*'
 // The 'map' is stored in the note. It is an array of
 //	[0] array of heads (glyph names)
 //	[1] print (note)
@@ -1762,18 +1758,53 @@ function set_map(p_v, note, acc,
 	if (!map)
 		return
 
-	if (!map[nn]) {
-		nn = 'o' + nn.replace(/[',]+/, '')	// ' octave
-		if (!map[nn]) {
-			nn = 'k' + ntb[(note.pit + 75 -
-					p_v.ckey.k_sf * 11) % 7]
-			if (!map[nn]) {
-				nn = 'all'		// 'all'
-				if (!map[nn])
-					return
-			}
-		}
-	}
+	// test if 'nn' is in the map
+	function map_p() {
+		if (map[nn])
+			return 1 //true
+	    var	sf, d
+
+		nn = 'o' + nn.replace(/[',]+/, '')	// '
+		if (map[nn])
+			return 1 //true
+//fixme: useless
+		d = abc2svg.keys[p_v.ckey.k_sf + 7][(note.pit + 75) % 7]
+		d = (!d && acc == 3) ? 0 : acc
+		nn = 'k' + ['__','_','','^','^^','='][d + 2]	// key chromatic
+			+ ntb[(note.pit + 75 - p_v.ckey.k_sf * 11) % 7]
+		if (map[nn])
+			return 1 //true
+		nn = nn.replace(/[_=^]/g,'')		// key diatonic
+		if (map[nn])
+			return 1 //true
+		sf = p_v.ckey.k_sf + [0, 2, 4, -1, 1, 3, -2][p_v.ckey.k_mode]
+		if (sf < -7)
+			sf += 7
+		else if (sf > 7)
+			sf -= 7
+		d = abc2svg.keys[sf + 7]
+				[(note.pit + 75) % 7]
+		if (d && acc == 3)
+			d = -d
+		else if (!d && !acc)
+			d = 3
+		else
+			d = acc - d
+		nn = 't' + ['__','_','=','^','^^','']	// tonic chromatic
+				[d + 2]
+			+ ntb[(note.pit + 75 - p_v.ckey.k_mode
+				 - p_v.ckey.k_sf * 11) % 7]
+		if (map[nn])
+			return 1 //true
+		nn = nn.replace(/[_=^]/g,'')		// tonic diatonic
+		if (map[nn])
+			return 1 //true
+		nn = '*'				// any note
+		return map[nn]
+	} // map_p()
+
+	if (!map_p())					// note in the map?
+		return					// no
 	map = map[nn]
 
 	if (trp_p) {
@@ -1926,12 +1957,21 @@ function pit2mid(pit, acc) {
 			return p
 		}
 	} else {				// equal temperament
+		p0 = cfmt.temper[abc2svg.p_b40[pit % 7]]	// main note
 		if (typeof acc != "object") {	// if not a fraction
 			b40 = abc2svg.p_b40[pit % 7] + acc
-			return cfmt.temper[b40] + o
+			p1 = cfmt.temper[b40]
+			if (s > 0) {			// sharp
+				if (p1 < p0)
+					p1 += 12
+			} else {
+				if (p1 > p0)
+					p1 -= 12
+			}
+			return p1 + o
 		}
 
-		if (acc[1] == cfmt.nedo) { // fraction of the edo divider
+		if (acc[1] == cfmt.nedo) {	// fraction with the edo divider
 			b40 = abc2svg.p_b40[pit % 7]
 			return cfmt.temper[b40] + o + s
 		}
@@ -2006,8 +2046,9 @@ function do_ties(s, tie_s) {
 
 // (possible hook)
 Abc.prototype.new_note = function(grace, sls) {
-    var	note, s, in_chord, c, dcn, type, tie_s, acc_tie,
-	i, n, s2, nd, res, num, dur, apit, div, ty,
+    var	note, s, in_chord, c, tie_s, acc_tie,
+	i, n, s2, nd, res, num, apit, div, ty,
+	chdur = 1,
 	dpit = 0,
 	sl1 = [],
 	line = parse.line,
@@ -2097,6 +2138,10 @@ Abc.prototype.new_note = function(grace, sls) {
 		s.dur_orig = ((curvoice.ulen < 0) ?
 					C.BLEN :
 					curvoice.ulen) * nd[0] / nd[1];
+		if (s.dur_orig < 12) {
+			error(0, s, "Bad note duration $1", s.dur_orig)
+			s.dur_orig = 12
+		}
 		s.dur = s.dur_orig * curvoice.dur_fact;
 		if (s.dur == curvoice.wmeasure)
 			s.fmr = 1		// full measure rest
@@ -2108,6 +2153,17 @@ Abc.prototype.new_note = function(grace, sls) {
 	case '[':			// chord
 		in_chord = true;
 		c = line.next_char()
+		i = line.buffer.indexOf(']', line.index)
+		if (i < 0) {
+			syntax(1, "No end of chord")
+			return
+		}
+		n = line.index			// save the parser index
+		line.index = i + 1		// set the parser to the end of chord
+		nd = parse_dur(line)
+		chdur = nd[0] / nd[1]		// length factor of the chord
+		in_chord = reg_dur.lastIndex	// hack: index after the chord length
+		line.index = n			// restore the parser index
 		// fall thru
 	default:			// accidental, chord, note
 		if (curvoice.acc_tie) {
@@ -2129,15 +2185,15 @@ Abc.prototype.new_note = function(grace, sls) {
 						syntax(1, errs.not_ascii)
 						return //null
 					}
-					type = char_tb[i]
-					switch (type[0]) {
+					ty = char_tb[i]
+					switch (ty[0]) {
 					case '(':
 						sl1.push(parse_vpos());
 						c = line.char()
 						continue
 					case '!':
-						if (type.length > 1)
-							a_dcn.push(type.slice(1, -1))
+						if (ty.length > 1)
+							a_dcn.push(ty.slice(1, -1))
 						else
 							get_deco()	// line -> a_dcn
 						c = line.next_char()
@@ -2153,6 +2209,12 @@ Abc.prototype.new_note = function(grace, sls) {
 						curvoice.ulen)
 			if (!note)
 				return //null
+
+			note.dur *= chdur		// chord factor
+			if (note.dur < 12) {
+				error(0, s, "Bad note duration $1", note.dur)
+				note.dur = 12
+			}
 
 			if (curvoice.octave)
 				note.pit += curvoice.octave * 7
@@ -2237,10 +2299,6 @@ Abc.prototype.new_note = function(grace, sls) {
 					})
 				}
 			}
-			if (a_dcn.length) {
-				s.time = curvoice.time	// (needed for !tie)!
-				dh_cnv(s, note)
-			}
 			s.notes.push(note)
 			if (!in_chord)
 				break
@@ -2283,16 +2341,14 @@ Abc.prototype.new_note = function(grace, sls) {
 				}
 				break
 			}
-			if (c == ']') {
-				line.index++;
+			if (a_dcn.length) {
+				s.time = curvoice.time	// (needed for !tie)!
+				dh_cnv(s, note)
+			}
 
-				// adjust the chord duration
-				nd = parse_dur(line);
+			if (c == ']') {
+				line.index = in_chord
 				s.nhd = s.notes.length - 1
-				for (i = 0; i <= s.nhd ; i++) {
-					note = s.notes[i];
-					note.dur = note.dur * nd[0] / nd[1]
-				}
 				break
 			}
 		}

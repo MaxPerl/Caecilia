@@ -1,6 +1,6 @@
 // abc2svg - draw.js - draw functions
 //
-// Copyright (C) 2014-2024 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg-core.
 //
@@ -30,7 +30,7 @@ var	STEM_MIN	= 16,	/* min stem height under beams */
 	BEAM_OFFSET	= .25,	/* pos of flat beam relative to staff line */
 	BEAM_SHIFT	= 5,	/* shift of second and third beams */
 	BEAM_STUB	= 7,	/* length of stub for flag under beam */ 
-	SLUR_SLOPE	= .5,	/* max slope of a slur */
+	SLUR_SLOPE	= .7,	// max slope of a slur
 	GSTEM		= 15,	/* grace note stem length */
 	GSTEM_XOFF	= 2.3	/* x offset for grace note stem */
 
@@ -399,13 +399,11 @@ Abc.prototype.calculate_beam = function(bm, s1) {
 				if (s1.stem > 0) {
 					y = g.ymx - y
 						+ BEAM_DEPTH + BEAM_SHIFT * (nflags - 1)
-						+ 2
 					if (y > 0)
 						b += y
 				} else {
 					y = g.ymn - y
 						- BEAM_DEPTH - BEAM_SHIFT * (nflags - 1)
-						- 2
 					if (y < 0)
 						b += y
 				}
@@ -739,10 +737,9 @@ function draw_lstaff(x) {
 function draw_meter(s) {
 	if (!s.a_meter)
 		return
-    var	dx, i, j, meter, x,
-		st = s.st,
-		p_staff = staff_tb[st],
-		y = p_staff.y;
+    var	i, m, meter, x, x0, yt,
+	p_staff = staff_tb[s.st],
+	y = p_staff.y
 
 	// adjust the vertical offset according to the staff definition
 	if (p_staff.stafflines != '|||||')
@@ -751,17 +748,57 @@ function draw_meter(s) {
 	for (i = 0; i < s.a_meter.length; i++) {
 		meter = s.a_meter[i];
 		x = s.x + s.x_meter[i]
-
+		yt = y + (meter.bot ? 18 : 12)
+		if (s.a_meter[i + 1]
+		 && (s.a_meter[i + 1].top == '|'
+		  || s.a_meter[i + 1].top == '.')) {
+			xygl(x, yt, "mtr" + meter.top[0] + s.a_meter[i + 1].top)
+			i++
+			continue
+		}
+		xygl(x, yt, "mtr" + meter.top[0])
+		if (meter.top.length > 1) {
+			m = 0
+			x0 = x
+			while (1) {
+				switch (meter.top[m]) {
+				case '(':
+				case ')':
+					x += 4
+					break
+				case '1':
+					x += 8
+					break
+				case ' ':
+					x += 4
+					break
+				case '+':
+					x += 2
+					// fall thru
+				default:
+					x += 10
+					break
+				}
+				if (++m >= meter.top.length)
+					break
+				xygl(x, yt, "mtr" + meter.top[m])
+			}
+			x = (x0 + x) / 2 - 5
+		}
 		if (meter.bot) {
-			out_XYAB('\
-<g transform="translate(X,Y)" text-anchor="middle">\n\
-	<text y="-12">A</text>\n\
-	<text>B</text>\n\
-</g>\n', x, y + 6, m_gl(meter.top), m_gl(meter.bot))
-		} else {
-			out_XYAB('\
-<text x="X" y="Y" text-anchor="middle">A</text>\n',
-				x, y + 12, m_gl(meter.top))
+			if (meter.bot[1]) {
+				if (meter.bot[0] == 1) {
+					x0 = x - 4
+					x += 4
+				} else {
+					x0 = x - 5
+					x += 5
+				}
+				xygl(x0, y + 6, "mtr" + meter.bot[0])
+				xygl(x, y + 6, "mtr" + meter.bot[1])
+			} else {
+				xygl(x, y + 6, "mtr" + meter.bot[0])
+			}
 		}
 	}
 }
@@ -859,8 +896,8 @@ Abc.prototype.draw_hl = function(s) {
 		dx1 = (hla[i][1] < shhd ? hla[i][1] : shhd) - dx
 		dx2 = (hla[i][1] > shhd ? hla[i][1] : shhd) + dx
 		if (hlp < bot * 2) {
-			if (hlp < yl * 2)
-				yl = ++hlp >> 1
+			if (++hlp < yl * 2)
+				yl = hlp >> 1
 			n--
 		} else if (hlp > top * 2) {
 			yu = hlp >> 1
@@ -1566,7 +1603,7 @@ function draw_basic_note(s, m, y_tb) {
 	/* draw the dots */
 /*fixme: to see for grace notes*/
 	if (dots) {
-		dotx = x + (7.7 + s.xmx) * stv_g.scale
+		dotx = x + (6.6 + s.xmx) * stv_g.scale
 		if (y_tb[m] == undefined) {
 			y_tb[m] = 3 * (s.notes[m].pit - 18)
 			if ((s.notes[m].pit & 1) == 0)
@@ -1981,7 +2018,7 @@ function draw_slur(path,	// list of symbols under the slur
 						y1 = k1.ys - 3
 					}
 				} else {
-					y1 = k1.y - 8
+					y1 = k1.y - 5
 				}
 			}
 		}
@@ -2016,7 +2053,7 @@ function draw_slur(path,	// list of symbols under the slur
 					else
 						y2 = k2.ys - 3
 				} else {
-					y2 = k2.y - 8
+					y2 = k2.y - 5
 				}
 			}
 		}
@@ -2099,7 +2136,7 @@ function draw_slur(path,	// list of symbols under the slur
 	if (k1.grace)
 		x1 = k1.x - GSTEM_XOFF * .5
 	if (k2.grace)
-		x2 = k2.x + GSTEM_XOFF * 1.5;
+		x2 = k2.x + GSTEM_XOFF * .5
 
 	h = 0;
 	a = (y2 - y1) / (x2 - x1)
@@ -2130,15 +2167,15 @@ function draw_slur(path,	// list of symbols under the slur
 		case C.GRACE:
 			for (g = k.extra; g; g = g.next) {
 				if (dir > 0) {
-					y = 3 * (g.notes[g.nhd].pit - 18) + 6
-					if (y < g.ymx)
+//					y = 3 * (g.notes[g.nhd].pit - 18) + 6
+//					if (y < g.ymx)
 						y = g.ymx;
 					y -= a * g.x + addy
 					if (y > h)
 						h = y
 				} else {
-					y = 3 * (g.notes[0].pit - 18) - 6
-					if (y > g.ymn)
+//					y = 3 * (g.notes[0].pit - 18) - 6
+//					if (y > g.ymn)
 						y = g.ymn;
 					y -= a * g.x + addy
 					if (y < h)
@@ -2243,7 +2280,7 @@ function draw_slurs(s, last) {
 			s = prev_scut(s)
 			break
 		case 'o':			// no end
-			for (s3 = s; s3.ts_next; s3 = s3.ts_next)
+			for (s3 = gr1 || s; s3.ts_next; s3 = s3.ts_next)
 				;
 			s2 = s3
 			for (; s3; s3 = s3.ts_prev) {
@@ -2852,9 +2889,8 @@ function draw_tie(not1, not2,
 	  || (dir < 0 && s1.dot_low)))
 		x1 += 5
 
-	y = staff_tb[st].y + 3 * (p - 18) + /* 1.0 * */ dir
-
-	h = (.03 * (x2 - x1) + 16) * dir * s1.fmt.tieheight
+	y = staff_tb[st].y + 3 * (p - 18) + .8 * dir
+	h = (.15 * (x2 - x1) + 14) * dir * s1.fmt.tieheight
 //	anno_start(k1, 'slur')
 	slur_out(x1, y, x2, y, dir, h, not1.tie_ty & C.SL_DOTTED)
 //	anno_stop(k1, 'slur')
@@ -2871,6 +2907,7 @@ function draw_all_ties(p_voice) {
 	set_color(s1.color)
 	for ( ; s1; s1 = s1.next) {
 		if (s1.ti2			// if end of tie
+		 && !s1.invis
 		 && s1.time != tim2) {		// and new end
 			for (m = 0; m <= s1.nhd; m++) {
 				not2 = s1.notes[m]
@@ -2881,7 +2918,8 @@ function draw_all_ties(p_voice) {
 				draw_tie(not1, not2, 1)
 			}
 		}
-		if (!s1.ti1)			// if not start of tie
+		if (!s1.ti1			// if not start of tie
+		 || s1.invis)
 			continue
 
 		// get the end of the tie(s)
@@ -3066,6 +3104,10 @@ function draw_sym_near() {
 		default:
 			y_set(s.st, true, s.x - s.wl, s.wl + s.wr, s.ymx + 2);
 			y_set(s.st, false, s.x - s.wl, s.wl + s.wr, s.ymn - 2)
+			// fall thru
+		case C.PART:
+		case C.TEMPO:
+		case C.STAVES:
 			continue
 		case C.NOTE:
 			break
@@ -3205,9 +3247,7 @@ function draw_vname(indent, stl) {
 		st = cur_sy.voices[v].st
 		if (!stl[st])
 			continue
-		if (!gene.vnt)
-			continue
-		p = gene.vnt == 2 ? p_voice.nm : p_voice.snm
+		p = gene.vnt == 1 ? p_voice.nm : p_voice.snm
 		if (!p)
 			continue
 		delete p_voice.new_name
@@ -3229,7 +3269,7 @@ function draw_vname(indent, stl) {
 		y = staff_tb[st].y
 			+ staff_tb[st].topbar * .5
 				* staff_tb[st].staffscale
-			+ h2 * (a_p.length - 2)
+			+ h2 * (a_p.length - 2) + h *.22
 
 		// if instrument with 2 staves, center the voice name
 		if ((cur_sy.staves[st].flags & OPEN_BRACE)
@@ -3409,18 +3449,15 @@ function draw_systems(indent) {
 				if (stlines[i] != '.' && stlines[i] != '-')
 					break
 			}
-			if (i >= l - 1)			// 0 or 1 line
-				bar_bot[st] = staff_tb[st].y + 6 * (l - 2) * sc
-			else if (i == l - 2)		// 2 lines
-				bar_bot[st] = staff_tb[st].y + 6 * (l - 3) * sc
-			else
-				bar_bot[st] = staff_tb[st].y + 6 * i * sc
+			bar_bot[st] = staff_tb[st].y + 6 * (
+						i == l - 1 ? (l - 2) :
+						i >= l - 2 ? (l - 3) :
+						i) * sc
 			if (!dy) {
-				if (i >= l - 2) {	// 0, 1 or 2 lines
-					dy = staff_tb[st].y + 6 * l * sc
-				} else {
-					dy = staff_tb[st].y + 6 * (l - 1) * sc
-				}
+				dy = staff_tb[st].y + 6 * (
+						i == l ? (l + 1) :
+						i >= l - 2 ? l :
+						(l - 1)) * sc
 			}
 			bar_height[st] = dy - bar_bot[st];
 			bar_ng[st] = l - i && l - 1 - i	// number of gaps
@@ -3456,8 +3493,8 @@ function draw_systems(indent) {
 		i = ba.length
 		if (!i)
 			return
-		while (1) {
-			b = ba[--i]
+		while (--i >= 0) {
+			b = ba[i]
 			st = b[0].st
 			if (b[1] > bar_bot[st])
 				b[1] = bar_bot[st]
@@ -3508,7 +3545,7 @@ function draw_systems(indent) {
 					continue
 				case ty:
 					ln += 'm-' + w.toFixed(1) +
-						' ' + dy +
+						' ' + dy.toFixed(2) +
 						'h' + w.toFixed(1);
 					dy = 0
 					continue
@@ -3547,7 +3584,7 @@ function draw_systems(indent) {
 		bar_type = s.bar_type,
 		st = s.st,
 		p_staff = staff_tb[st],
-		top = ng >= 3 ? 6 * ng : ng == 1 ? 18 : 12,
+		top = ng >= 3 ? 6 * ng : (4 - ng) * 6,
 		x = s.x
 
 		// don't put a line between the staves if there is no bar above
@@ -3638,19 +3675,13 @@ function draw_systems(indent) {
 
 	// output all the bars
 	function out_bars() {
-	    var	i, b, bx,
+	    var	i, b,
 		l = ba.length
 
-		set_font("annotation");
-		bx = gene.curfont.box
-		if (bx)
-			gene.curfont.box = 0
 		for (i = 0; i < l; i++) {
 			b = ba[i]		// symbol, bottom, height, top
 			draw_bar(b[0], b[1], b[2], b[3])
 		}
-		if (bx)
-			gene.curfont.box = bx
 
 		set_sscale(-1)
 		if (sb)			// single bars
@@ -3934,13 +3965,13 @@ Abc.prototype.draw_symbols = function(p_voice) {
 			if (s.clef_octave) {
 /*fixme:break the compatibility and avoid strange numbers*/
 				if (s.clef_octave > 0) {
-					y += s.ymx - 10
+					y += s.ymx + 1
 					if (s.clef_small)
-						y -= 1
+						y -= 2
 				} else {
-					y += s.ymn + 6
-					if (s.clef_small)
-						y += 1
+					y += s.ymn - 2 //+2
+//					if (s.clef_small)
+//						y += 1
 				}
 				xygl(x - 2, y, (s.clef_octave == 7
 						|| s.clef_octave == -7)

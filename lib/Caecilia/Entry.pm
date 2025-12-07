@@ -218,7 +218,13 @@ sub changed {
 	#########################
 	my $textblock = $entry->textblock_get();
 	my $cp1 = pEFL::Evas::TextblockCursor->new($textblock);
-	$cp1->pos_set($entry->cursor_pos_get());
+	if ($change_info->insert()) {
+		# In paste events rehighlighting should enclose the whole pasted text!!!
+		$cp1->pos_set($entry->cursor_pos_get() - $change->{insert}->{plain_length});
+	}
+	else {
+		$cp1->pos_set($entry->cursor_pos_get());
+	}
 	my $cp2 = pEFL::Evas::TextblockCursor->new($textblock);
 	$cp2->pos_set($entry->cursor_pos_get());
 	

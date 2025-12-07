@@ -1,6 +1,6 @@
 // sndmid.js - audio output using HTML5 MIDI
 //
-// Copyright (C) 2019-2023 Jean-Francois Moine
+// Copyright (C) 2019-2024 Jean-Francois Moine
 //
 // This file is part of abc2svg.
 //
@@ -49,6 +49,7 @@ function Midi5(i_conf) {
     var	po,
 	conf = i_conf,		// configuration
 	empty = function() {},
+	det_tb,			// detune table
 	rf,			// get_outputs result function
 	op			// output MIDI port
 
@@ -56,6 +57,39 @@ function Midi5(i_conf) {
 	function get_time(po) {
 		return window.performance.now() / 1000
 	} // get_time()
+
+    var	mutone = function(k, a, t) {
+		if (!det_tb) {
+			if (!a)
+				return		// no microtone
+			det_tb = {}
+		}
+		if (!Midi5.ma.sysexEnabled) {	// no SysEx
+			mutone = empty		// don't come back here anymore
+			return
+		}
+	    var	old_a = det_tb[k]		// previous detune of 'k'
+
+		if ((!old_a && !a)
+		 || old_a == a)
+			return			// same detune
+		det_tb[k] = a
+
+		a *= 163.84			// 16384 / 100
+		po.op.send(new Uint8Array([
+			0xf0, 0x7f,		// realtime SysEx
+			0x7f,			// all devices
+			0x08,			// MIDI tuning
+			0x02,			// note change
+			0,			// tuning prog number
+			0x01,			// number of notes
+				k,		// key
+				k,		// semitone
+				(a >> 7) & 0x7f, // fraction of semitone
+				a & 0x7f,
+			0xf7			// SysEx end
+			]), t)
+	} // mutone()
 
 	// create a note
 	// @po = play object
@@ -72,25 +106,11 @@ function Midi5(i_conf) {
 		k |= 0			// remove the detune value
 
 		t *= 1000		// convert to ms
-		d *= 1000		
+		d *= 1000
 
-		if (a && Midi5.ma.sysexEnabled) {	// if microtone
-// fixme: should cache the current microtone values
-			po.op.send(new Uint8Array([
-				0xf0, 0x7f,	// realtime SysEx
-				0x7f,		// all devices
-				0x08,		// MIDI tuning standard
-				0x02,		// note change
-				i & 0x7f,		// tuning prog number
-				0x01,		// number of notes
-					k,		// key
-					k,		// note
-					a / .78125,	// MSB fract
-					0,		// LSB fract
-				0xf7		// SysEx end
-				]), t)
-		}
-		po.op.send(new Uint8Array([0x90 + c, k, 127]), t)	// note on
+		mutone(k, a, t)		// handle microtone accidentals
+
+		po.op.send(new Uint8Array([0x90 + c, k, 80]), t)	// note on
 		po.op.send(new Uint8Array([0x80 + c, k, 0]), t + d - 20) // note off
 	} // note_run()
 
@@ -165,14 +185,7 @@ if(0){
 			navigator.requestMIDIAccess({sysex: true}).then(
 				send_outputs,
 				function(msg) {
-
-					// open MIDI without SysEx
-					navigator.requestMIDIAccess().then(
-						send_outputs,
-						function(msg) {
-							rf()
-						}
-					)
+					rf()
 				}
 			)
 		}, // get_outputs()
@@ -218,22 +231,6 @@ if(0){
 				v_c: [],	// voice to channel
 				c_i: []		// channel to instrument
 			}
-if (0) {
-// temperament
-			op.send(new Uint8Array([
-				0xf0, 0x7f,	// realtime SysEx
-				0x7f,		// all devices
-				0x08,		// MIDI tuning standard
-				0x02,		// note change
-				0x00,		// tuning prog number
-				0x01,		// number of notes
-					0x69,		// key
-					0x69,		// note
-					0x00,		// MSB fract
-					0,		// LSB fract
-				0xf7		// SysEx end
-				]), t)
-}
 
 			abc2svg.play_next(po)
 		}, // play()

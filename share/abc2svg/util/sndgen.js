@@ -1,6 +1,6 @@
 // sndgen.js - sound generation
 //
-// Copyright (C) 2019-2024 Jean-Francois Moine
+// Copyright (C) 2019-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg.
 //
@@ -32,6 +32,21 @@
 if (!abc2svg)
     var	abc2svg = {}
 
+// tempo table
+	abc2svg.tmp_tb = {
+		grave:		30,
+		lento:		40,
+		largo:		50,
+		adagio:		66,
+		andante:	86,
+		moderato:	96,
+		allegretto:	112,
+		allegro:	130,
+		vivace:		150,
+		presto:		180,
+		prestissimo:	210
+	}
+
 function ToAudio() {
  return {
 
@@ -44,7 +59,7 @@ function ToAudio() {
 	p_time = 0,		// last playing time
 	abc_time = 0,		// last ABC time
 	play_fac = C.BLEN / 4 * 120 / 60, // play time factor - default: Q:1/4=120
-	i, n, dt, d, v,
+	dt, s_m, d,
 	s = first,
 	rst = s,		// left repeat (repeat restart)
 	rst_fac,		// play factor on repeat restart
@@ -222,38 +237,84 @@ function ToAudio() {
 
 	// update the time linkage when the start time has changed
 	function relink(s, dt) {
-	    var	tim = s.time + dt,		// new time
-		s2 = s.ts_next
+	    var	s2 = s.ts_next
 
-		s.ts_prev.ts_next = s2		// remove from the time linkage
-		s2.ts_prev = s.ts_prev
-
-		while (!s2.seqst && s2.ts_next)
-			s2 = s2.ts_next
-		if (s2.time < s.time + dt)	// don't move after the next time seq.
-			dt = s2.time - s.time
 		s.time += dt			// update time and duration
-		s.dur -= dt
-		s.ts_prev = s2.ts_prev		// update the time linkage
-		s.ts_prev.ts_next = s
-		s.ts_next = s2
-		s2.ts_prev = s
-		s.seqst = 1 //true
-		if (s2.time == s.time)
-			s2.seqst = 0 //false
+		if (s.dur)
+			s.dur -= dt
+		s.seqst = 1 //true		// new time sequence
+		if (s.ts_next)
+			s.ts_next.seqst = 1 //true
+
+		s2 = s
+		if (dt < 0) {			// if move backwards the grace notes
+			do {
+				s2 = s2.prev
+			} while (s2 && !s2.dur)
+			if (s2) {
+				s2.dur += dt
+				s2.pdur = s2.dur / play_fac
+				s2 = s2.ts_next
+				if (s2 == s)
+					s2 = null	// no linkage change
+			}
+		} else {
+			if (!s.ts_next) {
+				s2 = null
+			} else {
+				s2 = s2.ts_next
+				while (s2 && !s2.seqst)
+					s2 = s2.ts_next
+			}
+		}
+
+		// update the time linkage
+		if (s2) {
+			s.ts_prev.ts_next = s.ts_next	// remove from the time linkage
+			if (s.ts_next)
+				s.ts_next.ts_prev = s.ts_prev
+			s.ts_prev = s2.ts_prev		// new linkage
+			s.ts_next = s2
+			if (s2.ts_prev)
+				s2.ts_prev.ts_next = s
+			s.ts_next.ts_prev = s
+			if (s2.time == s.time)
+				s2.seqst = 0 //false
+		} else if (s.ts_next) {
+			s.ts_next.seqst = 1
+		}
 	} // relink()
 
 	// generate the grace notes
 	function gen_grace(s) {
-	    var	g, i, n, t, d, s2,
+		if (s.midgen)
+			return				// generation already done
+		s.midgen = 1 //true
+	    var	g, i, n, t, d, prev,
 		next = s.next
 
+//fixme: assume the grace notes in the sequence have the same duration
+		n = 0
+		for (g = s.extra; g; g = g.next)
+			n++				// number of notes
+
+		prev = s.prev
+		while (prev && !prev.dur)		// search the previous note/rest
+			prev = prev.prev
+
 		// before beat
-		if (s.sappo) {
-			d = C.BLEN / 16
-		} else if ((!next || next.type != C.NOTE)
-			&& s.prev && s.prev.type == C.NOTE) {
-			d = s.prev.dur / 2
+		if (prev
+		 && (s.sappo
+		  || !next || next.type != C.NOTE)) {
+			if (s.sappo) {
+				d = C.BLEN / 16
+				if (d > prev.dur / 3)
+					d = prev.dur / 3
+			} else {
+				d = prev.dur / 2
+			}
+			relink(s, -d)
+			s.ptim -= d / play_fac
 
 		// on beat
 		} else {
@@ -264,16 +325,18 @@ function ToAudio() {
 				d = next.dur / 3
 			if (s.p_v.key.k_bagpipe)
 				d /= 2
+			if (d / n < 24)
+				d = 24 * n
+			if (s.sappo		// (appogiatura at start of tune!)
+			 && d > C.BLEN / 16)
+				d = C.BLEN / 16
 			relink(next, d)
 		}
-//fixme: assume the grace notes in the sequence have the same duration
-		n = 0
-		for (g = s.extra; g; g = g.next)
-			n++
+
 		d /= n * play_fac
-		t = p_time
+		t = 0
 		for (g = s.extra; g; g = g.next) {
-			g.ptim = t
+			g.dtim = t
 			g.pdur = d
 			t += d
 		}
@@ -281,12 +344,33 @@ function ToAudio() {
 
 	// change the tempo
 	function set_tempo(s) {
+		if (!s.tempo && !s.new_beat) {
+		    var	p = (s.tempo_str1 || s.tempo_str2)
+			if (!p)
+				return play_fac		// no change
+		    var	upm = abc2svg.tmp_tb[p.toLowerCase()]
+
+			if (!upm)
+				return play_fac		// no change
+			upm *= C.BLEN / 240 // (/4/60)
+			if (!s_m.a_meter)
+				return upm
+			if (!s_m.a_meter[0].bot)
+				return (s_m.a_meter[1] && s_m.a_meter[1].top == '|')
+						? upm * 2 : upm
+			if (s_m.a_meter[0].bot == "8"
+			 && !(s_m.a_meter[0].top % 3))
+			 	return upm / 2 * 3
+			return upm * s_m.a_meter[0].bot / 4
+		}
 	    var	i,
 		d = 0,
 		n = s.tempo_notes.length
 
 		for (i = 0; i < n; i++)
 			d += s.tempo_notes[i]
+		if (s.new_beat)
+			return play_fac * s.new_beat / d
 		return d * s.tempo / 60
 	} // set_tempo()
 
@@ -315,7 +399,9 @@ function ToAudio() {
 		abc2svg.chord(first, voice_tb, cfmt)
 
 	// if %%playbeats, create the sounds
-	if (cfmt.playbeats)
+	s_m = first.p_v.meter			// current meter
+	if (cfmt.playbeats
+	  && first.p_v.meter.wmeasure != 1)	// if not M:none
 		def_beats()
 
 	if (s.parts)
@@ -400,36 +486,22 @@ function ToAudio() {
 			}
 			break
 		case C.GRACE:
-			if (s.time == 0		// if before beat at start time
-			 && abc_time == 0) {
-				dt = 0
-				if (s.sappo)
-					dt = C.BLEN / 16
-				else if (!s.next || s.next.type != C.NOTE)
-					dt = d / 2
-				abc_time -= dt
-			}
+			d = s.ts_next			// the grace note may move
 			gen_grace(s)
+			if (d)
+				s = d.ts_prev
 			break
 		case C.REST:
 		case C.NOTE:
 			d = s.dur
-			if (s.next && s.next.type == C.GRACE) {
-				dt = 0
-				if (s.next.sappo)
-					dt = C.BLEN / 16
-				else if (!s.next.next || s.next.next.type != C.NOTE)
-					dt = d / 2
-				s.next.time -= dt
-				d -= dt
-			}
 			d /= play_fac
 			s.pdur = d
-			v = s.v
+			break
+		case C.METER:
+			s_m = s				// current meter
 			break
 		case C.TEMPO:
-			if (s.tempo)
-				play_fac = set_tempo(s)
+			play_fac = set_tempo(s)
 			break
 		}
 		s = s.ts_next
@@ -539,10 +611,14 @@ abc2svg.play_next = function(po) {
 			po.midi_ctrl(po, s, t)
 		}
 		for (s = p_v.sym; s != s2; s = s.next) {
-			if (s.subtype == "midictl")
+			if (s.subtype == "midictl") {
 				po.midi_ctrl(po, s, t)
-			else if (s.subtype == 'midiprog')
+			} else if (s.subtype == 'midiprog') {
+				po.v_c[s.v] = s.chn
+				if (s.instr != undefined)
+					po.c_i[po.v_c[s.v]] = s.instr
 				po.midi_prog(po, s)
+			}
 		}
 
 		// if no %%MIDI, set 'grand acoustic piano' as the instrument
@@ -551,13 +627,16 @@ abc2svg.play_next = function(po) {
 			po.v_c[s2.v] = i = s2.v < 9 ? s2.v : s2.v + 1
 		if (po.c_i[i] == undefined)
 			po.c_i[i] = 0	// piano
-
+		while (p_v.voice_down) {
+			p_v = p_v.voice_down
+			po.v_c[p_v.v] = i
+		}
 		po.p_v[s2.v] = true	// synchronization done
 	} // set_ctrl()
 
     // start and continue to play
     function play_cont(po) {
-    var	d, i, st, m, note, g, s2, t, maxt, now,
+    var	d, i, st, m, note, g, s2, t, maxt, now, p_v,
 	C = abc2svg.C,
 	s = po.s_cur
 
@@ -603,18 +682,14 @@ abc2svg.play_next = function(po) {
 
 	// if speed change, shift the start time
 	if (po.conf.new_speed) {
-		po.stim = now - (now - po.stim) *
-					po.conf.speed / po.conf.new_speed
+		po.stim = t - s.ptim / po.conf.new_speed
 		po.conf.speed = po.conf.new_speed
 		po.conf.new_speed = 0
-		t = po.stim + s.ptim / po.conf.speed
 	}
 
 	maxt = t + po.tgen		// max time = now + 'tgen' seconds
 	po.timouts = []
 	while (1) {
-		if (!po.p_v[s.v])		// if new voice
-			set_ctrl(po, s, t)	// set the MIDI controls
 		switch (s.type) {
 		case C.BAR:
 			s2 = null
@@ -690,12 +765,23 @@ abc2svg.play_next = function(po) {
 		case C.BAR:
 			break
 		case C.BLOCK:
-			if (s.subtype == "midictl")
+			if (s.subtype == "midictl") {
 				po.midi_ctrl(po, s, t)
-			else if (s.subtype == 'midiprog')
+			} else if (s.subtype == 'midiprog') {
+				po.v_c[s.v] = s.chn
+				if (s.instr != undefined)
+					po.c_i[po.v_c[s.v]] = s.instr
 				po.midi_prog(po, s)
+				p_v = s.p_v
+				while (p_v.voice_down) {
+					p_v = p_v.voice_down
+					po.v_c[p_v.v] = s.chn
+				}
+			}
 			break
 		case C.GRACE:
+			if (!po.p_v[s.v])
+				set_ctrl(po, s, t)
 			for (g = s.extra; g; g = g.next) {
 				d = g.pdur / po.conf.speed
 				for (m = 0; m <= g.nhd; m++) {
@@ -703,7 +789,7 @@ abc2svg.play_next = function(po) {
 					if (!note.noplay)
 					    po.note_run(po, g,
 						note.midi,
-						t + g.ptim - s.ptim,
+						t + g.dtim,
 //fixme: there may be a tie...
 						d)
 				}
@@ -711,6 +797,8 @@ abc2svg.play_next = function(po) {
 			break
 		case C.NOTE:
 		case C.REST:
+			if (!po.p_v[s.v])		// if new voice
+				set_ctrl(po, s, t)	// set the MIDI controls
 			d = s.pdur / po.conf.speed
 		    if (s.type == C.NOTE) {
 			for (m = 0; m <= s.nhd; m++) {
@@ -788,7 +876,7 @@ abc2svg.play_next = function(po) {
 	get_part(po)
 
 	po.stim = po.get_time(po) + .3	// start time + 0.3s
-			- po.s_cur.ptim * po.conf.speed
+			- po.s_cur.ptim / po.conf.speed
 	po.p_v = []			// voice table for the MIDI controls
 	if (!po.repv)
 		po.repv = 1

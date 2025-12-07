@@ -1,4 +1,4 @@
-:;# shell script to convert ABC or MEI music notation to other format
+# shell script to convert ABC or MEI music notation to other format
 # using abc2svg and quickjs (https://bellard.org/quickjs/)
 
 # search where are the abc2svg scripts
@@ -70,6 +70,10 @@ var abc2svg = {
 	load(path + "cmdline.js")
 
 	abc_cmd("abcqjs", args, "QuickJS")
+
+// test: list the global variables
+//for (var k in this)
+// console.log(k)
 ' $p "$@"
 
 The previous solution with the shebang line as

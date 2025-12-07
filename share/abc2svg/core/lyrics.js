@@ -1,6 +1,6 @@
 // abc2svg - lyrics.js - lyrics
 //
-// Copyright (C) 2014-2023 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg-core.
 //
@@ -109,6 +109,7 @@ function get_sym(p, cont) {
 			deco_cnv(s, s.prev)
 			break
 		case '"':
+			parse.line.index = j + 2	// (+ 's:')
 			parse_gchord(d)
 			if (a_gch)			// if no error
 				csan_add(s)
@@ -121,8 +122,8 @@ function get_sym(p, cont) {
 }
 
 /* -- parse a lyric (vocal) line (w:) -- */
-function get_lyrics(text, cont) {
-    var s, word, p, i, j, ly, dfnt, ln, c, cf
+function get_lyrics(p, cont) {
+    var s, word, i, j, ly, dfnt, ln, c, cf
 
 	if (curvoice.ignore)
 		return
@@ -135,6 +136,12 @@ function get_lyrics(text, cont) {
 		if (!s) {
 			syntax(1, "+: lyric without music")
 			return
+		}
+		if (p[0] == '~') {			// +:~next~words
+			while (!s.a_ly)
+				s = s.prev
+			ly = s.a_ly[curvoice.lyric_line]
+			p = ly.t.replace(/ /g,'~') + p
 		}
 		dfnt = get_font("vocal")
 		if (gene.deffont != dfnt) {	// if vocalfont change
@@ -161,7 +168,6 @@ function get_lyrics(text, cont) {
 	}
 
 	/* scan the lyric line */
-	p = text;
 	i = 0
 	cf = gene.curfont
 	while (1) {
@@ -274,7 +280,7 @@ function ly_set(s) {
 
 	// get the available horizontal space before the next lyric words
 	for (s2 = s.ts_next; s2; s2 = s2.ts_next) {
-		if (s2.shrink) {
+		if (s2.seqst) {
 			dx += s2.shrink
 			n++			// number of symbols without word
 		}
@@ -359,11 +365,11 @@ function ly_set(s) {
 
 	// if not room enough, shift the following notes to the right
 	dx -= 6
-	if (dx < wx) {
+	if (dx < wx && s2) {
 		dx = (wx - dx) / n
 		s1 = s.ts_next
 		while (1) {
-			if (s1.shrink) {
+			if (s1.seqst) {
 				s1.shrink += dx
 				s3.wr += dx	// (needed for end of line)
 				s3 = s1

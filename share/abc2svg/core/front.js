@@ -1,6 +1,6 @@
 // abc2svg - front.js - ABC parsing front-end
 //
-// Copyright (C) 2014-2024 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg-core.
 //
@@ -217,6 +217,7 @@ function do_include(fn) {
 	parse_sav = clone(parse);
 	tosvg(fn, file);
 	parse_sav.state = parse.state;
+	parse_sav.ckey = parse.ckey
 	parse = parse_sav;
 	include--
 }
@@ -272,7 +273,44 @@ function tosvg(in_fname,		// file name
 		return src
 	} // uncomment()
 
+	// set the sequence showing the source and save it in sav.src
+	function set_src(stag, se) {
+	    var	r, t,
+		etag = ""
+
+		if (!se)
+			se = file.indexOf('\n\n', bol)	// end of tune
+		if (se < 0)
+			se = eof
+		if (typeof stag != "object") {		// set the tag after source
+			if (stag[0] != 'b' && stag[0] != 'a' && stag[0] != '+'
+			 && stag[0] != '*')
+				stag = 'b' + stag	// default: source before
+			if (stag[1] != '<')		// (if bool)
+				stag = stag[0] + "<pre>"
+			r = stag.match(/<\/?[^>]*>/g)
+			while (1) {
+				t = r.pop()
+				if (!t)
+					break
+				if (t[1] == '/' || t.slice(-2) == '/>')
+					r.pop()		// skip this stop/start tag
+				else
+					etag += '</' + t.slice(1)
+			}
+			cfmt.show_source = stag = [stag, etag]
+		}
+		t = stag[0].slice(1)
+			+ clean_txt(file.slice(bol, se))
+			+ stag[1]
+		if (stag[0][0] == '+' && sav.src)
+			sav.src += t
+		else
+			sav.src = t
+	} // set_src()
+
 	function end_tune() {
+		parse.bol = bol				// (for multi V:)
 		generate()
 		cfmt = sav.cfmt;
 		info = sav.info;
@@ -288,6 +326,11 @@ function tosvg(in_fname,		// file name
 		init_tune()
 		img.chg = true;
 		set_page();
+		if (cfmt.show_source) {
+			user.img_out("</div>")
+			if (cfmt.show_source[0][0] == 'a')
+				user.img_out(sav.src)
+		}
 	} // end_tune()
 
 	// get %%voice
@@ -500,12 +543,30 @@ function tosvg(in_fname,		// file name
 				continue
 			}
 			switch (a[1]) {
+			case "show_source":
+				b = uncomment(a[2])
+				switch (b[0]) {
+				case '*':
+					i = file.indexOf('\n' + line0 + line1
+							+ "show_source", eol)
+					bol -= 2	// keep %%show_.. in the source
+					set_src(b, i)
+					user.img_out(sav.src)
+					// fall thru
+				case '0':
+					b = ""
+					// fall thru
+				default:
+					cfmt[a[1]] = b
+					// fall thru
+				}
+				continue
 			case "select":
 				if (parse.state != 0) {
 					syntax(1, errs.not_in_tune, "%%select")
 					continue
 				}
-				select = uncomment(text.slice(7))
+				select = uncomment(a[2])
 				if (select[0] == '"')
 					select = select.slice(1, -1);
 				if (!select) {
@@ -643,11 +704,15 @@ function tosvg(in_fname,		// file name
 			sav.maps = clone(maps, 1);
 			sav.mac = clone(mac);
 			sav.maci = clone(maci);
+			if (cfmt.show_source) {
+				bol -= 2
+				set_src(cfmt.show_source)
+				if (cfmt.show_source[0][0] == 'b')
+					user.img_out(sav.src)
+				user.img_out('<div class="source">')
+			}
 			info.X = text;
 			parse.state = 1			// tune header
-			if (user.page_format
-			 && blkdiv < 1)		// (if no newpage)
-				blkdiv = 1	// the tune starts by the next SVG
 			if (parse.tune_opts)
 				tune_filter()
 			continue
@@ -657,6 +722,7 @@ function tosvg(in_fname,		// file name
 				continue
 			case 1:
 			case 2:
+				text = trim_title(text, info.T)
 				if (info.T == undefined)	// (keep empty T:)
 					info.T = text
 				else
@@ -749,6 +815,10 @@ function tosvg(in_fname,		// file name
 	}
 	if (parse.state >= 2)
 		end_tune();
+	if (sav.src && cfmt.show_source[0] == '+') {
+		user.img_out(sav.src)		// source of all tunes
+		sav.src = null
+	}
 	parse.state = 0
 }
 Abc.prototype.tosvg = tosvg

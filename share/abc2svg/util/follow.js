@@ -39,7 +39,7 @@ user.anno_stop = function(type, start, stop, x, y, w, h) {
 }
 
 	playconf.onnote = function(i, on) {
-	    var	b, i, e, elts,
+	    var	b, e, elts,
 		x = 0,
 		y = 0
 

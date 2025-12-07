@@ -1,6 +1,6 @@
 // abc2svg - subs.js - text output
 //
-// Copyright (C) 2014-2024 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg-core.
 //
@@ -19,20 +19,17 @@
 
 // add font styles
     var	sheet
-var add_fstyle = typeof document != "undefined" ?
-    function(s) {
+var add_fstyle = abc2svg.el
+    ? function(s) {
     var	e
 
 	font_style += "\n" + s
-	if (!sheet) {
-		if (abc2svg.styles)	// if styles from a previous generation
-			abc2svg.styles.remove()
-
+	if (!abc2svg.styles) {
 		e = document.createElement('style')
 		document.head.appendChild(e)
-		sheet = e.sheet
 		abc2svg.styles = e
 	}
+	sheet = abc2svg.styles.sheet
 	s = s.match(/[^{]+{[^}]+}/g)	// insert each style
 	while (1) {
 		e = s.shift()
@@ -118,31 +115,34 @@ function cwidf(c) {
 	return cwid(c) * gene.curfont.swfac
 }
 
+// make XML clean
+function clean_txt(p) {
+	return p.replace(/<|>|&[^&\s]*?;|&/g, function(c) {
+		switch (c) {
+		case '<': return "&lt;"
+		case '>': return "&gt;"
+		case '&': return "&amp;"
+		}
+		return c		// &xxx;
+	})
+} // clean_txt()
+
 // estimate the width and height of a string ..
 var strwh
 
 (function() {
-    if (typeof document != "undefined") {
+    if (typeof document != "undefined"
+     && abc2svg.el) {
 
     // .. by the browser
-
-	// create a text element if not done yet
-      var	el
 
 	// change the function
 	strwh = function(str) {
 		if (str.wh)
 			return str.wh
-		if (!el) {
-			el = document.createElement('text')
-			el.style.position = 'absolute'
-			el.style.top = '-1000px'
-			el.style.padding = '0'
-			el.style.visibility = "hidden"
-			document.body.appendChild(el)
-		}
 
 	    var	c,
+		el = abc2svg.el,	// hidden <span> created by edit/abcweb/...
 		font = gene.curfont,
 		h = font.size,
 		w = 0,
@@ -150,23 +150,16 @@ var strwh
 		i0 = 0,
 		i = 0
 
+		if (!el.parentElement)		// insert back the <span> in the document
+			document.body.appendChild(el)
 		el.className = font_class(font)
-		el.style.lineHeight = 1
 
 		if (typeof str == "object") {	// if string already converted
 			el.innerHTML = str
 			str.wh = [ el.clientWidth, el.clientHeight ]
 			return str.wh
 		}
-
-		str = str.replace(/<|>|&[^&\s]*?;|&/g, function(c){
-			switch (c) {
-			case '<': return "&lt;"
-			case '>': return "&gt;"
-			case '&': return "&amp;"
-			}
-			return c		// &xxx;
-		})
+		str = clean_txt(str)
 
 		while (1) {
 			i = str.indexOf('$', i)
@@ -180,6 +173,7 @@ var strwh
 					i++
 					continue
 				}
+				el.className = font_class(font)
 			}
 
 			el.innerHTML = str.slice(i0, i >= 0 ? i : undefined)
@@ -187,9 +181,9 @@ var strwh
 //fixme: bad width if space(s) at end of string
 			if (el.clientHeight > h)
 				h = el.clientHeight
+
 			if (i < 0)
 				break
-			el.style.font = style_font(font).slice(5);
 			i += 2;
 			i0 = i
 		}
@@ -302,7 +296,7 @@ function str2svg(str) {
 
 	// convert to String and memorize the string width and height
 	o = new String(o)
-	if (typeof document != "undefined")
+	if (abc2svg.el)
 		strwh(o)		// browser
 	else
 		o.wh = strwh(str)	// CLI
@@ -422,7 +416,6 @@ function write_title(title, is_subtitle) {
 	if (!title)
 		return
 	set_page();
-	title = trim_title(title, is_subtitle)
 	if (is_subtitle) {
 		set_font("subtitle");
 		h = cfmt.subtitlespace
@@ -525,7 +518,8 @@ function write_text(text, action) {
 					vskip(wh * cfmt.lineskipfac)
 					xy_str(0, ww[1] * .2,
 						words.slice(k, j).join(' '),
-						action, strlw)
+						action, strlw,
+						[w - ww[0], ww[1]])
 					k = j;
 					w = ww[0]
 					wh = 0
@@ -722,231 +716,49 @@ function put_history() {
 	}
 }
 
-/* -- write heading with format -- */
-var info_font_init = {
-	A: "info",
-	C: "composer",
-	O: "composer",
-	P: "parts",
-	Q: "tempo",
-	R: "info",
-	T: "title",
-	X: "title"
-}
-function write_headform(lwidth) {
-    var	c, font, font_name, align, x, y, sz, w, yd,
-		info_val = {},
-		info_font = Object.create(info_font_init),
-		info_sz = {
-			A: cfmt.infospace,
-			C: cfmt.composerspace,
-			O: cfmt.composerspace,
-			R: cfmt.infospace
-		},
-		info_nb = {}
+// build a new sequence of the parts with clearer names
+function part_seq() {
+    var	i,
+	o = ""
 
-	// compress the format
-	var	fmt = "",
-		p = cfmt.titleformat,
-		j = 0,
-		i = 0
-
-	while (1) {
-		while (p[i] == ' ')
-			i++
-		c = p[i++]
-		if (!c)
-			break
-		if (c < 'A' || c > 'Z') {
-			switch (c) {
-			case '+':
-				align = '+'
-				c = p[i++]
-				break
-			case ',':
-				fmt += '\n'
-				// fall thru
-			default:
-				continue
-			case '<':
-				align = 'l'
-				c = p[i++]
-				break
-			case '>':
-				align = 'r'
-				c = p[i++]
-				break
-			}
-		} else {
-			switch (p[i]) {		// old syntax
-			case '-':
-				align = 'l'
-				i++
-				break
-			case '1':
-				align = 'r'
-				i++
-				break
-			case '0':
-				i++
-				// fall thru
-			default:
-				align = 'c'
-				break
-			}
-		}
-		if (!info_val[c]) {
-			if (!info[c])
-				continue
-			info_val[c] = info[c].split('\n');
-			info_nb[c] = 1
-		} else {
-			info_nb[c]++
-		}
-		fmt += align + c
+	for (i = 0; i < info.P.length; i++) {
+		if (i)
+			o += ' '
+		o += partname(info.P[i])[1]
 	}
-	fmt += '\n'
+	return o
+} // part_seq()
 
-	// loop on the blocks
-	var	ya = {
-			l: cfmt.titlespace,
-			c: cfmt.titlespace,
-			r: cfmt.titlespace
-		},
-		xa = {
-			l: 0,
-			c: lwidth * .5,
-			r: lwidth
-		},
-		yb = {},
-		str;
-	p = fmt;
-	i = 0
-	while (1) {
+// get the meaningful names of a part (P:)
+function partname(c) {
+    var	i, r, tmp
 
-		// get the y offset of the top text
-		yb.l = yb.c = yb.r = y = 0;
-		j = i
-		while (1) {
-			align = p[j++]
-			if (align == '\n')
-				break
-			c = p[j++]
-			if (align == '+' || yb[align])
-				continue
+    if (cfmt.partname) {
+	tmp = cfmt.partname.split('\n')
 
-			str = info_val[c]
-			if (!str)
-				continue
-			font_name = info_font[c]
-			if (!font_name)
-				font_name = "history";
-			font = get_font(font_name);
-			sz = font.size * 1.1
-			if (info_sz[c])
-				sz += info_sz[c]
-			if (y < sz)
-				y = sz;
-			yb[align] = sz
-		}
-		ya.l += y - yb.l;
-		ya.c += y - yb.c;
-		ya.r += y - yb.r
-		while (1) {
-			align = p[i++]
-			if (align == '\n')
-				break
-			c = p[i++]
-			if (!info_val[c].length)
-				continue
-			str = info_val[c].shift()
-			if (p[i] == '+') {
-				info_nb[c]--;
-				i++
-				c = p[i++];
-				if (info_val[c].length) {
-					if (str)
-						str += ' ' + info_val[c].shift()
-					else
-						str = ' ' + info_val[c].shift()
-				}
-			}
-			font_name = info_font[c]
-			if (!font_name)
-				font_name = "history";
-			font = get_font(font_name);
-			sz = font.size * 1.1
-			if (info_sz[c])
-				sz += info_sz[c];
-			set_font(font);
-			x = xa[align];
-			y = ya[align] + sz
-			yd = y - font.size * .22	// descent
-
-			if (c == 'Q') {			/* special case for tempo */
-				self.set_width(glovar.tempo)
-				if (!glovar.tempo.invis) {
-					if (align != 'l') {
-						tempo_build(glovar.tempo)
-						w = glovar.tempo.tempo_wh[0]
-
-						if (align == 'c')
-							w *= .5;
-						x -= w
-					}
-					writempo(glovar.tempo, x, -y)
-				}
-			} else if (str) {
-				if (c == 'T')
-					str = trim_title(str,
-							 info_font.T[0] == 's')
-				xy_str(x, -yd, str, align)
-			}
-
-			if (c == 'T') {
-				font_name = info_font.T = "subtitle";
-				info_sz.T = cfmt.subtitlespace
-			}
-			if (info_nb[c] <= 1) {
-				if (c == 'T') {
-					font = get_font(font_name);
-					sz = font.size * 1.1
-					if (info_sz[c])
-						sz += info_sz[c];
-					set_font(font)
-				}
-				while (info_val[c].length > 0) {
-					y += sz;
-					str = info_val[c].shift();
-					xy_str(x, -yd, str, align)
-				}
-			}
-			info_nb[c]--;
-			ya[align] = y
-		}
-		if (ya.c > ya.l)
-			ya.l = ya.c
-		if (ya.r > ya.l)
-			ya.l = ya.r
-		if (i >= p.length)
+	for (i = 0; i < tmp.length; i++) {
+		if (tmp[i][0] == c) {
+			r = tmp[i].match(/.\s+(\S+)\s*(.+)?/)
 			break
-		ya.c = ya.r = ya.l
+		}
 	}
-	vskip(ya.l)
-}
+    }
+	if (!r)
+		return [0, c, c]
+	if (!r[2])
+		r[2] = r[1]
+	if (r[2][0] == '"')
+		r[2] = r[2].slice(1, -1)
+	return r
+} // partname()
 
 /* -- output the tune heading -- */
-function write_heading() {
-	var	i, j, area, composer, origin, rhythm, down1, down2,
+// (possible hook)
+Abc.prototype.tunhd = function() {
+    var	i, j, area, composer, origin, rhythm, down1, down2, p,
 		lwidth = get_lwidth()
 
 	vskip(cfmt.topspace)
-
-	if (cfmt.titleformat) {
-		write_headform(lwidth);
-		vskip(cfmt.musicspace)
-		return
-	}
 
 	/* titles */
 	if (info.T
@@ -1036,10 +848,19 @@ function write_heading() {
 			down2 = down1 + i
 		else
 			down2 += i
-		xy_str(0, -down2 + gene.curfont.size *.22, info.P)
+		p = info.P
+		if (cfmt.partname)
+			p = part_seq()
+		xy_str(0, -down2 + gene.curfont.size *.22, p)
 		down2 += gene.curfont.pad
 	} else if (down1 > down2) {
 		down2 = down1
 	}
 	vskip(down2 + cfmt.musicspace)
-}
+} // tunhd()
+
+// output the tune header
+function write_heading() {
+	vskip(cfmt.topspace)
+	self.tunhd()
+} // write_heading()

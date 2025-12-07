@@ -1,6 +1,6 @@
 // abc2svg - tune.js - tune generation
 //
-// Copyright (C) 2014-2024 Jean-Francois Moine
+// Copyright (C) 2014-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg-core.
 //
@@ -173,10 +173,8 @@ function sort_all() {
 			}
 		}
 
-		// if the previous symbol is a grace note at the same offset as the bar
-		// remove the grace notes from the previous time sequence
-		if (!fl) {
-			while (prev.type == C.GRACE
+		if (!prev.next || prev.next.time == time) {
+			while ((prev.type == C.GRACE || prev.type == C.SPACE)
 			    && vtb[prev.v] && !vtb[prev.v].bar_type) {
 				delete prev.seqst
 				vtb[prev.v] = prev
@@ -752,9 +750,9 @@ function not2abc(pit, acc) {
     var	i,
 	nn = ''
 
-	if (acc && acc != 3) {
+	if (acc) {
 		if (typeof acc != "object") {
-			nn = ['__', '_', '', '^', '^^'][acc + 2]
+			nn = ['__', '_', '', '^', '^^', '='][acc + 2]
 		} else {
 			i = acc[0]
 			if (i > 0) {
@@ -789,16 +787,12 @@ function get_map(text) {
 		return
 	}
 	ns = a[1]
-	if (ns[0] == '*' || ns.indexOf("all") == 0) {
-		ns = 'all'
-	} else {
-		if (ns.indexOf("octave,") == 0	// remove the octave part
-		 || ns.indexOf("key,") == 0) {
+	if (ns != '*') {
+ 		if (ns.indexOf("octave,") == 0	// remove the octave part
+		 || ns.indexOf("key,") == 0
+		 || !ns.indexOf("tonic,")) {
 			ty = ns[0]
-			ns = ns.split(',')[1]
-			ns = ns.replace(/[,']+/, '').toUpperCase() //'
-			if (ns.indexOf("key,") == 0)
-				ns = ns.replace(/[=^_]+/, '')
+			ns = ns.split(',')[1].toUpperCase()
 		}
 		tmp = new scanBuf
 		tmp.buffer = ns
@@ -976,6 +970,8 @@ Abc.prototype.do_pscom = function(text) {
 			dur: 0
 		}
 		if (parse.state >= 2) {
+			if (curvoice.clone)
+				do_cloning()
 			curvoice = voice_tb[0]
 			curvoice.eoln = 1 //true
 			sym_link(s)
@@ -1065,6 +1061,8 @@ Abc.prototype.do_pscom = function(text) {
 		if (len < 1)
 			len = 90
 		if (parse.state >= 2) {
+			if (curvoice.clone)
+				do_cloning()
 			s = new_block(cmd);
 			s.x = (lwidth - len) / 2 / cfmt.scale;
 			s.l = len / cfmt.scale;
@@ -1090,6 +1088,8 @@ Abc.prototype.do_pscom = function(text) {
 	case "staff":
 		if (parse.state != 3)
 			return
+		if (curvoice.clone)
+			do_cloning()
 		val = parseInt(param)
 		if (isNaN(val)) {
 			syntax(1, "Bad %%staff value '$1'", param)
@@ -1111,6 +1111,8 @@ Abc.prototype.do_pscom = function(text) {
 	case "staffbreak":
 		if (parse.state != 3)
 			return
+		if (curvoice.clone)
+			do_cloning()
 		s = {
 			type: C.STBRK,
 			dur:0
@@ -1157,6 +1159,8 @@ Abc.prototype.do_pscom = function(text) {
 		k = cmd[0] == 'c' ? 'c' : cfmt.textoption
 		set_font("text")
 		if (parse.state >= 2) {
+			if (curvoice.clone)
+				do_cloning()
 			s = new_block("text")
 			s.text = param
 			s.opt = k
@@ -1206,6 +1210,8 @@ Abc.prototype.do_pscom = function(text) {
 			return
 		}
 		if (parse.state >= 2) {
+			if (curvoice.clone)
+				do_cloning()
 			s = new_block(cmd);
 			s.sk = val
 			return
@@ -1221,6 +1227,8 @@ Abc.prototype.do_pscom = function(text) {
 	case "scale":
 	case "staffwidth":
 		if (parse.state >= 2) {
+			if (curvoice.clone)
+				do_cloning()
 			s = new_block(cmd);
 			s.param = param
 			return
@@ -1243,6 +1251,8 @@ Abc.prototype.do_begin_end = function(type,
 			text) {
 	var i, j, action, s
 
+	if (curvoice && curvoice.clone)
+		do_cloning()
 	switch (type) {
 	case "js":
 		js_inject(text)
@@ -1273,7 +1283,17 @@ Abc.prototype.do_begin_end = function(type,
 				syntax(1, "No </style> in %%beginsvg sequence")
 				break
 			}
-			style += text.slice(i + 1, j).replace(/\s+$/, '')
+			s = text.slice(i + 1, j).replace(/\s+$/gm, '')
+			if (cfmt.fullsvg) {
+				i = s.match(/@font-face[^}]*}/)
+				if (i && i[0].indexOf("text") > 0) {
+					ff.text = "\n"
+						+ i[0]	// assume only one @font-face
+					s = s.replace(i[0], '')
+				}
+			}
+			if (s && s != "\n")
+				style += s
 		}
 		j = 0
 		while (1) {
@@ -1489,17 +1509,17 @@ function fill_mr_ba(p_v) {
 
 /* -- get staves definition (%%staves / %%score) -- */
 function get_staves(cmd, parm) {
-    var	s, p_voice, p_voice2, i, flags, v, vid, a_vf,
+    var	s, p_voice, p_voice2, i, flags, v, vid, a_vf, eoln,
 	st, range,
 	nv = voice_tb.length,
 	maxtime = 0
 
 	// if sequence with many voices, load the other voices
 	if (curvoice && curvoice.clone) {
-		i = parse.eol
-		parse.eol = parse.bol		// remove the %%staves line
+//		i = parse.eol
+//		parse.eol = parse.bol		// remove the %%staves line
 		do_cloning()
-		parse.eol = i
+//		parse.eol = i
 	}
 
 	if (parm) {
@@ -1514,6 +1534,10 @@ function get_staves(cmd, parm) {
 	/* create a new staff system */
 	for (v = 0; v < nv; v++) {
 		p_voice = voice_tb[v]
+		if (p_voice.eoln) {
+			eoln = 1
+			delete p_voice.eoln
+		}
 		if (p_voice.time > maxtime)
 			maxtime = p_voice.time
 	}
@@ -1523,18 +1547,29 @@ function get_staves(cmd, parm) {
 	} else {
 //		if (nv)					// if many voices
 		self.voice_adj(1)
+
+		// synchronize the voices
+		for (v = 0; v < nv; v++) {
+			p_voice = voice_tb[v]
+			p_voice.time = maxtime
+			p_voice.lyric_restart = p_voice.last_sym
+			p_voice.sym_restart = p_voice.last_sym
+		}
+
 		/*
 		 * create a new staff system and
 		 * link the 'staves' symbol in a voice which is seen from
 		 * the previous system - see sort_all
 		 */
+	   if (!par_sy.voices[curvoice.v])
 		for (v = 0; v < par_sy.voices.length; v++) {
 			if (par_sy.voices[v]) {
 				curvoice = voice_tb[v]
 				break
 			}
 		}
-		curvoice.time = maxtime;
+
+		curvoice.eoln = eoln
 		s = {
 			type: C.STAVES,
 			dur: 0
@@ -1544,14 +1579,11 @@ function get_staves(cmd, parm) {
 		par_sy.nstaff = nstaff;
 
 		// if no parameter, duplicate the current staff system
-		// and do a voice re-synchronization
 		if (!parm) {
 			s.sy = clone(par_sy, 2)		// clone the staves and voices
 			par_sy.next = s.sy
 			par_sy = s.sy
 			staves_found = maxtime
-			for (v = 0; v < nv; v++)
-				voice_tb[v].time = maxtime
 			curvoice = voice_tb[par_sy.top_voice]
 			return
 		}
@@ -1581,7 +1613,6 @@ function get_staves(cmd, parm) {
 	for (i = 0; i < a_vf.length; i++) {
 		vid = a_vf[i][0];
 		p_voice = new_voice(vid);
-		p_voice.time = maxtime;
 		v = p_voice.v
 
 		a_vf[i][0] = p_voice;
@@ -2050,7 +2081,7 @@ function new_voice(id) {
 	p_voice = {
 		v: v,
 		id: id,
-		time: 0,
+		time: staves_found >= 0 ? staves_found : 0,
 		new: true,
 		pos: {
 //			dyn: 0,
@@ -2122,7 +2153,7 @@ function do_cloning() {
 	vs = clone.vs,
 	a = clone.a,
 	bol = clone.bol,
-	eol = parse.eol,
+	eol = parse.bol,
 	parse_sav = parse,
 	file = parse.file
 

@@ -1,6 +1,6 @@
 // abc2svg - modules.js - module handling
 //
-// Copyright (C) 2018-2022 Jean-Francois Moine
+// Copyright (C) 2018-2025 Jean-Francois Moine
 //
 // This file is part of abc2svg-core.
 //
@@ -37,6 +37,7 @@ abc2svg.modules = {
 	voicecombine: { fn: 'combine' },
 	diagram: { fn: 'diag' },
 	equalbars: {},
+	fit2box: {},
 	gamelan: {},
 	grid: {},
 	grid2: {},
@@ -53,7 +54,9 @@ abc2svg.modules = {
 	sth: {},
 	strtab: {},
 	temperament: { fn: 'temper' },
+	temponame: { fn: 'tempo' },
 	tropt: {},
+	titleformat: { fn: 'tunhd' },
 
 	nreq: 0,
 
@@ -86,7 +89,7 @@ abc2svg.modules = {
 		// test if some keyword in the file
 	    var	m, i, fn,
 		nreq_i = this.nreq,
-		ls = file.match(/(^|\n)(%%|I:).+?\b/g)
+		ls = file.match(/(%%|I:).+?\b/g)
 
 		if (!ls)
 			return true

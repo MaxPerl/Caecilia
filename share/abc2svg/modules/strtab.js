@@ -1,6 +1,6 @@
 // abc2svg - strtab.js - tablature for string instruments
 //
-// Copyright (C) 2020-2023 Jean-Francois Moine
+// Copyright (C) 2020-2024 Jean-Francois Moine
 //
 // This file is part of abc2svg.
 //
@@ -52,10 +52,10 @@ abc2svg.strtab = {
 
 		for (m = 0; m <= s.nhd; m++) {
 			not = s.notes[m]
-			if (not.nb < 0)
+			if (!not.nb)
 				continue
 			x = s.x - 3
-			if (not.nb >= 10)
+			if (not.nb.length > 1)
 				x -= 3
 			y = 3 * (not.pit - 18)
 			abc.out_svg('<text class="bg' + abc.bgn +
@@ -265,7 +265,7 @@ abc2svg.strtab = {
     }, // set_fmt()
 
     // change the notes when the global generation settings are done
-    set_stems: function(of) {
+    set_glue: function(of, width) {
     var	p_v, i, m, nt, n, bi, bn, strss, g,
 	C = abc2svg.C,
 	abc = this,
@@ -275,29 +275,39 @@ abc2svg.strtab = {
 
 	// set a string (pitch) and a fret number
 	function set_pit(p_v, s, nt, i) {
-	    var	st = s.st
+	    var	m,
+		st = s.st
 
 		if (i >= 0) {
-			nt.nb = (p_v.diafret ? nt.pit : nt.midi) - p_v.tab[i]
+			nt.nb = ((p_v.diafret ? nt.pit : nt.midi) - p_v.tab[i])
+						.toString()
 			if (p_v.diafret && nt.acc)
-				n += '+'
+				nt.nb += '+'
 			nt.pit = i * 2 + 18
 		} else {
-			nt.nb = -1
+			nt.nb = ""
 			nt.pit = 18
 		}
 		nt.acc = 0
 		nt.invis = true
 		if (!s.grace)
 			strss[i] = s.time + s.dur
-		if (s.dur <= C.BLEN / 2 && !s.stemless) {
-			if (!lstr[st])
-				lstr[st] = [ 10 ]
-			if (lstr[st][0] > i) {
-				lstr[st][0] = i
-				lstr[st][1] = s
-			}
-			s.stemless = true
+	    if (p_v.pos.stm != C.SL_HIDDEN) {
+		if (!lstr[st])
+			lstr[st] = [ 10, null, C.BLEN ]
+		if (lstr[st][0] > i) {
+			lstr[st][0] = i		// lowest string
+			lstr[st][1] = s
+		}
+		if (s.dur < lstr[st][2])
+			lstr[st][2] = s.dur
+	    }
+		s.stemless = 1 //true
+		if (s.dots) {			// have nicer dots
+			s.xmx = 0
+			for (m = 0; m <= s.nhd; m++)
+				s.notes[m].shhd = 0
+			s.dot_low = 0
 		}
 	} // set_pit()
 
@@ -335,8 +345,10 @@ abc2svg.strtab = {
 					nt.sls[i].ty |= C.SL_ABOVE
 				}
 			}
-			if (nt.nb != undefined)
+			if (nt.nb) {
+				delete nt.a_dd
 				continue
+			}
 			if (nt.a_dd) {
 				i = nt.a_dd.length
 				while (--i >= 0) {
@@ -372,7 +384,9 @@ abc2svg.strtab = {
 		}
 
 		s.y = 3 * (nt.pit - 18)
-		s.ymn = 0		// don't get space below the tablature
+
+ 		// if no stem, don't get space below the tablature
+		s.ymn =	s.stemless ? -12 : 0
 	} // set_notes()
 
 	// get the string number from the decoration
@@ -394,7 +408,7 @@ abc2svg.strtab = {
 		}
 	}
 
-	of()				// do the normal work
+	of(width)				// do the normal work
 
 	// loop on the notes of the voices with a tablature
 	for ( ; s; s = s.ts_next) {
@@ -402,10 +416,9 @@ abc2svg.strtab = {
 		// let a stem on the lowest string
 		if (s.seqst || (s.ts_prev && s.ts_prev.type == C.GRACE)) {
 			for (i = 0; i < lstr.length; i++) {
-				if (lstr[i]) {
+				if (lstr[i] && lstr[i][2] < C.BLEN)
 					lstr[i][1].tabst = 1
-					lstr[i] = null
-				}
+				lstr[i] = null
 			}
 		}
 
@@ -427,9 +440,12 @@ abc2svg.strtab = {
 			if (p_v.pos.gst == C.SL_HIDDEN)
 				s.sappo = 0
 			for (g = s.extra; g; g = g.next) {
-				if (p_v.pos.gst == C.SL_HIDDEN)
-					g.stemless = true
 				set_notes(p_v, g)
+				for (i = 0; i < lstr.length; i++) {
+					if (lstr[i] && lstr[i][2] < C.BLEN)
+						lstr[i][1].tabst = 1
+					lstr[i] = null
+				}
 			}
 			break
 		case C.NOTE:
@@ -437,7 +453,11 @@ abc2svg.strtab = {
 			break
 		}
 	}
-    }, // set_stems()
+	for (i = 0; i < lstr.length; i++) {
+		if (lstr[i] && lstr[i][2] < C.BLEN)
+			lstr[i][1].tabst = 1		// top of stem
+	}
+    }, // set_glue()
 
     // get the parameters of the current voice
     set_vp: function(of, a) {
@@ -619,7 +639,7 @@ abc2svg.strtab = {
 			}
 		} else if (!p_v.tab) {
 			tab = p_v.diafret ?
-				[10, 14, 17] :		// dulcimer
+				[17, 14, 10] :		// dulcimer
 				[40, 45, 50, 55, 59, 64] // guitar strings
 		} else {
 			tab = p_v.tab
@@ -678,7 +698,7 @@ abc2svg.strtab = {
 	abc.draw_symbols = abc2svg.strtab.draw_symbols.bind(abc, abc.draw_symbols)
 	abc.gch_build = abc2svg.strtab.csan_bld.bind(abc, abc.gch_build)
 	abc.set_format = abc2svg.strtab.set_fmt.bind(abc, abc.set_format);
-	abc.set_stems = abc2svg.strtab.set_stems.bind(abc, abc.set_stems)
+	abc.set_sym_glue = abc2svg.strtab.set_glue.bind(abc, abc.set_sym_glue)
 	abc.set_vp = abc2svg.strtab.set_vp.bind(abc, abc.set_vp)
 
 	// define specific decorations used to force the string number

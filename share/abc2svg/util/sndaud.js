@@ -132,7 +132,8 @@ function Audio5(i_conf) {
 		// get the instrument parameters
 		// adapted from getInstruments() in sf2-parser.js
 		function get_instr(i) {
-		    var	instrument = sf2par.instrument,
+		    var	generator,
+			instrument = sf2par.instrument,
 			zone = sf2par.instrumentZone,
 			j = instrument[i].instrumentBagIndex,
 			jl = instrument[i + 1]
@@ -141,13 +142,13 @@ function Audio5(i_conf) {
 			info = []
 
 			while (j < jl) {
-				instrumentGenerator =
+				generator =
 					sf2par.createInstrumentGenerator_(zone, j)
 //				instrumentModulator =
 //					sf2par.createInstrumentModulator_(zone, j)
 
 				info.push({
-					generator: instrumentGenerator.generator,
+					generator: generator.generator,
 //					modulator: instrumentModulator.modulator
 				})
 				j++
@@ -160,8 +161,15 @@ function Audio5(i_conf) {
 	} // get_instr()
 
 	// sf2_create
-	    var i, j, k, sid, gen, parm, gparm, sample, infos,
-		sampleRate, scale,
+	    var i, j, k, sid, gen, parm, sample, infos,
+		sample_hdr, scale, tune,
+		gparm = {			// default parameters
+			attack: .01,
+			hold: .01,
+			decay: .01,
+//			sustain: 0,
+//			release: .01,
+		},
 		b = instr >> 7,			// bank
 		p = instr % 128,		// preset
 		pr = sf2pre
@@ -182,27 +190,20 @@ function Audio5(i_conf) {
 		}
 		pr = pr.info			// list of gen/mod
 		for (k = 0; k < pr.length; k++) {
-		    if (!pr[k].generator.instrument)
+		    gen = pr[k].generator
+//fixme: there may be generator definitions here
+//fixme: what when many instruments?
+		    if (!gen.instrument)
 			continue
-		    gparm = null
 
-		    infos = get_instr(pr[k].generator.instrument.amount).info
+		    infos = get_instr(gen.instrument.amount).info
 		    for (i = 0; i < infos.length; i++) {
 			gen = infos[i].generator
 
-			if (!gparm) {
-				parm = gparm = {	// default parameters
-					attack: .001,
-					hold: .001,
-					decay: .001,
-					sustain: 0
-//					release: .001
-				    }
-			} else {
-				parm = Object.create(gparm) // new parameters
-				if (!gen.sampleID)
-					gparm = parm	// global para,eters
-			}
+			// check if already a generator for this key range
+			j = gen.keyRange.lo
+			parm = params[instr][j]
+			parm =  Object.create(parm || gparm)
 
 			if (gen.attackVolEnv)
 				parm.attack = Math.pow(2,
@@ -212,41 +213,33 @@ function Audio5(i_conf) {
 						gen.holdVolEnv.amount / 1200)
 			if (gen.decayVolEnv)
 				parm.decay = Math.pow(2,
-						gen.decayVolEnv.amount / 1200) / 3
+//						gen.decayVolEnv.amount / 1200) / 3
+						gen.decayVolEnv.amount / 1200) / 4
 			if (gen.sustainVolEnv)
-				parm.sustain = gen.sustainVolEnv.amount / 1000
+				parm.sustain = gen.sustainVolEnv.amount / 10	// in dB
 //			if (gen.releaseVolEnv)
 //				parm.release = Math.pow(2,
 //						gen.releaseVolEnv.amount / 1200)
+			if (gen.initialAttenuation)
+				parm.atte = gen.initialAttenuation / 10		// in dB
 			if (gen.sampleModes && gen.sampleModes.amount & 1)
 				parm.sm = 1
 
-			if (!gen.sampleID)	// (empty generator!)
-				continue
-
+		    if (gen.sampleID) {
 			sid = gen.sampleID.amount
-			sampleRate = sf2par.sampleHeader[sid].sampleRate
+			sample_hdr = sf2par.sampleHeader[sid]
 			sample = sf2par.sample[sid]
 			parm.buffer = ac.createBuffer(1,
 						sample.length,
-						sampleRate)
-
-			parm.hold += parm.attack
-			parm.decay += parm.hold
-
-			// sustain > 40dB is not audible
-			if (parm.sustain >= .4)
-				parm.sustain = 0.01	// must not be null
-			else
-				parm.sustain = 1 - parm.sustain / .4
+						sample_hdr.sampleRate)
 
 			sample_cp(parm.buffer, sample)
 
 			if (parm.sm) {
-				parm.loopStart = sf2par.sampleHeader[sid].startLoop /
-					sampleRate
-				parm.loopEnd = sf2par.sampleHeader[sid].endLoop /
-					sampleRate
+				parm.loopStart = sample_hdr.startLoop /
+					sample_hdr.sampleRate
+				parm.loopEnd = sample_hdr.endLoop /
+					sample_hdr.sampleRate
 			}
 
 			// define the notes
@@ -254,10 +247,11 @@ function Audio5(i_conf) {
 					gen.scaleTuning.amount : 100) / 100,
 			tune = (gen.coarseTune ? gen.coarseTune.amount : 0) +
 				(gen.fineTune ? gen.fineTune.amount : 0) / 100 +
-				sf2par.sampleHeader[sid].pitchCorrection / 100 -
+				sample_hdr.pitchCorrection / 100 -
 				(gen.overridingRootKey ?
 					gen.overridingRootKey.amount :
-					sf2par.sampleHeader[sid].originalPitch)
+					sample_hdr.originalPitch)
+		    }
 
 			for (j = gen.keyRange.lo; j <= gen.keyRange.hi; j++) {
 				rates[instr][j] = Math.pow(Math.pow(2, 1 / 12),
@@ -481,6 +475,7 @@ function Audio5(i_conf) {
 	function note_run(po, s, key, t, d) {
 //console.log('run c:'+po.v_c[s.v]+' i:'+po.c_i[po.v_c[s.v]])
 	    var	g, st,
+		t2 = t,
 		c = po.v_c[s.v],
 		instr = po.c_i[c],
 		k = key | 0,
@@ -492,7 +487,7 @@ function Audio5(i_conf) {
 		 || !parm)		// if the instrument could not be loaded
 			return		// or if it has not this key
 		o.buffer = parm.buffer
-		if (parm.loopStart) {
+		if (parm.sm) {
 			o.loop = true
 			o.loopStart = parm.loopStart
 			o.loopEnd = parm.loopEnd
@@ -506,20 +501,29 @@ function Audio5(i_conf) {
 		o.playbackRate.value = po.rates[instr][k]
 
 		g = po.ac.createGain()
-		if (parm.hold < 0.002) {
+
+		if (parm.atte)			// if initial attenuation
+			v /= Math.pow(10, parm.atte / 20)
+		if (parm.hold <= .01) {
 			g.gain.setValueAtTime(v, t)
 		} else {
-			if (parm.attack < 0.002) {
+			if (parm.attack <= .01) {
 				g.gain.setValueAtTime(v, t)
 			} else {
-				g.gain.setValueAtTime(0, t)
-				g.gain.linearRampToValueAtTime(v, t + parm.attack)
+				g.gain.setValueAtTime(.01, t)
+				t2 += parm.attack
+				g.gain.linearRampToValueAtTime(v, t2)
 			}
-			g.gain.setValueAtTime(v, t + parm.hold)
+			t2 += parm.hold
+			g.gain.setValueAtTime(v, t2)
 		}
 
-		g.gain.exponentialRampToValueAtTime(parm.sustain * v,
-					t + parm.decay)
+		if (parm.sustain && parm.decay > .01) {
+			v = parm.sustain == 100
+				? .01			// 100dB -> full attenuation
+				: v / Math.pow(10, parm.sustain / 20)
+			g.gain.exponentialRampToValueAtTime(v, t2 + parm.decay)
+		}
 
 		if (s.p_v.pan != undefined) {	// (control 10)
 		    var	p = po.ac.createStereoPanner()

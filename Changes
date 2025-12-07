@@ -1,5 +1,9 @@
 Revision history for Perl extension Caecilia.
 
+0.24
+	- Fix paste text event: Whole text should be rehighlighted
+	- Fix render problem with missing parameter while using option -B
+	- Update abc2svg to new version (v1.22.28)
 0.23
 	- Fix the problem, that play_length doesn't work on midi files (see https://git.enlightenment.org/enlightenment/efl/issues/101)
 	- new feature: Play from specific note if the note is clicked with right button

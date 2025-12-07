@@ -26,6 +26,7 @@
 		monospace: 1
 	},
 	txt_ff = "text,serif",		// text font-family (serif for compatibility)
+	ff = {},			// font-face's from %%beginsvg
 	fmt_lock = {}
 
 var cfmt = {
@@ -109,7 +110,8 @@ H "History: "',
 	subtitlefont: {name: txt_ff, size: 16},
 	subtitlespace: 3,
 	sysstaffsep: 34,
-	systnames: -1,
+	systnames: -1,			// (for compatibility)
+	systvoices: 3,
 	tempofont: {name: txt_ff, weight: "bold", size: 12},
 	textfont: {name: txt_ff, size: 16},
 //	textoption: undefined,
@@ -156,7 +158,7 @@ shiftunison: true,
 slurheight: true,
 squarebreve: true,    
 staffsep: true,
-systnames: 1, //
+systvoices: 1, //true
 stemheight: true,
 stretchlast: true,
 stretchstaff: true,
@@ -390,10 +392,10 @@ function get_unit(param) {
 	return NaN
 }
 
-// set the infoname
-function set_infoname(param) {
+// set the name of an info or a part
+function set_infoname(cmd, param) {
 //fixme: check syntax: '<letter> ["string"]'
-	var	tmp = cfmt.infoname.split("\n"),
+    var	tmp = cfmt[cmd] ? cfmt[cmd].split("\n") : "",
 		letter = param[0]
 
 	for (var i = 0; i < tmp.length; i++) {
@@ -404,10 +406,13 @@ function set_infoname(param) {
 			tmp.splice(i, 1)
 		else
 			tmp[i] = param
-		cfmt.infoname = tmp.join('\n')
+		cfmt[cmd] = tmp.join('\n')
 		return
 	}
-	cfmt.infoname += "\n" + param
+	if (cfmt[cmd])
+		cfmt[cmd] += "\n" + param
+	else
+		cfmt[cmd] = param
 }
 
 // get the text option
@@ -534,10 +539,19 @@ Abc.prototype.set_format = function(cmd, param) {
 	case "measrepnb":
 	case "shiftunison":
 	case "systnames":
+	case "systvoices":
 		v = parseInt(param)
 		if (isNaN(v)) {
 			syntax(1, "Bad integer value");
 			break
+		}
+		if (cmd == "systnames") {	// compatibility
+			switch (v) {
+			case -1: v = 3; break
+			case 1: v = 2; break
+			case 2: v = 1; break
+			}
+			cmd = "systvoices"
 		}
 		cfmt[cmd] = v
 		break
@@ -545,7 +559,6 @@ Abc.prototype.set_format = function(cmd, param) {
 	case "bgcolor":
 	case "fgcolor":
 	case "propagate-accidentals":
-	case "titleformat":
 	case "writeout-accidentals":
 		cfmt[cmd] = param
 		break
@@ -724,7 +737,8 @@ Abc.prototype.set_format = function(cmd, param) {
 			cfmt[cmd] = v
 		break
 	case "infoname":
-		set_infoname(param)
+	case "partname":
+		set_infoname(cmd, param)
 		break
 	case "notespacingfactor":
 		v = param.match(/([.\d]+)[,\s]*(\d+)?/)
@@ -826,7 +840,7 @@ Abc.prototype.set_format = function(cmd, param) {
 	case "titletrim":
 		v = param == '' ? 1 : +param
 		if (isNaN(v))
-			v = get_bool(param) ? 0 : 1
+			v = +get_bool(param)
 		if (cmd[1] == 't') {		// stretchlast
 			if (v < 0 || v > 1) {
 				syntax(1, errs.bad_val, '%%' + cmd)
@@ -912,8 +926,10 @@ function use_font(font) {
 				set_font_fac(font)
 			if (!font.pad)
 				font.pad = 0
+		}
 
 			// set the pointer to the width of the characters
+		if (!font.cw_tb) {
 			font.cw_tb = !font.name ? ssw_tb
 				: font.name.indexOf("ans") > 0
 					? ssw_tb		// sans-serif
@@ -932,6 +948,10 @@ function use_font(font) {
 			add_fstyle(".f" + font.fid
 				+ (cfmt.fullsvg || "")
 				+ ' text,tspan{white-space:pre}')
+		if (ff.text && !ff.used && font.name.indexOf("text") >= 0) {
+			font_style += ff.text	// add font-face's from %%beginsvg
+			ff.used = 1 //true
+		}
 	}
 }
 
@@ -955,12 +975,11 @@ function get_font(fn) {
 				font2.weight = null
 			if (font2.style)
 				font2.style = null
-		} else {
+		}
 			if (font.weight)
 				font2.weight = font.weight
 			if (font.style)
 				font2.style = font.style
-		}
 		if (font.src)
 			font2.src = font.src
 		if (font.size)

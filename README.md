@@ -1,5 +1,5 @@
 # Caecilia
-A simple Editor with Syntax Highlighting, a preview function and click-to-note feature for the ABC notation format (http://abcnotation.com/) written with perl/pEFL
+A simple Editor with Syntax Highlighting, MIDI playing and a preview function with click-to-note (Left Mouseclick) or play-from-note (Right Mouseclick) feature for the ABC notation format (http://abcnotation.com/) written with perl/pEFL.
 
 ![Screenshot to Caecilia](https://github.com/MaxPerl/Caecilia/raw/master/screenshot.jpg "Screenshot to Caecilia")
 

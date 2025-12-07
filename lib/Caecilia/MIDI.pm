@@ -197,7 +197,10 @@ sub _pos_update {
 	my $progress_spinner = $self->elm_progress_spinner; 
 	
 	my $position = $emotion->position_get();
-	my $duration = $emotion->play_length_get();
+	
+	# WORKAROUND: play_length() does not work on midi files
+	#my $duration = $emotion->play_length_get();
+	my $duration = $play_length;
 	
 	$progress_spinner->min_max_set(0,$duration);
 	$progress_spinner->value_set($position);
@@ -215,7 +218,7 @@ sub _pos_update {
 	    my $region_x=0; my $region_y=0; my $region_w=0; my $first_pointer_per_pos_y=undef; 
 	    foreach my $event (@$events) {
 	        # We added the ABC file some commands (e.g. %%fullsvg 1, %%musicfont etc)
-	        # TODO: Save the added value as istart?
+	        # TODO: Save the added value as istart? DONE with preview_beginabc_length, istn't it?
 	        my $renderer = $self->app->renderer();
 	        my $istart = $event->{istart} + $renderer->preview_beginabc_length();
 	        my $voice = $event->{voice};
@@ -321,7 +324,8 @@ sub generate_events {
     my %events;
     foreach my $line ( split(/\n/,$notes) ) {
         $line =~ m/\s*(\d+)\t\d*\t\d*\t\d*\t(\d*)\t(\d*)/;
-        my $time = $1; $time = $time/100; $time = sprintf("%.1f",$time);
+        my $time = $1; 
+        $time = $time/100; $time = sprintf("%.1f",$time);
         my $voice = $2;
         my $istart = $3;
         
@@ -335,6 +339,10 @@ sub generate_events {
             $events{$time} = [];
             push @{ $events{$time} }, \%event;
         }
+        
+        # Add a link to midi position in the notes hash of PREVIEW
+        my $key_of_note = $istart + $self->app->renderer->preview_beginabc_length();
+        $self->app->preview->{notes}->{$key_of_note}->{"midi_position"} = $time;
     }
     $self->{events} = \%events;
 }
@@ -404,6 +412,7 @@ sub to_midi {
         my $channel = $voices{$voice};
         push @{ $tracks{"$voice"} }, ['text_event', $time, "T:$time V:$voice ISTART:$istart"];
         push @{ $tracks{"$voice"} }, ['note', $time, $duration, $channel, $pitch, 64];
+        
     }
 
     my @tracks; $n = 1;

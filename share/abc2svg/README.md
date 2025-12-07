@@ -11,7 +11,7 @@ editing, displaying, printing, playing the music files and
 converting them to other formats such as ABC and MEI notations.
 
 The **abc2svg** core is based on the
-[abcm2ps](https://github.com/lewdlime/abcm2ps) C code
+[abcm2ps](https://chiselapp.com/user/moinejf/repository/abcm2ps) C code
 which requires compilation on every operating system. 
 The **abc2svg** scripts can run in any system with no compilation on
 any platform that contains an internet browser. This includes MS-Windows,
@@ -349,6 +349,12 @@ They are:
 - `toparam.js`  
   This script just outputs the abc2svg parameters.
 
+- `tosvg.js`  
+  This script creates a SVG file that includes all the SVGs of the generation.
+
+    The included SVG images are updated for being correctly rendered by tools
+  that use librsvg, the SVG library for GNOME (feh, viewnior, swayimg...).
+
 #### 2.3 PDF generation
 
 `abctopdf` is a shell script which converts ABC to PDF using one of the
@@ -514,7 +520,7 @@ Here are the scripts which are used in a web context:
     The music source may be editable.
     To change it, the script contains two functions:  
     - `abc2svg.get_music` returns the source of the music sequence
-       (in &lt;script&gt; type "text/vnd.abc", class="abc" or inlined ABC)
+       (in &lt;script&gt; type "text/vnd.abc", class="abc" or inlined ABC).
        Its argument is the HTML &lt;div&gt; element that contains the music.  
     - `abc2svg.set_music` has two arguments, the HTML &lt;div&gt; element
        and the new source of the music.
