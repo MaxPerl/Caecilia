@@ -499,6 +499,7 @@ let content = std.loadFile(abc_file);
 let context = "";
 
 // fix the problem about the text coordinates in librsvg
+// stolen from abctopdf :-)
 function bug(p) {
     var	i, t, r, x, y, c, o, j = 0;
 
