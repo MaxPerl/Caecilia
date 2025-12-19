@@ -45,7 +45,9 @@ sub new {
 	# TODO: abc2svg_path should be an option in app not in renderer or midi
 	my $renderer_object = {app => $app, 
 	    abc2svg_path => $app->share_dir . "/abc2svg/",
-	    notes => {}};
+	    notes => {},
+		error_message => "",
+		elm_error_btn => undef,};
 	bless $renderer_object,$class;
 	
 	return $renderer_object;
@@ -145,22 +147,19 @@ sub render_preview {
 	}
 	
 	print "ERROR MSG $error_message\n";
+	$self->error_message($error_message);
 	if ($error_message) {
-		# TODO:
-		# if generating preview doesn't work, show an error dialog
-		my $popup = pEFL::Elm::Popup->add($app->elm_mainwindow());
-		$popup->part_text_set("default", "<b>Error occured while running abcm2ps:</b><br/><br/>". $error_message );
-		$popup->scrollable_set(1);
-		my $btn = pEFL::Elm::Button->add($popup);
-		$btn->text_set("Close");
-		$popup->part_content_set("button1",$btn);
-		$btn->smart_callback_add("clicked",sub {$_[0]->del},$popup);
-	
-		# popup show should be called after adding all the contents and the buttons
-		# of popup to set the focus into popup's contents correctly.
-		$popup->show();
-		
+		$self->elm_error_btn->text_set("Show Errors");
 	}
+	else {
+		$self->elm_error_btn->text_set("No Errors");
+	}
+}
+
+sub show_errors {
+	my ($self) = @_;
+	my $app = $self->app();
+	$app->_show_info("Error occured while running abcm2ps:",$self->error_message());
 }
 
 sub correct_pages {
@@ -469,7 +468,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|elm_render_win|elm_out_en|elm_fmt_combo|elm_firstmeasure_spin|elm_pattern_en|preview_beginabc_length|preview_scale|/;
+		unless $AUTOLOAD =~m/app|elm_render_win|elm_out_en|elm_fmt_combo|elm_firstmeasure_spin|elm_pattern_en|preview_beginabc_length|preview_scale|error_message|elm_error_btn|/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

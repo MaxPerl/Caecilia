@@ -23,6 +23,24 @@ our @ISA = qw(Exporter);
 
 our $AUTOLOAD;
 
+
+# Shortcuts for the popup menu:
+my @dynamics = qw(!f! !ff! !fff! !ffff! !mf! !mp! !p! !pp! !ppp! !pppp!);
+my @articulations = qw(!>! !tenuto! !sfz! !dot! !^! !+! !arpeggio! !open! !roll! !snap! !slide! !wedge! !upbow! !downbow! !ped! !ped-up! !breath! !longphrase! !mediumphrase! !shortphrase!);
+my @ornaments = qw(!trill! !lowermordent! !uppermordent! !turn! !turnx! !invertedturn!);
+my @fermata = qw(!fermata! !segno! !coda! !D.S.! !D.C.! !fine!);
+my @repetitions = qw( !/! !//! !///! !trem1! !trem2! !trem3! !trem4! !beambr! !beambr2!);
+my @range_decos = ("!<(!", "!<)!", "!>(!", "!>)!", "!-(!", "!-)!", "!~(!", "!~)!", "!8va(!", "!8va)!", "!8vb(!", "!8vb)!", "!trill(!", "!trill)!");
+
+my %decos = (
+	"dynamics" => \@dynamics,
+	"articulations" => \@articulations,
+	"ornaments" => \@ornaments,
+	"fermata etc" => \@fermata,
+	"repetitions" => \@repetitions,
+	"range decos" => \@range_decos,
+);
+
 sub new {
 	my ($class, $app, $box) = @_;
 	
@@ -112,7 +130,13 @@ sub init_entry {
 	$en->smart_callback_add("changed,user" => \&changed, $self);
 	$en->smart_callback_add("text,set,done" => \&text_set_done, $self);
 	
-	
+	# Shortcuts for decorations
+	$en->context_menu_item_add("Insert dynamics", undef, ELM_ICON_NONE, \&select_deco,[$self,"dynamics"]);
+	$en->context_menu_item_add("Insert articulations", undef, ELM_ICON_NONE, \&select_deco,[$self,"articulations"]);
+	$en->context_menu_item_add("Insert ornaments", undef, ELM_ICON_NONE, \&select_deco,[$self,"ornaments"]);
+	$en->context_menu_item_add("Insert fermata etc.", undef, ELM_ICON_NONE, \&select_deco,[$self,"fermata etc"]);
+	$en->context_menu_item_add("Insert repetitions", undef, ELM_ICON_NONE, \&select_deco,[$self,"repetitions"]);
+	$en->context_menu_item_add("Insert range decos", undef, ELM_ICON_NONE, \&select_deco,[$self,"range decos"]);
 	
 	$box->part_content_set("left",$en);
 	$en->show();
@@ -191,7 +215,7 @@ sub changed {
 	#print "REHIGHLIGHT " . $self->rehighlight() . "\n";
 	
 	my $change_info = pEFL::ev_info2obj($ev,"pEFL::Elm::EntryChangeInfo");
-	
+
 	my $change = $change_info->change();
 	$change = _correct_change($change_info, $change);
 	
@@ -207,6 +231,9 @@ sub changed {
 	my $title = $elm_it->text_get();
 	$elm_it->text_set("$title*") if ($current_tune->changed() && $title !~/\*$/);
 	$elm_it->text_set("$title") if ($current_tune->changed() == 0 && $title =~/\*$/);
+	
+	# For insert decoration functionality it is important, that preview is up_to_date
+	$self->app->preview->up_to_date(0);
 	
 	########################
 	# Fill undo stack
@@ -925,6 +952,96 @@ sub set_linecolumn_label {
 	return unless(defined($label));
 	$label->text_set("Line: $line Column: $column");
 	$self->current_line($line); 
+}
+
+###################
+# Insert decoration functionality
+###################
+
+sub genlist_text_get {
+	my ($data, $obj, $part) = @_;
+	return "$data";
+}
+
+sub insert_deco {
+	my ($self, $obj, $item) = @_;
+	my $en = $self->elm_entry();
+	$item = pEFL::ev_info2obj($item,"ElmGenlistItemPtr");
+	
+	my $win = $obj->top_widget_get;
+	
+	my $deco = $item->text_get();
+	
+	my $cursor_pos = $en->cursor_pos_get();
+	$en->entry_insert($self->highlight_str($deco));
+	
+	#Fill undo
+	# we have to add 2 undo records manually, because it doesn't work automatically
+	my $undo_record_insert = {};
+	$undo_record_insert->{pos} = $cursor_pos;
+	$undo_record_insert->{content} = $deco;
+	$undo_record_insert->{plain_length} = length($deco);
+	push @{$self->app->current_tune->undo_stack},$undo_record_insert;
+	
+	# and we have to set §entry->changed counter
+	my $current_tune = $self->app->current_tune();
+	$current_tune->changed($current_tune->changed()+1) if ($self->is_undo() eq "no" && $self->is_rehighlight() eq "no");
+	my $elm_it = $current_tune->elm_toolbar_item; 
+	my $title = $elm_it->text_get();
+	$elm_it->text_set("$title*") if ($current_tune->changed() && $title !~/\*$/);
+	$elm_it->text_set("$title") if ($current_tune->changed() == 0 && $title =~/\*$/);
+	
+	$win->del();
+	
+	# If decos are added in the preview it is important that the preview is reloaded
+	# doesn't harm, wenn decos are added in entry, so that we always refresh the preview :-)
+	$self->app->preview_cb();
+}
+
+sub select_deco {
+	my ($data, $en, $ev_info) = @_;
+	my $self = $data->[0]; 
+	my $deco_type = $data->[1];
+	
+	my $win = pEFL::Elm::Win->add($self->app->elm_mainwindow(), "Insert $deco_type", ELM_WIN_BASIC);
+	$win->focus_highlight_enabled_set(1);
+	$win->autodel_set(1);
+	
+	my $bx = pEFL::Elm::Box->add($win);
+	$bx->size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+	$bx->size_hint_align_set(EVAS_HINT_FILL,EVAS_HINT_FILL);
+	$bx->show();
+	
+	my $list = pEFL::Elm::Genlist->new($bx);
+	$list->size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+	$list->size_hint_align_set(EVAS_HINT_FILL,EVAS_HINT_FILL);
+	$list->show();
+	
+	my $itc = pEFL::Elm::GenlistItemClass->new();
+	$itc->item_style("default");
+	$itc->text_get(\&genlist_text_get);
+	
+	foreach my $deco (@{$decos{"$deco_type"}}) {
+		$list->item_append($itc,$deco, undef, ELM_GENLIST_ITEM_NONE(), \&insert_deco, $self); 
+	}
+	
+	my $btn = pEFL::Elm::Button->add($bx);
+	$btn->size_hint_weight_set(EVAS_HINT_EXPAND,0);
+	$btn->size_hint_align_set(EVAS_HINT_FILL,0);
+	$btn->text_set("Cancel");
+	$btn->smart_callback_add("clicked" => sub {$win->del()}, undef);
+	$btn->show();
+	
+	$bx->pack_end($list);
+	$bx->pack_end($btn);
+
+	$win->resize_object_add($bx);
+	$win->resize(250,200);
+	
+	$win->show();
+	
+	return $win;
+	
 }
 
 ######################

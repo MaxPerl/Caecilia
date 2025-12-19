@@ -521,6 +521,9 @@ sub preview_cb {
 		$self->preview->page(1) unless $self->preview->page();
 		$self->preview->number_of_pages($number_of_pages);
 		$self->preview->render_preview("$tmpdir/preview");
+		
+		# For insert decoration functionality it is important, that preview is up-to-date
+		$self->preview->up_to_date(1);
 	}
 	else {
 		warn "$tmpdir/preview-1.svg doesn*t exist\n";
@@ -653,20 +656,7 @@ sub file_cb {
 sub about {
 	my ($self) = @_;
 	
-	my $popup = pEFL::Elm::Popup->add($self->elm_mainwindow());
-	
-	$popup->part_text_set("title,text","<b>Caecilia</b>");
-	$popup->text_set("A simple Editor for the ABC notation format written in Perl/pEFL");
-	
-	# popup buttons
-	my $btn = pEFL::Elm::Button->add($popup);
-	$btn->text_set("Close");
-	$popup->part_content_set("button1",$btn);
-	$btn->smart_callback_add("clicked",sub {$_[0]->del},$popup);
-	
-	# popup show should be called after adding all the contents and the buttons
-	# of popup to set the focus into popup's contents correctly.
-	$popup->show();
+	$self->_show_info("Caecilia", "A simple Editor for the ABC notation format written in Perl/pEFL");
 	
 }
 

@@ -1,5 +1,5 @@
 # Caecilia
-A simple Editor with Syntax Highlighting, MIDI playing and a preview function with click-to-note (Left Mouseclick) or play-from-note (Right Mouseclick) feature for the ABC notation format (http://abcnotation.com/) written with perl/pEFL.
+A simple Editor with Syntax Highlighting, MIDI playing and a preview function with click-to-note (Left Mouseclick), insert-decorations-through Entry and Preview (left-click in Entry or longpress in Preview) and play-from-note (right click in Preview) feature for the ABC notation format (http://abcnotation.com/) written with perl/pEFL.
 
 ![Screenshot to Caecilia](https://github.com/MaxPerl/Caecilia/raw/master/screenshot.jpg "Screenshot to Caecilia")
 
@@ -15,7 +15,7 @@ sudo make install
 
 Therefore you need the following libraries and perl modules:
 
-* pEFL (at the moment you need the newest version of github. The version on CPAN doesn't work!)
+* pEFL
 * Source::SyntaxHighlight
 * Image::Info
 * File::ShareDir
@@ -24,5 +24,6 @@ Therefore you need the following libraries and perl modules:
 * HTML::Entities
 * MIDI
 * MIDI::Util
+* Music::Tempo
 * JavaScript::QuickJS
 * YAML

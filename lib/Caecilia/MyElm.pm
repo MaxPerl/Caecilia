@@ -27,6 +27,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 	_expand_widget
 	_combobox_item_pressed
 	_add_color_setting
+	_show_info
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -299,6 +300,27 @@ sub _change_color {
 	
 	my ($r,$g,$b,$a) = $obj->color_get();
 	$rect->color_set($r,$g,$b,$a);
+}
+
+sub _show_info {
+	my ($self, $title, $text) = @_;
+	
+	my $popup = pEFL::Elm::Popup->add($self->elm_mainwindow());
+	
+	$popup->part_text_set("title,text","<b>$title</b>");
+	$popup->text_set("$text");
+	
+	$popup->scrollable_set(1);
+	
+	# popup buttons
+	my $btn = pEFL::Elm::Button->add($popup);
+	$btn->text_set("Close");
+	$popup->part_content_set("button1",$btn);
+	$btn->smart_callback_add("clicked",sub {$_[0]->del},$popup);
+	
+	# popup show should be called after adding all the contents and the buttons
+	# of popup to set the focus into popup's contents correctly.
+	$popup->show();
 }
 
 1;

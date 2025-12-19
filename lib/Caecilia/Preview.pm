@@ -36,6 +36,8 @@ sub new {
 		notes => {},
 		notes_rect => [],
 		visible => [],
+		longpress_check => undef,
+		"up_to_date" => 0,
 		};
 	
 	bless($obj,$class);
@@ -131,7 +133,9 @@ sub load_tune {
 	    my $renderer = $self->app->renderer;
 	    my $istart = $note->{istart} - $renderer->preview_beginabc_length();
 		my $iend = $note->{iend} - $renderer->preview_beginabc_length();
-	    $n->event_callback_add(EVAS_CALLBACK_MOUSE_DOWN, \&jump_to_note, [$self,$note]);
+	    
+		$n->event_callback_add(EVAS_CALLBACK_MOUSE_UP, \&jump_to_note, [$self,$note]);
+		$n->event_callback_add(EVAS_CALLBACK_MOUSE_DOWN, \&set_longpress_check, [$self,$note]);
 	
 		$note->{evas_object} = $n;
 		
@@ -157,46 +161,134 @@ sub create_note_rect {
 	return $n;
 }
 
-sub jump_to_note {
+sub set_longpress_check {
 	my ($data, $evas, $obj, $event_info) = @_;
 	my $event = pEFL::ev_info2obj($event_info, "pEFL::Evas::Event::MouseDown");
 	my ($self, $note) = @$data;
-	my $istart = $note->{istart};
-	my $start_offset = $note->{istart} - $self->app->renderer->preview_beginabc_length(); 
-	my $stop_offset = $note->{iend} - $self->app->renderer->preview_beginabc_length();
-	if ($event->button == 1) {
-	
-	my $en = $self->app->entry->elm_entry;
-	my $textblock = $en->textblock_get();
-	my $cp1 = pEFL::Evas::TextblockCursor->new($textblock);
-	#$cp1->pos_set(0);
-	#my $i;
-	#for ($i=0;$i<$row;$i++) {
-	#	$cp1->paragraph_next();
-	#}
-	#my $lpos = $cp1->pos_get();
-	$cp1->pos_set($start_offset);
-	my $cp2 = pEFL::Evas::TextblockCursor->new($textblock);
-	$cp2->pos_set($stop_offset);
-	
-	my $start = $cp1->pos_get();
-	my $e = $cp2->pos_get();
-	$en->cursor_pos_set($start);
-	$en->select_region_set($start,$e);
-	
-	$cp1->free();
-	$cp2->free();
+	$self->longpress_check(1);
+	pEFL::Ecore::Timer->add(1,\&longpress_cb,[$self,$note]);
+}
+
+sub longpress_cb {
+	my ($data) = @_;
+	my ($self, $note) = @$data;
+	if ($self->up_to_date() == 0) {
+		$self->app->_show_info("Error", "The Entry was changed and so the Preview is not up to date.<br>" .
+			"Please refresh preview before inserting decorations");
 	}
-	elsif ($event->button == 3) {
-		my $midi_position = $self->{notes}->{$istart}->{midi_position};
-		my $midi = $self->app->midi;
-		my $spinner = $midi->elm_progress_spinner;
-		my $video = $midi->elm_video();
-		my $emotion = $video->emotion_get();
+	elsif ($self->longpress_check) {
+		$self->longpress_check(0);
+		show_context_menu($self,$note);
+	}		
+	return ECORE_CALLBACK_CANCEL;
+}
+
+sub show_context_menu {
+	my ($self, $note) = @_;
+	
+	#return if ($list_mouse_down > 0);
+	my $obj = $self->elm_viewer();
+	
+	my $ctxpopup = pEFL::Elm::Ctxpopup->add($obj);
+	$ctxpopup->smart_callback_add("dismissed", \&_dismissed_cb, undef);
+	
+	item_new($ctxpopup, "dynamics", "home", $self, $note);
+	item_new($ctxpopup, "articulations", "file",$self, $note);
+   	item_new($ctxpopup, "ornaments", "delete", $self,$note);
+   	item_new($ctxpopup, "fermata etc", "folder", $self,$note);
+   	item_new($ctxpopup,"repetitions", "edit", $self,$note);
+   	item_new($ctxpopup,"range decos", "clock", $self,$note);
+   	
+   	
+   	my $canvas = $obj->evas_get();
+   	my ($x, $y) = $canvas->pointer_canvas_xy_get();
+   	$ctxpopup->move($x,$y);
+   	$ctxpopup->show();
+}
+
+sub _ctxpopup_item_cb {
+	my ($data, $obj, $evinfo) = @_;
+	my $selected = pEFL::ev_info2obj($evinfo, "pEFL::Elm::CtxpopupItem");
+	print "ctxpopup item selected: " . $data->[0] . "\n";
+	
+	my $self = $data->[0];
+	my $note = $data->[2];
+	my $istart = $note->{istart};
+	my $start_offset = $note->{istart} - $self->app->renderer->preview_beginabc_length();
+	
+	my $entry = $self->elm_entry();
+	$entry->select_none();
+	$entry->cursor_pos_set($start_offset);
+	
+	$obj->del();
+	Caecilia::Entry::select_deco($data,$data->[0]->app->entry->elm_entry(),undef);
+	
+}
+
+sub item_new {
+	my ($ctxpopup, $label, $icon, $self, $note) = @_;
+	
+	my $ic = pEFL::Elm::Icon->add($ctxpopup);
+	#$ic->standard_set($icon);
+	$ic->resizable_set(0,0);
+	my $entry = $self->app->entry();
 		
-		$video->pause() if ($emotion->play_get());
-		$video->play_position_set($midi_position);
-		$video->play();
+	return $ctxpopup->item_append("Insert $label", $ic, \&_ctxpopup_item_cb, [$entry, $label, $note]);
+}
+
+sub _dismissed_cb {
+	my ($data, $obj, $ev) = @_;
+	$obj->del();
+}
+
+sub jump_to_note {
+	my ($data, $evas, $obj, $event_info) = @_;
+	my $event = pEFL::ev_info2obj($event_info, "pEFL::Evas::Event::MouseUp");
+	my ($self, $note) = @$data;
+	
+	unless ($self->longpress_check()) {
+		# Do nothing, because we had a hold event
+	}
+	else {
+		$self->longpress_check(0);
+		my $istart = $note->{istart};
+		my $start_offset = $note->{istart} - $self->app->renderer->preview_beginabc_length(); 
+		my $stop_offset = $note->{iend} - $self->app->renderer->preview_beginabc_length();
+		if ($event->button == 1) {
+	
+		my $en = $self->app->entry->elm_entry;
+		my $textblock = $en->textblock_get();
+		my $cp1 = pEFL::Evas::TextblockCursor->new($textblock);
+		#$cp1->pos_set(0);
+		#my $i;
+		#for ($i=0;$i<$row;$i++) {
+		#	$cp1->paragraph_next();
+		#}
+		#my $lpos = $cp1->pos_get();
+		$cp1->pos_set($start_offset);
+		my $cp2 = pEFL::Evas::TextblockCursor->new($textblock);
+		$cp2->pos_set($stop_offset);
+	
+		my $start = $cp1->pos_get();
+		my $e = $cp2->pos_get();
+		$en->cursor_pos_set($start);
+		$en->select_region_set($start,$e);
+	
+		$cp1->free();
+		$cp2->free();
+		}
+		elsif ($event->button == 3) {
+			my $midi_position = $self->{notes}->{$istart}->{midi_position};
+			my $midi = $self->app->midi;
+			my $spinner = $midi->elm_progress_spinner;
+			my $video = $midi->elm_video();
+			my $emotion = $video->emotion_get();
+		
+			$video->pause() if ($emotion->play_get());
+			$video->play_position_set($midi_position);
+			$video->play();
+		}
+	
 	}
 	
 }
@@ -309,7 +401,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|elm_viewer|elm_scroller|page|number_of_pages|/;
+		unless $AUTOLOAD =~m/app|elm_viewer|elm_scroller|page|number_of_pages|longpress_check|up_to_date|/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

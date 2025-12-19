@@ -97,6 +97,12 @@ sub init_ui {
     $box->pack_end($progress_spinner);$progress_spinner->show();
     $self->elm_progress_spinner($progress_spinner);
 
+    
+    my $renderer_error_b = pEFL::Elm::Button->add($box);
+    $renderer_error_b->text_set("No errors");
+    $box->pack_end($renderer_error_b); $renderer_error_b->show();
+    $self->app->renderer->elm_error_btn($renderer_error_b);
+    
     my $emotion = $video->emotion_get();
     $emotion->smart_callback_add("position_update",\&_pos_update,$self);
     $emotion->smart_callback_add("length_change",\&_pos_update,$self);
@@ -106,6 +112,7 @@ sub init_ui {
     $play_b->smart_callback_add("clicked" => \&play, $video);
     $rewind_b->smart_callback_add("clicked" => \&rewind, $video);
     $forward_b->smart_callback_add("clicked" => \&forward, $video);
+    $renderer_error_b->smart_callback_add("clicked" => \&Caecilia::Renderer::show_errors, $self->app->renderer);
 
     $progress_spinner->smart_callback_add("changed" => \&change_pos, $video);
 
