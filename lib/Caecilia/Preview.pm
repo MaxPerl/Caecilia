@@ -166,7 +166,7 @@ sub set_longpress_check {
 	my $event = pEFL::ev_info2obj($event_info, "pEFL::Evas::Event::MouseDown");
 	my ($self, $note) = @$data;
 	$self->longpress_check(1);
-	pEFL::Ecore::Timer->add(1,\&longpress_cb,[$self,$note]);
+	pEFL::Ecore::Timer->add(0.4,\&longpress_cb,[$self,$note]);
 }
 
 sub longpress_cb {
