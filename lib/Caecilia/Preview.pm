@@ -172,7 +172,7 @@ sub set_longpress_check {
 sub longpress_cb {
 	my ($data) = @_;
 	my ($self, $note) = @$data;
-	if ($self->up_to_date() == 0) {
+	if ($self->longpress_check && $self->up_to_date() == 0) {
 		$self->app->_show_info("Error", "The Entry was changed and so the Preview is not up to date.<br>" .
 			"Please refresh preview before inserting decorations");
 	}
@@ -198,7 +198,7 @@ sub show_context_menu {
    	item_new($ctxpopup, "fermata etc", "folder", $self,$note);
    	item_new($ctxpopup,"repetitions", "edit", $self,$note);
    	item_new($ctxpopup,"range decos", "clock", $self,$note);
-   	
+   	item_new($ctxpopup,"bindings", "clock", $self,$note);
    	
    	my $canvas = $obj->evas_get();
    	my ($x, $y) = $canvas->pointer_canvas_xy_get();
@@ -209,16 +209,16 @@ sub show_context_menu {
 sub _ctxpopup_item_cb {
 	my ($data, $obj, $evinfo) = @_;
 	my $selected = pEFL::ev_info2obj($evinfo, "pEFL::Elm::CtxpopupItem");
-	print "ctxpopup item selected: " . $data->[0] . "\n";
 	
 	my $self = $data->[0];
 	my $note = $data->[2];
-	my $istart = $note->{istart};
-	my $start_offset = $note->{istart} - $self->app->renderer->preview_beginabc_length();
 	
-	my $entry = $self->elm_entry();
-	$entry->select_none();
-	$entry->cursor_pos_set($start_offset);
+	#my $istart = $note->{istart};
+	#my $start_offset = $note->{istart} - $self->app->renderer->preview_beginabc_length();
+	
+	#my $entry = $self->elm_entry();
+	#$entry->select_none();
+	#$entry->cursor_pos_set($start_offset);
 	
 	$obj->del();
 	Caecilia::Entry::select_deco($data,$data->[0]->app->entry->elm_entry(),undef);

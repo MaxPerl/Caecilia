@@ -39,6 +39,7 @@ sub new {
 		events => {},
 		voice_pointers => [],
 		preview_scale_factor => 1,
+		is_finished => 0,
 		};
 	
 	bless($obj,$class);
@@ -105,11 +106,11 @@ sub init_ui {
     
     my $emotion = $video->emotion_get();
     $emotion->smart_callback_add("position_update",\&_pos_update,$self);
-    $emotion->smart_callback_add("length_change",\&_pos_update,$self);
+    #$emotion->smart_callback_add("length_change",\&_pos_update,$self);
     $emotion->smart_callback_add("playback_finished",\&_playback_finished_cb,$self);
 
     $mid_b->smart_callback_add("clicked" => \&generate_mid, $self);
-    $play_b->smart_callback_add("clicked" => \&play, $video);
+    $play_b->smart_callback_add("clicked" => \&play, $self);
     $rewind_b->smart_callback_add("clicked" => \&rewind, $video);
     $forward_b->smart_callback_add("clicked" => \&forward, $video);
     $renderer_error_b->smart_callback_add("clicked" => \&Caecilia::Renderer::show_errors, $self->app->renderer);
@@ -122,12 +123,16 @@ sub init_ui {
 
 sub _playback_finished_cb {
     my ($self, $em, $event) = @_;
+    
     my $video = $self->elm_video();
-    $video->stop();
-    $video->file_set("");
-    $video->file_set($self->midi_file);
-    $self->elm_progress_spinner->value_set(0);
+    #$video->file_set("");
+    #$video->file_set($self->midi_file);
+    #$video->play_position_set(0);
+    #$self->elm_progress_spinner->value_set(0);
+    #$video->stop();
+    #$video->pause();
     $video->pause();
+    $self->is_finished(1);
 }
 
 sub generate_mid {
@@ -165,7 +170,6 @@ sub generate_mid {
 	close $fh;
     
     my $preview = $self->app->preview;
-    $preview->page(1);
     $preview->render_preview($self->app->tmpdir . "/preview");
     
     my $config = $self->app->settings->load_config();
@@ -174,11 +178,16 @@ sub generate_mid {
     my $notes = $self->to_notes();
     $self->generate_events($notes);
     $self->to_midi($notes);
-
+	
     my $opus = MIDI::Opus->new({'from_file' => $self->midi_file});
-    my $track = ($opus->tracks)[0];
-    my ($score, $end_time) = MIDI::Score::events_r_to_score_r($track->events_r);
-    $play_length = $end_time / 100;
+    
+    # The problem is: Opus has two tracks. Only one with notes :-(
+    # So we have to check all tracks for the length
+    foreach my $track ($opus->tracks()) {
+    
+    	my ($score, $end_time) = MIDI::Score::events_r_to_score_r($track->events_r);
+    	$play_length = $end_time / 100 if ( ($end_time / 100) > $play_length);
+    }
     
     my $video = $self->elm_video;
     $video->stop();
@@ -186,21 +195,18 @@ sub generate_mid {
     $video->file_set($self->midi_file);
     $video->play_position_set(0);
     $self->elm_progress_spinner->value_set(0);
+    $video->pause;
 }
 
 sub change_pos {
     my ($video, $spinner, $event_info) = @_;
-    
-    $video->pause();
     my $pos = $spinner->value_get();
     $region_old_y = 0;
     $video->play_position_set($pos);
-    $video->play();
 }
 
 sub _pos_update {
 	my ($self, $emotion, $event_info) = @_;
-	
 	my $progress_spinner = $self->elm_progress_spinner; 
 	
 	my $position = $emotion->position_get();
@@ -285,7 +291,15 @@ sub _pos_update {
 }
 
 sub play {
-    my ($video, $btn, $event_info) = @_;
+    my ($self, $btn, $event_info) = @_;
+    
+    my $video = $self->elm_video();
+    
+    if ($self->is_finished()) {
+    	$video->play_position_set(0);
+    	$self->elm_progress_spinner->value_set(0);
+    	$self->is_finished(0);
+    }
     
     my $emotion = $video->emotion_get();
     if ($emotion->play_get()) {
@@ -438,7 +452,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|abc_file|events|midi_file|abc2svg_path|preview_scale_factor|voice_pointers|elm_midibar|elm_video|elm_progress_spinner/;
+		unless $AUTOLOAD =~m/app|abc_file|events|midi_file|abc2svg_path|preview_scale_factor|voice_pointers|elm_midibar|elm_video|elm_progress_spinner|is_finished|/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

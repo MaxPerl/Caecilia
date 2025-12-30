@@ -31,6 +31,7 @@ my @ornaments = qw(!trill! !lowermordent! !uppermordent! !turn! !turnx! !inverte
 my @fermata = qw(!fermata! !segno! !coda! !D.S.! !D.C.! !fine!);
 my @repetitions = qw( !/! !//! !///! !trem1! !trem2! !trem3! !trem4! !beambr! !beambr2!);
 my @range_decos = ("!<(!", "!<)!", "!>(!", "!>)!", "!-(!", "!-)!", "!~(!", "!~)!", "!8va(!", "!8va)!", "!8vb(!", "!8vb)!", "!trill(!", "!trill)!");
+my @bindings = ("(", ")");
 
 my %decos = (
 	"dynamics" => \@dynamics,
@@ -39,6 +40,7 @@ my %decos = (
 	"fermata etc" => \@fermata,
 	"repetitions" => \@repetitions,
 	"range decos" => \@range_decos,
+	"bindings" => \@bindings,
 );
 
 sub new {
@@ -964,13 +966,30 @@ sub genlist_text_get {
 }
 
 sub insert_deco {
-	my ($self, $obj, $item) = @_;
+	my ($data, $obj, $item) = @_;
+	
+	my $self = $data->[0];
+	my $note = $data->[1]; 
+	
 	my $en = $self->elm_entry();
 	$item = pEFL::ev_info2obj($item,"ElmGenlistItemPtr");
 	
-	my $win = $obj->top_widget_get;
-	
 	my $deco = $item->text_get();
+	
+	# $note is only defined if deco is inserted by Preview!!!
+	# In that case Cursor must set to the position of the note first
+	if (defined($note)) {
+		
+		# Important: Bindings are specials. The end range deco must be inserted after the note!
+		my $istart = $deco eq ")" ? $note->{iend} : $note->{istart};
+		my $start_offset = $istart - $self->app->renderer->preview_beginabc_length();
+	
+	
+		$en->select_none();
+		$en->cursor_pos_set($start_offset);
+	}
+	
+	my $win = $obj->top_widget_get;
 	
 	my $cursor_pos = $en->cursor_pos_get();
 	$en->entry_insert($self->highlight_str($deco));
@@ -1002,6 +1021,7 @@ sub select_deco {
 	my ($data, $en, $ev_info) = @_;
 	my $self = $data->[0]; 
 	my $deco_type = $data->[1];
+	my $note = $data->[2] || undef;
 	
 	my $win = pEFL::Elm::Win->add($self->app->elm_mainwindow(), "Insert $deco_type", ELM_WIN_BASIC);
 	$win->focus_highlight_enabled_set(1);
@@ -1022,7 +1042,7 @@ sub select_deco {
 	$itc->text_get(\&genlist_text_get);
 	
 	foreach my $deco (@{$decos{"$deco_type"}}) {
-		$list->item_append($itc,$deco, undef, ELM_GENLIST_ITEM_NONE(), \&insert_deco, $self); 
+		$list->item_append($itc,$deco, undef, ELM_GENLIST_ITEM_NONE(), \&insert_deco, [$self,$note]); 
 	}
 	
 	my $btn = pEFL::Elm::Button->add($bx);

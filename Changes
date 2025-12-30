@@ -3,6 +3,8 @@ Revision history for Perl extension Caecilia.
 0.25_01
 	- Add insert decoration functionality (through Entry and through Preview (longpress)
 	- Some code cleaning
+	- Fix MIDI playback: Pause playing when Midi playback is finished
+	- Fix random problems with MIDI playlength / progress spinner of the elm playback element
 0.24
 	- Fix paste text event: Whole text should be rehighlighted
 	- Fix render problem with missing parameter while using option -B
