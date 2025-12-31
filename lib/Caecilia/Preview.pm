@@ -192,13 +192,13 @@ sub show_context_menu {
 	my $ctxpopup = pEFL::Elm::Ctxpopup->add($obj);
 	$ctxpopup->smart_callback_add("dismissed", \&_dismissed_cb, undef);
 	
-	item_new($ctxpopup, "dynamics", "home", $self, $note);
-	item_new($ctxpopup, "articulations", "file",$self, $note);
-   	item_new($ctxpopup, "ornaments", "delete", $self,$note);
-   	item_new($ctxpopup, "fermata etc", "folder", $self,$note);
-   	item_new($ctxpopup,"repetitions", "edit", $self,$note);
-   	item_new($ctxpopup,"range decos", "clock", $self,$note);
-   	item_new($ctxpopup,"bindings", "clock", $self,$note);
+	item_new($ctxpopup, "dynamics", "mp", $self, $note);
+	item_new($ctxpopup, "articulations", ">",$self, $note);
+   	item_new($ctxpopup, "ornaments", "trill", $self,$note);
+   	item_new($ctxpopup, "fermata etc", "fermata", $self,$note);
+   	item_new($ctxpopup,"repetitions", "slashslashslash", $self,$note);
+   	item_new($ctxpopup,"range decos", "8vastart", $self,$note);
+   	item_new($ctxpopup,"bindings", "end", $self,$note);
    	
    	my $canvas = $obj->evas_get();
    	my ($x, $y) = $canvas->pointer_canvas_xy_get();
@@ -226,14 +226,16 @@ sub _ctxpopup_item_cb {
 }
 
 sub item_new {
-	my ($ctxpopup, $label, $icon, $self, $note) = @_;
+	my ($ctxpopup, $label, $fname, $self, $note) = @_;
 	
-	my $ic = pEFL::Elm::Icon->add($ctxpopup);
-	#$ic->standard_set($icon);
-	$ic->resizable_set(0,0);
+	my $icon_file = $self->app()->share_dir() . "/icons/decos/$fname.png";
+    my $icon = pEFL::Elm::Icon->add($ctxpopup);
+    $icon->file_set("$icon_file", undef );
+    $icon->size_hint_aspect_set(0.5, 1, 1);
+    
 	my $entry = $self->app->entry();
 		
-	return $ctxpopup->item_append("Insert $label", $ic, \&_ctxpopup_item_cb, [$entry, $label, $note]);
+	return $ctxpopup->item_append("Insert $label", $icon, \&_ctxpopup_item_cb, [$entry, $label, $note]);
 }
 
 sub _dismissed_cb {

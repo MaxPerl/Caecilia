@@ -26,10 +26,10 @@ our $AUTOLOAD;
 
 # Shortcuts for the popup menu:
 my @dynamics = qw(!f! !ff! !fff! !ffff! !mf! !mp! !p! !pp! !ppp! !pppp!);
-my @articulations = qw(!>! !tenuto! !sfz! !dot! !^! !+! !arpeggio! !open! !roll! !snap! !slide! !wedge! !upbow! !downbow! !ped! !ped-up! !breath! !longphrase! !mediumphrase! !shortphrase!);
+my @articulations = qw(!>! !tenuto! !sfz! !dot! !^! !+! !arpeggio! !open! !roll! !snap! !slide! !wedge! !upbow! !downbow! !ped! !ped-up! !caesura! !breath! !longphrase! !mediumphrase! !shortphrase!);
 my @ornaments = qw(!trill! !lowermordent! !uppermordent! !turn! !turnx! !invertedturn!);
 my @fermata = qw(!fermata! !segno! !coda! !D.S.! !D.C.! !fine!);
-my @repetitions = qw( !/! !//! !///! !trem1! !trem2! !trem3! !trem4! !beambr! !beambr2!);
+my @repetitions = qw( !/! !//! !///! !trem1! !trem2! !trem3! !trem4!);
 my @range_decos = ("!<(!", "!<)!", "!>(!", "!>)!", "!-(!", "!-)!", "!~(!", "!~)!", "!8va(!", "!8va)!", "!8vb(!", "!8vb)!", "!trill(!", "!trill)!");
 my @bindings = ("(", ")");
 
@@ -133,12 +133,12 @@ sub init_entry {
 	$en->smart_callback_add("text,set,done" => \&text_set_done, $self);
 	
 	# Shortcuts for decorations
-	$en->context_menu_item_add("Insert dynamics", undef, ELM_ICON_NONE, \&select_deco,[$self,"dynamics"]);
-	$en->context_menu_item_add("Insert articulations", undef, ELM_ICON_NONE, \&select_deco,[$self,"articulations"]);
-	$en->context_menu_item_add("Insert ornaments", undef, ELM_ICON_NONE, \&select_deco,[$self,"ornaments"]);
-	$en->context_menu_item_add("Insert fermata etc.", undef, ELM_ICON_NONE, \&select_deco,[$self,"fermata etc"]);
-	$en->context_menu_item_add("Insert repetitions", undef, ELM_ICON_NONE, \&select_deco,[$self,"repetitions"]);
-	$en->context_menu_item_add("Insert range decos", undef, ELM_ICON_NONE, \&select_deco,[$self,"range decos"]);
+	$en->context_menu_item_add("Insert dynamics", $self->app->share_dir()."/icons/decos/mp.png", ELM_ICON_FILE, \&select_deco,[$self,"dynamics"]);
+	$en->context_menu_item_add("Insert articulations", $self->app->share_dir()."/icons/decos/>.png", ELM_ICON_FILE, \&select_deco,[$self,"articulations"]);
+	$en->context_menu_item_add("Insert ornaments", $self->app->share_dir()."/icons/decos/trill.png", ELM_ICON_FILE, \&select_deco,[$self,"ornaments"]);
+	$en->context_menu_item_add("Insert fermata etc.", $self->app->share_dir()."/icons/decos/fermata.png", ELM_ICON_FILE, \&select_deco,[$self,"fermata etc"]);
+	$en->context_menu_item_add("Insert repetitions", $self->app->share_dir()."/icons/decos/slashslashslash.png", ELM_ICON_FILE, \&select_deco,[$self,"repetitions"]);
+	$en->context_menu_item_add("Insert range decos", $self->app->share_dir()."/icons/decos/8vastart.png", ELM_ICON_FILE, \&select_deco,[$self,"range decos"]);
 	
 	$box->part_content_set("left",$en);
 	$en->show();
@@ -962,7 +962,7 @@ sub set_linecolumn_label {
 
 sub genlist_text_get {
 	my ($data, $obj, $part) = @_;
-	return "$data";
+	return $data->[1];
 }
 
 sub insert_deco {
@@ -1017,6 +1017,26 @@ sub insert_deco {
 	$self->app->preview_cb();
 }
 
+sub _genlist_content_get {
+    my ($data, $obj, $part) = @_;
+ 	
+ 	my $self = $data->[0];
+ 	my $fname = $data->[1];
+	$fname =~ s/!//g;
+	$fname =~ s/~/tilde/g;
+	$fname =~ s/\)/end/g;
+	$fname =~ s/\(/start/g;
+	$fname =~ s/\//slash/g;
+	
+	$fname = $self->app()->share_dir() . "/icons/decos/$fname.png";
+    my $icon = pEFL::Elm::Icon->add($obj);
+    if ($part eq "elm.swallow.icon") {
+        $icon->file_set("$fname", undef );
+    }
+    $icon->size_hint_aspect_set(0.5, 1, 1);
+    return $icon;
+}
+
 sub select_deco {
 	my ($data, $en, $ev_info) = @_;
 	my $self = $data->[0]; 
@@ -1040,9 +1060,10 @@ sub select_deco {
 	my $itc = pEFL::Elm::GenlistItemClass->new();
 	$itc->item_style("default");
 	$itc->text_get(\&genlist_text_get);
+	$itc->content_get(\&_genlist_content_get);
 	
 	foreach my $deco (@{$decos{"$deco_type"}}) {
-		$list->item_append($itc,$deco, undef, ELM_GENLIST_ITEM_NONE(), \&insert_deco, [$self,$note]); 
+		$list->item_append($itc,[$self, $deco], undef, ELM_GENLIST_ITEM_NONE(), \&insert_deco, [$self,$note]); 
 	}
 	
 	my $btn = pEFL::Elm::Button->add($bx);
