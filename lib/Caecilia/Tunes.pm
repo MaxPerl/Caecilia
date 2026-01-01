@@ -194,7 +194,7 @@ sub _new_tune {
 	my $itc = pEFL::Elm::GenlistItemClass->new();
 	$itc->item_style("default");
 	$itc->text_get(sub {return $_[0];});
-	my @measures = ("C","C|","2/3", "3/4","4/4", "5/4","6/4","7/4", "2/2", "3/2", "4/2", "3/8","5/8", "6/8", "7/8","8/8","9/8", "12/8", "3/16", "6/16", "12/16");
+	my @measures = ("C","C|","2/4", "3/4","4/4", "5/4","6/4","7/4", "2/2", "3/2", "4/2", "3/8","5/8", "6/8", "7/8","8/8","9/8", "12/8", "3/16", "6/16", "12/16");
 	foreach my $m (@measures) {
 		$measure_combo->item_append($itc,$m,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
