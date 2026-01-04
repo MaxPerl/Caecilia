@@ -21,8 +21,13 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 	_add_header
 	_add_label
 	_add_checkoption
+	_add_entry
 	_add_entry_with_check
 	_add_spin_with_check
+	_add_spinner
+	_add_slider
+	_add_combo
+	_add_buttons
 	_expand_widget_x
 	_expand_widget
 	_combobox_item_pressed
@@ -57,13 +62,28 @@ sub _add_label {
 sub _add_checkoption {
 	my ($table, %opts) = @_;
 	
+	my $column = $opts{column} || 0;
 	my $check = pEFL::Elm::Check->add($table);
 	_expand_widget_x($check);
 	$check->text_set($opts{label});
 	$check->state_set(1) if ($opts{value});
-	$check->show(); $table->pack($check,0,$opts{row},2,1);
+	$check->show(); $table->pack($check,$column,$opts{row},2,1);
 	
 	return $check;
+}
+
+sub _add_entry {
+	my ($table,%opts) = @_;
+	
+	my $entry = pEFL::Elm::Entry->add($table);
+	$entry->entry_set($opts{entry});
+	$entry->scrollable_set(1);
+	$entry->single_line_set(1);
+	$entry->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
+	_expand_widget($entry);
+	$entry->show(); $table->pack($entry,0,$opts{row},2,1);
+	
+	return $entry;
 }
 
 sub _add_entry_with_check {
@@ -121,6 +141,74 @@ sub _add_spin_with_check {
 	return ($check,$spinner);
 }
 
+sub _add_spinner {
+	my ($table, %opts) = @_;
+	
+	my $column = 0,
+	my $width = $opts{width};
+	
+	my $format = $opts{format} || "%1.0f";
+	my $interval = $opts{interval} || 1;
+	
+	if ($opts{label}) {
+		$column = 1; $width = $width-1;
+		_add_label($table,$opts{row},$opts{label}, 1);
+	}
+	
+	my $spinner = pEFL::Elm::Spinner->add($table);
+	$spinner->label_format_set($format);
+	$spinner->min_max_set(0,$opts{max}); $spinner->interval_set($interval);
+	$spinner->editable_set(1);
+	$spinner->value_set($opts{value});
+	_expand_widget_x($spinner);
+	$spinner->show(); $table->pack($spinner,1,$opts{row},$width,1);
+	
+	return $spinner;
+}
+
+sub _add_slider {
+	my ($table, %opts) = @_;
+	
+	my $column = 0;
+	my $width = $opts{width};
+	
+	if ($opts{label}) {
+		$column = 1; $width = $width-1;
+		_add_label($table,$opts{row},$opts{label}, 1);
+	}
+	my $spinner = pEFL::Elm::Slider->add($table);
+	$spinner->size_hint_align_set(EVAS_HINT_FILL,0.5);
+	$spinner->size_hint_weight_set(EVAS_HINT_EXPAND,0.0);
+	$spinner->unit_format_set("%1.0f");
+	$spinner->indicator_format_set("%1.0f");
+	$spinner->min_max_set(0,$opts{max});
+	$spinner->step_set(1);
+	$spinner->value_set($opts{value});
+	$spinner->show(); $table->pack($spinner,1,$opts{row},$width,1);	
+	
+	return $spinner;
+}
+
+sub _add_combo {
+	my ($table, %opts) = @_;
+	
+	my $frame = $opts{frame} || "";
+	my $combo = pEFL::Elm::Combobox->add($table);
+	_expand_widget_x($combo);
+	$combo->text_set("$opts{text}");
+	
+	my $itc = pEFL::Elm::GenlistItemClass->new();
+	$itc->item_style("default");
+	$itc->text_get(sub {return $_[0];});
+	foreach my $m (@{$opts{genlist}}) {
+		$combo->item_append($itc,$m,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
+	}
+	$combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, $frame);
+	$combo->show(); $table->pack($combo,0,$opts{row},$opts{width},1);
+	
+	return $combo;
+}
+
 sub toggle {
 	my ($data,$check) = @_;
 	
@@ -156,6 +244,31 @@ sub _combobox_item_pressed_cb {
 	# Focus Workaround 2: Without this sometimes (multiple selection)
 	# frame doesn't get the scroller again [and can't be scrolled by wheel]
 	$data->focus_set(1);
+}
+
+sub _add_buttons {
+	my ($table,%opts) = @_;
+	
+	my $ok_label = $opts{ok} || "OK";
+	my $cancel_label = $opts{cancel} || "Cancel";
+	
+	my $width = $opts{width} || 2;
+	my $btn_bx = pEFL::Elm::Box->add($table);
+	_expand_widget_x($btn_bx);
+	$btn_bx->horizontal_set(1);
+	$btn_bx->show(); $table->pack($btn_bx,0,$opts{row},$width,1);
+	
+	my $ok_btn = pEFL::Elm::Button->new($btn_bx);
+	$ok_btn->text_set($ok_label);
+	_expand_widget($ok_btn);
+	$ok_btn->show(); $btn_bx->pack_end($ok_btn);
+	
+	my $cancel_btn = pEFL::Elm::Button->new($btn_bx);
+	$cancel_btn->text_set($cancel_label);
+	_expand_widget($cancel_btn);
+	$cancel_btn->show(); $btn_bx->pack_end($cancel_btn);
+	
+	return ($ok_btn,$cancel_btn);
 }
 
 ############
@@ -305,7 +418,11 @@ sub _change_color {
 sub _show_info {
 	my ($self, $title, $text) = @_;
 	
-	my $popup = pEFL::Elm::Popup->add($self->elm_mainwindow());
+	my $parent = $self;
+	if (ref($self) eq "Caecilia") {
+		$parent = $self->elm_mainwindow();
+	}
+	my $popup = pEFL::Elm::Popup->add($parent);
 	
 	$popup->part_text_set("title,text","<b>$title</b>");
 	$popup->text_set("$text");

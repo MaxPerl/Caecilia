@@ -27,6 +27,7 @@ use Caecilia::Entry;
 use Caecilia::Settings;
 use Caecilia::Preview;
 use Caecilia::Renderer;
+use Caecilia::Recorder;
 use Caecilia::MIDI;
 use Caecilia::MyElm ":all";
 
@@ -116,6 +117,9 @@ sub init_ui {
 	
 	my $renderer = Caecilia::Renderer->new($self);
 	$self->renderer($renderer);
+	
+	my $recorder = Caecilia::Recorder->new($self);
+	$self->recorder($recorder);
 	
 	my $box = pEFL::Elm::Box->add($win);
 	$box->size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
@@ -455,6 +459,10 @@ sub add_toolbar {
 	my $it_sep = $tabsbar->item_append(undef,undef,undef,undef);
 	$it_sep->separator_set(1);
 	$tabsbar->item_append("document-export","Export",sub {my $r = $self->renderer(); $r->show_dialog()},undef);
+	my $it_sep5 = $tabsbar->item_append(undef,undef,undef,undef);
+	$it_sep5->separator_set(1);
+	$tabsbar->item_append("media-record","Record MIDI",sub {my $r = $self->recorder(); $r->show_record_dialog($self)},undef);
+	$tabsbar->item_append("document-import","Import MIDI",sub {my $r = $self->recorder(); $r->show_import_midi_dialog($self)},undef);
 	my $it_sep2 = $tabsbar->item_append(undef,undef,undef,undef);
 	$it_sep2->separator_set(1);
 	$tabsbar->item_append("view-restore","Preview",\&preview_cb,$self);
@@ -905,7 +913,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~ m/tunes|entry|settings|renderer|midi|user_dir|share_dir|tmpdir|mpv|current_tune|preview|elm_mainwindow|elm_menu|elm_toolbar|elm_src_highlight_check|elm_linewrap_check|elm_linecolumn_label/;
+		unless $AUTOLOAD =~ m/tunes|entry|settings|renderer|recorder|midi|user_dir|share_dir|tmpdir|mpv|current_tune|preview|elm_mainwindow|elm_menu|elm_toolbar|elm_src_highlight_check|elm_linewrap_check|elm_linecolumn_label/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

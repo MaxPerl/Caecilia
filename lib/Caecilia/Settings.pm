@@ -110,32 +110,6 @@ sub _settings_category_cb {
 	#$tit->selected_set(1);
 }
 
-sub _add_buttons {
-	my ($self,$table,$row, $width) = @_;
-	
-	$width = $width || 2;
-	my $btn_bx = pEFL::Elm::Box->add($table);
-	_expand_widget_x($btn_bx);
-	$btn_bx->horizontal_set(1);
-	$btn_bx->show(); $table->pack($btn_bx,0,$row,$width,1);
-	
-	my $ok_btn = pEFL::Elm::Button->new($btn_bx);
-	$ok_btn->text_set("OK");
-	_expand_widget($ok_btn);
-	$ok_btn->show(); $btn_bx->pack_end($ok_btn);
-	
-	my $cancel_btn = pEFL::Elm::Button->new($btn_bx);
-	$cancel_btn->text_set("Cancel");
-	_expand_widget($cancel_btn);
-	$cancel_btn->show(); $btn_bx->pack_end($cancel_btn);
-	
-	# Callbacks
-	$cancel_btn->smart_callback_add("clicked", sub { $self->elm_settings_win()->del(); }, undef );
-	$ok_btn->smart_callback_add("clicked", \&save_settings, $self);
-	
-	return $btn_bx;
-}
-
 sub _settings_general_create {
 	my ($self,$parent) = @_;
 	
@@ -161,34 +135,46 @@ sub _settings_general_create {
 	
 	_add_header($table,0,"Path to abcm2ps", 1);
 	
-	my $abcm2ps_path_en = pEFL::Elm::Entry->add($table);
-	$abcm2ps_path_en->entry_set($config->{abcm2ps_path} || "abcm2ps");
-	$abcm2ps_path_en->scrollable_set(1);
-	$abcm2ps_path_en->single_line_set(1);
-	$abcm2ps_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
-	_expand_widget($abcm2ps_path_en);
-	$abcm2ps_path_en->show(); $table->pack($abcm2ps_path_en,0,1,2,1);
+	my $abcm2ps_path_en = _add_entry($table,
+		"entry" => $config->{abcm2ps_path} || "abcm2ps",
+		"row" => 1);
 	
 	_add_header($table,2,"Path to scores",1);
 	
-	my $scores_path_en = pEFL::Elm::Entry->add($table);
-	$scores_path_en->entry_set($config->{scores_path} || File::HomeDir->my_documents);
-	$scores_path_en->scrollable_set(1);
-	$scores_path_en->single_line_set(1);
-	$scores_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
-	_expand_widget($scores_path_en);
-	$scores_path_en->show(); $table->pack($scores_path_en,0,3,2,1);
+	my $scores_path_en = _add_entry($table,
+		"entry" => $config->{scores_path} || File::HomeDir->my_documents,
+		"row" => 3);
 	
-	my $sep = pEFL::Elm::Separator->add($table);
-	_expand_widget($sep);
-	$sep->show(); $table->pack($sep,0,4,2,4);
+	_add_header($table,4,"Path to midi2abc",1);
+	
+	my $midi2abc_path_en = _add_entry($table,
+		"entry" => $config->{midi2abc_path} || "midi2abc",
+		"row" => 5);
+		
+	_add_header($table,6,"Path to midish",1);
+	
+	my $midish_path_en = _add_entry($table,
+		"entry" => $config->{midi2abc_path} || "midish",
+		"row" => 7);
+	
+	_add_header($table,8,"Path to aseqdump",1);
+	
+	my $aseqdump_path_en = _add_entry($table,
+		"entry" => $config->{aseqdump_path} || "aseqdump",
+		"row" => 9);
 
 
 	# Save important widgets
 	$self->elm_abcm2ps_path_en($abcm2ps_path_en);
 	$self->elm_scores_path_en($scores_path_en);
+	$self->elm_midi2abc_path_en($midi2abc_path_en);
+	$self->elm_midish_path_en($midish_path_en);
+	$self->elm_aseqdump_path_en($aseqdump_path_en);
 	
-	$self->_add_buttons($table,8);
+	my ($ok_btn,$cancel_btn) = _add_buttons($table,"row" => 10);
+	# Callbacks
+	$cancel_btn->smart_callback_add("clicked", sub { $self->elm_settings_win()->del(); }, undef );
+	$ok_btn->smart_callback_add("clicked", \&save_settings, $self);
 	
 	$scroller->content_set($box);
 	$scroller->show();
@@ -264,7 +250,10 @@ sub _settings_preview_create {
 	$self->elm_preview_scale_spinner($preview_scale_spinner);
 	
 	
-	$self->_add_buttons($table,15);
+	my ($ok_btn, $cancel_btn) = _add_buttons($table,"row" => 15);
+	# Callbacks
+	$cancel_btn->smart_callback_add("clicked", sub { $self->elm_settings_win()->del(); }, undef );
+	$ok_btn->smart_callback_add("clicked", \&save_settings, $self);
 	
 	$scroller->content_set($box);
 	$scroller->show();
@@ -323,7 +312,10 @@ sub _settings_midi_create {
 	# Save important widgets
 	$self->elm_midi_ticks_slider($midi_ticks_spinner);
 	
-	$self->_add_buttons($table,4,3);
+	my ($ok_btn, $cancel_btn) = _add_buttons($table,"row"=>4,"width"=>3);
+	# Callbacks
+	$cancel_btn->smart_callback_add("clicked", sub { $self->elm_settings_win()->del(); }, undef );
+	$ok_btn->smart_callback_add("clicked", \&save_settings, $self);
 	
 	$scroller->content_set($box);
 	$scroller->show();
@@ -455,7 +447,10 @@ sub _settings_appearance_create {
 	$self->elm_font_size_slider($font_size_spinner);
 	$self->elm_font_combo($font_combo);
 	
-	$self->_add_buttons($table,15);
+	my ($ok_btn, $cancel_btn) = _add_buttons($table,"row"=> 15);
+	# Callbacks
+	$cancel_btn->smart_callback_add("clicked", sub { $self->elm_settings_win()->del(); }, undef );
+	$ok_btn->smart_callback_add("clicked", \&save_settings, $self);
 	
 	$scroller->content_set($box);
 	$scroller->show();
@@ -530,7 +525,10 @@ sub _settings_tabulator_create {
 	$self->elm_unexpand_check($unexpand_check);
 	$self->elm_expand_check($expand_check);
 	
-	$self->_add_buttons($table,7);
+	my ($ok_btn,$cancel_btn) = _add_buttons($table,"row"=> 7);
+	# Callbacks
+	$cancel_btn->smart_callback_add("clicked", sub { $self->elm_settings_win()->del(); }, undef );
+	$ok_btn->smart_callback_add("clicked", \&save_settings, $self);
 	
 	return $frame;
 }
@@ -676,7 +674,10 @@ sub _settings_abcm2ps_create {
 	$self->elm_numbernbarsboxed_check($numbernbarsboxed_check);
 	$self->elm_flatbeams_check($flatbeams_check);
 	
-	$self->_add_buttons($table,27);
+	my ($ok_btn, $cancel_btn) = _add_buttons($table,"row" => 27);
+	# Callbacks
+	$cancel_btn->smart_callback_add("clicked", sub { $self->elm_settings_win()->del(); }, undef );
+	$ok_btn->smart_callback_add("clicked", \&save_settings, $self);
 	
 	$scroller->content_set($box);
 	$scroller->show();
@@ -694,6 +695,9 @@ sub save_settings {
 	#################
 	$config->{abcm2ps_path} = $self->elm_abcm2ps_path_en->entry_get();
 	$config->{scores_path} = $self->elm_scores_path_en->entry_get();
+	$config->{midi2abc_path} = $self->elm_midi2abc_path_en->entry_get();
+	$config->{midish_path} = $self->elm_midish_path_en->entry_get();
+	$config->{aseqdump_path} = $self->elm_aseqdump_path_en->entry_get();
 	
 	################
 	# Preview
@@ -905,7 +909,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|config|elm_toolbar|elm_scores_path_en|elm_pageheight_spinner|elm_pagewidth_spinner|elm_preview_scale_spinner|elm_midi_ticks_slider|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
+		unless $AUTOLOAD =~m/app|config|elm_toolbar|elm_scores_path_en|elm_midi2abc_path_en|elm_midish_path_en|elm_aseqdump_path_en|elm_pageheight_spinner|elm_pagewidth_spinner|elm_preview_scale_spinner|elm_midi_ticks_slider|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

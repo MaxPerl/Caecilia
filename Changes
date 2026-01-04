@@ -1,5 +1,8 @@
 Revision history for Perl extension Caecilia.
 
+0.26_01
+	- Add Recorder / Import MIDI functionality
+	- some code cleaning
 0.25
 	- Add insert decoration functionality (through Entry and through Preview (longpress)
 	- Some code cleaning
