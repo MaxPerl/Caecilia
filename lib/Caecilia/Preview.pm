@@ -375,7 +375,7 @@ sub render_preview {
 	$filename = "$filename-$page.svg";
 	if (-e $filename) {
 		$self->{filename} = $filename;
-		$self->load_tune($filename, $config->{preview_scale});#scale_factor not used at moment
+		$self->load_tune($filename, $config->{preview_scale} || 1);#scale_factor not used at moment
 	}
 }
 
