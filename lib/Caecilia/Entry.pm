@@ -446,10 +446,15 @@ sub undo {
 		$entry->cursor_pos_set($undo->{start});
 		my $content = $undo->{content};
 		
-		# $undo->{content} is already saved in utf8 format!!! Really???
+		# $undo->{content} is already saved in utf8 format!!! Really??? 
+		# YES, the problem were only deleting the < and > (see next comment!)
 		# $content = pEFL::Elm::Entry::utf8_to_markup($content);
-		$content = pEFL::Elm::Entry::utf8_to_markup($content);
 		
+		# We must insert markup here because of the \t and \n
+		# Therefore we have to mask first the < and >
+		# Otherwise they are deleted and everything is messed up :-(
+		$content =~ s/&/&amp;/g;
+		$content =~ s/</&lt;/g;$content =~ s/>/&gt;/g;
 		$content =~ s/\t/<tab\/>/g; $content =~ s/\n/<br\/>/g;
 		$entry->entry_insert($content);
 		$entry->select_none();
@@ -507,10 +512,15 @@ sub redo {
 		
 		my $content = $redo->{content};
 		
-		# $redo->{content} is already saved in utf8 format!!! Really????
-		# $content = pEFL::Elm::Entry::markup_to_utf8($content);
-		$content = pEFL::Elm::Entry::markup_to_utf8($content);
+		# $undo->{content} is already saved in utf8 format!!! Really??? 
+		# YES, the problem were only deleting the < and > (see next comment)
+		# $content = pEFL::Elm::Entry::utf8_to_markup($content);
 		
+		# We must insert markup here because of the \t and \n
+		# Therefore we have to mask first the < and >
+		# Otherwise they are deleted and everything is messed up :-(
+		$content =~ s/&/&amp;/g;
+		$content =~ s/</&lt;/g;$content =~ s/>/&gt;/g;
 		$content =~ s/\t/<tab\/>/g; $content =~ s/\n/<br\/>/g;
 		$entry->cursor_pos_set($redo->{pos});
 		$entry->entry_insert($content);

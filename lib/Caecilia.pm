@@ -56,7 +56,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 our $SELF;
 
@@ -705,6 +705,10 @@ sub save {
 		# umlauts etc. must be converted
 		$content = Encode::decode("utf-8",$content);
 		
+		# Only for safety (I don't think, this is necessary):
+		# Entfernt alle Windows-Wagenrückläufe (Carriage Returns)
+		$content =~ s/\r//g; 
+		
 		# Here we mustn't decode entities
 		# otherwise for example &lt; is saved as <
 		#decode_entities($content);
@@ -764,6 +768,10 @@ sub open_file {
 		}
 	
 		close $fh;
+		
+		# Only for safety (I don't think, this is necessary):
+		# Entfernt alle Windows-Wagenrückläufe (Carriage Returns)
+		$content =~ s/\r//g;
 		
 		if ($config->{expand_tabs}) {
 			$content = expand($content);	
