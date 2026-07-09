@@ -872,15 +872,13 @@ sub line_get {
 	my ($self) = @_;
 	
 	my $en = $self->elm_entry();
-	my $lines = 1;
 	
 	my $textblock = $en->textblock_get();
 	my $cp1 = pEFL::Evas::TextblockCursor->new($textblock);
 	$cp1->pos_set($en->cursor_pos_get);
 	
-	while ($cp1->paragraph_prev()) {
-		$lines++;
-	}
+	my ($lines, $x,$y,$w,$h,$dir) = $cp1->line_geometry_get();
+	$lines = $lines+1;
 	
 	$cp1->free();
 		

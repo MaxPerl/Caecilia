@@ -180,9 +180,7 @@ sub init_ui {
 sub show_first_run_dialog {
 	my ($self,$win) = @_;
 	
-	my $fr_win = pEFL::Elm::Win->add($win, "Welcome", ELM_WIN_BASIC);
-	$fr_win->title_set("Welcome");
-	$fr_win->focus_highlight_enabled_set(1);
+	my $fr_win = pEFL::Elm::Win->util_dialog_add($self->elm_mainwindow(), "Welcome", "Welcome");
 	
 	my $bg = pEFL::Elm::Bg->add($fr_win);
 	_expand_widget($bg);
@@ -265,9 +263,7 @@ sub show_first_run_dialog {
 sub font_install {
 	my ($self) = @_;
 	
-	my $f_win = pEFL::Elm::Win->add($self->elm_mainwindow(), "Install Music Font", ELM_WIN_BASIC);
-	$f_win->title_set("Install Music Font");
-	$f_win->focus_highlight_enabled_set(1);
+	my $f_win = pEFL::Elm::Win->util_dialog_add($self->elm_mainwindow(), "Install Music Font", "Install Music Font");
 	$f_win->autodel_set(1);
 	
 	my $bg = pEFL::Elm::Bg->add($f_win);
@@ -620,8 +616,7 @@ sub on_exit {
 sub file_cb {
 	my ($self) = @_;
 	
-	my $fs_win = pEFL::Elm::Win->add($self->elm_mainwindow(), "Open a file", ELM_WIN_BASIC);
-	$fs_win->focus_highlight_enabled_set(1);
+	my $fs_win = pEFL::Elm::Win->util_dialog_add($self->elm_mainwindow(), "Open a File", "Open a file");
 	$fs_win->autodel_set(1);
 	
 	my $vbox = pEFL::Elm::Box->add($fs_win);

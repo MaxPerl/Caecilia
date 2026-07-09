@@ -35,6 +35,7 @@ sub new {
 		elm_video => undef,
 		elm_midibar => undef,
 		elm_progress_spinner => undef,
+		elm_voice_spinner => undef,
 		ecore_timer => undef,
 		events => {},
 		voice_pointers => [],
@@ -98,7 +99,16 @@ sub init_ui {
     $box->pack_end($progress_spinner);$progress_spinner->show();
     $self->elm_progress_spinner($progress_spinner);
 
-    
+    my $voice_label = pEFL::Elm::Label->new($box);
+    $voice_label->text_set("Y-Scroll to Voice");
+    $voice_label->show(); $box->pack_end($voice_label);
+	
+    my $voice_spinner = pEFL::Elm::Spinner->add($box);
+    $voice_spinner->min_max_set(0,64);
+    $voice_spinner->value_set(1);
+    $voice_spinner->show();$box->pack_end($voice_spinner);
+    $self->elm_voice_spinner($voice_spinner);
+	
     my $renderer_error_b = pEFL::Elm::Button->add($box);
     $renderer_error_b->text_set("No errors");
     $box->pack_end($renderer_error_b); $renderer_error_b->show();
@@ -190,12 +200,11 @@ sub generate_mid {
     }
     
     my $video = $self->elm_video;
-    $video->stop();
-    $video->file_set("");
+    $video->pause();
+    #$video->file_set("");
     $video->file_set($self->midi_file);
-    $video->play_position_set(0);
-    $self->elm_progress_spinner->value_set(0);
-    $video->pause;
+    #$video->play_position_set(0);
+    #$self->elm_progress_spinner->value_set(0);
 }
 
 sub change_pos {
@@ -218,6 +227,8 @@ sub _pos_update {
 	$progress_spinner->min_max_set(0,$duration);
 	$progress_spinner->value_set($position);
 	
+	my $scroll_y = 0;
+	
 	my $key = sprintf("%.1f",$position);
 	
 	if ( defined( $self->{events}->{$key} ) ) {
@@ -230,11 +241,20 @@ sub _pos_update {
 	    my ($vx,$vy,$vw,$vh) = $viewer->geometry_get();
 	    my $region_x=0; my $region_y=0; my $region_w=0; my $first_pointer_per_pos_y=undef; 
 	    foreach my $event (@$events) {
+		my $voice_spinner = $self->elm_voice_spinner();
+		my $follow_voice = $voice_spinner->value_get() || 1;
+	
 	        # We added the ABC file some commands (e.g. %%fullsvg 1, %%musicfont etc)
 	        # TODO: Save the added value as istart? DONE with preview_beginabc_length, istn't it?
 	        my $renderer = $self->app->renderer();
 	        my $istart = $event->{istart} + $renderer->preview_beginabc_length();
 	        my $voice = $event->{voice};
+	
+		if ($voice == $follow_voice-1) {
+	    		#print "Following Voice $voice to $follow_voice\n";
+				$scroll_y = 1;
+		}
+
 	        my @pointers = @{$self->{voice_pointers}};
 	        my %notes = %{$preview->{notes}}; 
 	        my $note = $notes{$istart};
@@ -256,13 +276,16 @@ sub _pos_update {
 			$region_x = $x-$vx-($vw/4) if ($x>$region_x);
 			# This is tricky: We don't want that the pointer jumps up and down on multiple voices
 			# so never jump up 
-			$region_y = $y-$vy-($vh/4) if ($y>$region_y);
-			if ($region_y < $region_old_y) {
-				$region_y = $region_old_y;
-			}
+			
+				$region_y = $y-$vy-($vh/4) if ($y>$region_y);
+				#if ($region_y < $region_old_y) {
+				#	$region_y = $region_old_y;
+				#}
+			
 			
 			# and use only the first pointer per position as anchor to center scrolling
-			unless (defined($first_pointer_per_pos_y)) {				
+			#unless (defined($first_pointer_per_pos_y)) {
+			if ($voice == $follow_voice-1) {				
 				$first_pointer_per_pos_y = $region_y;
 			}
 			
@@ -285,8 +308,13 @@ sub _pos_update {
 	        }
 	    }
 	    
-	    $region_old_y = $first_pointer_per_pos_y;
-	    $preview->elm_scroller->region_show($region_x, $first_pointer_per_pos_y, $vw/2,$vh/2);
+		if ($scroll_y) {
+	    	$region_old_y = $first_pointer_per_pos_y;
+			$preview->elm_scroller->region_show($region_x, $first_pointer_per_pos_y, $vw/2,$vh/2);
+		}
+		else {
+			$preview->elm_scroller->region_show($region_x, $region_old_y, $vw/2,$vh/2);
+		}
 	}
 }
 
