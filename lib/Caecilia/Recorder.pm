@@ -59,9 +59,7 @@ sub new {
 
 sub show_record_dialog {
 	my ($self) = @_;
-	my $new_win = pEFL::Elm::Win->add($self->app->elm_mainwindow(), "New abc file", ELM_WIN_BASIC);
-	$new_win->title_set("Record Midi");
-	$new_win->focus_highlight_enabled_set(1);
+	my $new_win = pEFL::Elm::Win->util_dialog_add($self->app->elm_mainwindow(), "New abc file", "Record Midi");
 	$new_win->autodel_set(1);
 	
 	my $bg = pEFL::Elm::Bg->add($new_win);
@@ -243,9 +241,7 @@ sub stop_recording {
 sub show_recording_finished_dialog {
 	my ($self) = @_;
 	
-	my $new_win = pEFL::Elm::Win->add($self->app->elm_mainwindow(), "Recording finished", ELM_WIN_BASIC);
-	$new_win->title_set("Recording finished");
-	$new_win->focus_highlight_enabled_set(1);
+	my $new_win = pEFL::Elm::Win->util_dialog_add($self->app->elm_mainwindow(), "Recording finished", "Recording finished");
 	$new_win->autodel_set(1);
 	
 	my $bg = pEFL::Elm::Bg->add($new_win);
@@ -300,9 +296,7 @@ sub record_again {
 
 sub show_import_midi_dialog {
 	my ($self) = @_;
-	my $new_win = pEFL::Elm::Win->add($self->app->elm_mainwindow(), "Import Midi", ELM_WIN_BASIC);
-	$new_win->title_set("Import Midi");
-	$new_win->focus_highlight_enabled_set(1);
+	my $new_win = pEFL::Elm::Win->util_dialog_add($self->app->elm_mainwindow(), "Import Midi", "Import Midi");
 	$new_win->autodel_set(1);
 	
 	my $bg = pEFL::Elm::Bg->add($new_win);
@@ -474,9 +468,7 @@ sub select_midi_file {
 	my $toplevel = $obj->top_widget_get();
 	bless($toplevel,"ElmWinPtr");
 	
-	my $new_win = pEFL::Elm::Win->add($toplevel, "Select Midi file", ELM_WIN_BASIC);
-	$new_win->title_set("Select Midi file");
-	$new_win->focus_highlight_enabled_set(1);
+	my $new_win = pEFL::Elm::Win->util_dialog_add($toplevel, "Select Midi file", "Select Midi file");
 	$new_win->autodel_set(1);
 	
 	my $bg = pEFL::Elm::Bg->add($new_win);

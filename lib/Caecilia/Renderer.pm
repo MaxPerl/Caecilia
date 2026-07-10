@@ -281,9 +281,7 @@ sub render_abcm2ps {
 	
 	# TODO:
 	# if generating preview doesn't work, show an error dialog
-	my $popup = pEFL::Elm::Win->add($app->elm_mainwindow(), "Render abc", ELM_WIN_BASIC);
-	$popup->title_set("Render completed");
-	$popup->focus_highlight_enabled_set(1);
+	my $popup = pEFL::Elm::Win->util_dialog_add($app->elm_mainwindow(), "Render abc", "Render completed");
 	$popup->autodel_set(1);
 	
 	my $bg = pEFL::Elm::Bg->add($popup);
@@ -328,9 +326,7 @@ sub show_dialog {
 	
 	my $app = $self->app();
 	
-	my $render_win = pEFL::Elm::Win->add($app->elm_mainwindow(), "Render abc", ELM_WIN_BASIC);
-	$render_win->title_set("Render");
-	$render_win->focus_highlight_enabled_set(1);
+	my $render_win = pEFL::Elm::Win->util_dialog_add($app->elm_mainwindow(), "Render abc", "Render");
 	$render_win->autodel_set(1);
 	$self->elm_render_win($render_win);
 	

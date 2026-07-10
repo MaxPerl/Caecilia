@@ -42,9 +42,7 @@ sub show_dialog {
 	
 	my $app = $self->app();
 	
-	my $settings_win = pEFL::Elm::Win->add($app->elm_mainwindow(), "Settings", ELM_WIN_BASIC);
-	$settings_win->title_set("Settings");
-	$settings_win->focus_highlight_enabled_set(1);
+	my $settings_win = pEFL::Elm::Win->util_dialog_add($app->elm_mainwindow(), "Settings", "Settings");
 	$settings_win->autodel_set(1);
 	$self->elm_settings_win($settings_win);
 	
