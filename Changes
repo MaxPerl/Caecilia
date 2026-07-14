@@ -1,5 +1,13 @@
 Revision history for Perl extension Caecilia.
 
+0.27
+	- Fix background in Dialogs	
+	- Fix MIDI playback:
+	  - always create a new Elm_Video (and so a new GStreamer Pipeline)
+	    so no "autoplay" when generating a new MIDI file
+	  - save position when generating a new MIDI file
+	  - hide always voice pointers when pausing / finishing / generating new midi file
+	  - Fix Y-Scrolling (follow only one [user-selected] voice)
 0.26
 	- Add Recorder / Import MIDI functionality
 	- some code cleaning

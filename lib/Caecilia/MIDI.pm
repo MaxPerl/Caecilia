@@ -41,6 +41,8 @@ sub new {
 		voice_pointers => [],
 		preview_scale_factor => 1,
 		is_finished => 0,
+		saved_pos => 0,
+		video_del => undef,
 		};
 	
 	bless($obj,$class);
@@ -64,7 +66,6 @@ sub init_ui {
     $box->pack_end($mid_b); $mid_b->show();
 
     my $video = pEFL::Elm::Video->add($box);
-    $video->size_hint_weight_set(EVAS_HINT_EXPAND,EVAS_HINT_EXPAND);
     $self->elm_video($video);
 
     # basic tutorial code
@@ -79,16 +80,16 @@ sub init_ui {
     # basic text button
     my $play_b = pEFL::Elm::Button->new($box);
     my $icon_play = pEFL::Elm::Icon->add($play_b);
-	$icon_play->standard_set("media-playback-start");
-	$play_b->part_content_set("icon",$icon_play);
+    $icon_play->standard_set("media-playback-start");
+    $play_b->part_content_set("icon",$icon_play);
     $box->pack_end($play_b);$play_b->show();
 
     # basic tutorial code
     # basic text button
     my $forward_b = pEFL::Elm::Button->new($box);
     my $icon_forward = pEFL::Elm::Icon->add($forward_b);
-	$icon_forward->standard_set("media-seek-forward");
-	$forward_b->part_content_set("icon",$icon_forward);
+    $icon_forward->standard_set("media-seek-forward");
+    $forward_b->part_content_set("icon",$icon_forward);
     $box->pack_end($forward_b);$forward_b->show();
 
     my $progress_spinner = pEFL::Elm::Slider->add($box);
@@ -118,6 +119,7 @@ sub init_ui {
     $emotion->smart_callback_add("position_update",\&_pos_update,$self);
     #$emotion->smart_callback_add("length_change",\&_pos_update,$self);
     $emotion->smart_callback_add("playback_finished",\&_playback_finished_cb,$self);
+    $emotion->smart_callback_add("open_done",\&_open_done_cb,$self);
 
     $mid_b->smart_callback_add("clicked" => \&generate_mid, $self);
     $play_b->smart_callback_add("clicked" => \&play, $self);
@@ -125,29 +127,31 @@ sub init_ui {
     $forward_b->smart_callback_add("clicked" => \&forward, $video);
     $renderer_error_b->smart_callback_add("clicked" => \&Caecilia::Renderer::show_errors, $self->app->renderer);
 
-    $progress_spinner->smart_callback_add("changed" => \&change_pos, $video);
+    $progress_spinner->smart_callback_add("changed" => \&change_pos, $self);
 
     $main_box->pack_end($box); $box->show();
+}
 
+sub _open_done_cb {
+    my ($data, $obj, $ev) = @_;
+    $data->hide_voice_pointers;
+    $obj->position_set($data->saved_pos());
+    $data->video_del()->del; 
+    $data->video_del(undef);
 }
 
 sub _playback_finished_cb {
     my ($self, $em, $event) = @_;
     
     my $video = $self->elm_video();
-    #$video->file_set("");
-    #$video->file_set($self->midi_file);
-    #$video->play_position_set(0);
-    #$self->elm_progress_spinner->value_set(0);
-    #$video->stop();
-    #$video->pause();
-    $video->pause();
+    $video->emotion_get->play_set(0);
+    $self->hide_voice_pointers;
     $self->is_finished(1);
 }
 
 sub generate_mid {
     my ($self) = @_;
-    
+
     # Clear old-files
 	if (-e $self->midi_file) {
 		unlink $self->midi_file or die "Coud not unlink MIDI File\n";
@@ -167,17 +171,17 @@ sub generate_mid {
     undef @{ $self->voice_pointers };
     
     # Get the text of the entry and add a white background to the preview.abc
-	my $text = $self->app->entry->elm_entry->entry_get();
-	# convert $text to utf8
-	$text = pEFL::Elm::Entry::markup_to_utf8($text);	
-	$text = Encode::decode("utf-8",$text);
+    my $text = $self->app->entry->elm_entry->entry_get();
+    # convert $text to utf8
+    $text = pEFL::Elm::Entry::markup_to_utf8($text);	
+    $text = Encode::decode("utf-8",$text);
 	
-	# Scale stylesheet directive isn't supported in preview
-	#$text =~ s/%%scale.*\n//g if ($opts{mode} eq 'preview');
-	# create new files for preview	
-	open my $fh, ">:encoding(utf8)", $self->abc_file() or die "Could not open abc file: $!\n";
-	print $fh "$text";
-	close $fh;
+    # Scale stylesheet directive isn't supported in preview
+    #$text =~ s/%%scale.*\n//g if ($opts{mode} eq 'preview');
+    # create new files for preview	
+    open my $fh, ">:encoding(utf8)", $self->abc_file() or die "Could not open abc file: $!\n";
+    print $fh "$text";
+    close $fh;
     
     my $preview = $self->app->preview;
     $preview->render_preview($self->app->tmpdir . "/preview");
@@ -198,17 +202,37 @@ sub generate_mid {
     	my ($score, $end_time) = MIDI::Score::events_r_to_score_r($track->events_r);
     	$play_length = $end_time / 100 if ( ($end_time / 100) > $play_length);
     }
-    
+
+    # To create a new GSTREAMER PIPELINE (and no auto playback when generating new midi file!!!)
+    # Create a new Elm Video
+
+    # First save position    
     my $video = $self->elm_video;
-    $video->pause();
-    #$video->file_set("");
-    $video->file_set($self->midi_file);
-    #$video->play_position_set(0);
-    #$self->elm_progress_spinner->value_set(0);
+    my $pos = $video->play_position_get();
+    $video->stop();
+    $self->saved_pos($pos);
+
+    # IMPORTANT: We cannot delete video here (otherwise we get a segfault)
+    # So do it, when the new file was opened in the new (!) Elm_Video
+    # (see open_done_cb)
+    $self->video_del($video);
+
+    # Here we create our new Elm_Video
+    my $box = $self->elm_midibar();
+    my $video_new = pEFL::Elm::Video->add($box);
+    $self->elm_video($video_new);
+
+    my $emotion = $video_new->emotion_get();
+    $emotion->smart_callback_add("position_update", \&_pos_update, $self);
+    $emotion->smart_callback_add("playback_finished", \&_playback_finished_cb, $self);
+    $emotion->smart_callback_add("open_done", \&_open_done_cb, $self);
+
+    $emotion->file_set($self->midi_file);
 }
 
 sub change_pos {
-    my ($video, $spinner, $event_info) = @_;
+    my ($self, $spinner, $event_info) = @_;
+    my $video = $self->elm_video();
     my $pos = $spinner->value_get();
     $region_old_y = 0;
     $video->play_position_set($pos);
@@ -216,6 +240,11 @@ sub change_pos {
 
 sub _pos_update {
 	my ($self, $emotion, $event_info) = @_;
+	
+	# If Emotion is not playing, don't do anything (especially don't show
+	# voice pointers (again))
+	return unless $emotion->play_get(); 
+
 	my $progress_spinner = $self->elm_progress_spinner; 
 	
 	my $position = $emotion->position_get();
@@ -233,25 +262,24 @@ sub _pos_update {
 	
 	if ( defined( $self->{events}->{$key} ) ) {
 	    
-	    my $preview = $self->app->preview();
-	    my $scale_factor = $self->preview_scale_factor();;
+	    	my $preview = $self->app->preview();
+	    	my $scale_factor = $self->preview_scale_factor();;
 	    
-	    my $events = $self->{events}->{$key};
-	    my $viewer = $preview->elm_viewer();
-	    my ($vx,$vy,$vw,$vh) = $viewer->geometry_get();
-	    my $region_x=0; my $region_y=0; my $region_w=0; my $first_pointer_per_pos_y=undef; 
-	    foreach my $event (@$events) {
-		my $voice_spinner = $self->elm_voice_spinner();
-		my $follow_voice = $voice_spinner->value_get() || 1;
+	    	my $events = $self->{events}->{$key};
+	    	my $viewer = $preview->elm_viewer();
+	    	my ($vx,$vy,$vw,$vh) = $viewer->geometry_get();
+	    	my $region_x=0; my $region_y=0; my $region_w=0; my $first_pointer_per_pos_y=undef; 
+	    	foreach my $event (@$events) {
+			my $voice_spinner = $self->elm_voice_spinner();
+			my $follow_voice = $voice_spinner->value_get() || 1;
 	
-	        # We added the ABC file some commands (e.g. %%fullsvg 1, %%musicfont etc)
-	        # TODO: Save the added value as istart? DONE with preview_beginabc_length, istn't it?
-	        my $renderer = $self->app->renderer();
-	        my $istart = $event->{istart} + $renderer->preview_beginabc_length();
-	        my $voice = $event->{voice};
+	        	# We added the ABC file some commands (e.g. %%fullsvg 1, %%musicfont etc)
+	        	# TODO: Save the added value as istart? DONE with preview_beginabc_length, istn't it?
+	        	my $renderer = $self->app->renderer();
+	        	my $istart = $event->{istart} + $renderer->preview_beginabc_length();
+	        	my $voice = $event->{voice};
 	
-		if ($voice == $follow_voice-1) {
-	    		#print "Following Voice $voice to $follow_voice\n";
+			if ($voice == $follow_voice-1) {
 				$scroll_y = 1;
 		}
 
@@ -259,42 +287,34 @@ sub _pos_update {
 	        my %notes = %{$preview->{notes}}; 
 	        my $note = $notes{$istart};
 	        if ($note->{page_nr} != $self->app->preview->page() ) {
-	        	#$self->elm_video->pause();
 	        	$self->app->preview->page($note->{page_nr});
 	        	$self->app->preview->render_preview($self->app->tmpdir . "/preview");
 	        	$region_old_y = 0;
-	        	#$self->elm_video->play();
 	        }
 	        
-            my $canvas = $preview->elm_scroller->evas_get();
+            	my $canvas = $preview->elm_scroller->evas_get();
             
             
 	        my ($sx,$sy,$sh) = $preview->elm_scroller->geometry_get();
 	        my $x = ($scale_factor*$note->{x}) + $vx-2;
-			my $y = ($scale_factor*$note->{y}) + $note->{svg_offset} +$vy;
+		my $y = ($scale_factor*$note->{y}) + $note->{svg_offset} +$vy;
 			
-			$region_x = $x-$vx-($vw/4) if ($x>$region_x);
-			# This is tricky: We don't want that the pointer jumps up and down on multiple voices
-			# so never jump up 
+		$region_x = $x-$vx-($vw/4) if ($x>$region_x);
+		# This is tricky: We don't want that the pointer jumps up and down on multiple voices
+		# so never jump up 	
+		$region_y = $y-$vy-($vh/4) if ($y>$region_y);	
 			
-				$region_y = $y-$vy-($vh/4) if ($y>$region_y);
-				#if ($region_y < $region_old_y) {
-				#	$region_y = $region_old_y;
-				#}
-			
-			
-			# and use only the first pointer per position as anchor to center scrolling
-			#unless (defined($first_pointer_per_pos_y)) {
-			if ($voice == $follow_voice-1) {				
-				$first_pointer_per_pos_y = $region_y;
-			}
+		# and use only the follow voice pointer per position as anchor to center scrolling
+		if ($voice == $follow_voice-1) {				
+			$first_pointer_per_pos_y = $region_y;
+		}
 			
 	        if ($pointers[$voice]) {
 	            my $p = $self->{voice_pointers}->[$voice];
 	            if ($x<$sx || $y < $sy) {
 					$p->hide();
 				}
-				else {
+		    else {
 	            	$p->move(($scale_factor*$note->{x})+$vx-2, ($scale_factor*$note->{y})+$note->{svg_offset}+$vy);
 	            	$p->show();
 	            }
@@ -331,10 +351,19 @@ sub play {
     
     my $emotion = $video->emotion_get();
     if ($emotion->play_get()) {
-		$video->pause()
+		$video->emotion_get->play_set(0);
+		$self->hide_voice_pointers();
 	}
 	else {
 		$video->play()
+	}
+}
+
+sub hide_voice_pointers {
+	my ($self) = @_;
+	my $voice_pointers = $self->voice_pointers();
+	foreach my $p (@$voice_pointers) {
+		$p->hide() if ($p);
 	}
 }
 
@@ -480,7 +509,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|abc_file|events|midi_file|abc2svg_path|preview_scale_factor|voice_pointers|elm_midibar|elm_video|elm_progress_spinner|is_finished|/;
+		unless $AUTOLOAD =~m/app|abc_file|events|midi_file|abc2svg_path|preview_scale_factor|voice_pointers|elm_midibar|elm_video|elm_progress_spinner|is_finished|saved_pos|video_del|/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;
