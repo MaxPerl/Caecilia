@@ -152,7 +152,7 @@ sub _settings_general_create {
 	_add_header($table,6,"Path to midish",1);
 	
 	my $midish_path_en = _add_entry($table,
-		"entry" => $config->{midi2abc_path} || "midish",
+		"entry" => $config->{midish_path} || "midish",
 		"row" => 7);
 	
 	_add_header($table,8,"Path to aseqdump",1);

@@ -939,7 +939,7 @@ __END__
 
 =head1 NAME
 
-Caecilia
+Caecilia - a simple editor for the ABC notation format written in Perl/pEFL
 
 =head1 DESCRIPTION
 
