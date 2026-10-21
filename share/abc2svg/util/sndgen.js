@@ -1,6 +1,6 @@
 // sndgen.js - sound generation
 //
-// Copyright (C) 2019-2025 Jean-Francois Moine
+// Copyright (C) 2019-2026 Jean-Francois Moine
 //
 // This file is part of abc2svg.
 //
@@ -85,9 +85,10 @@ function ToAudio() {
 	// create the starting beats
 	function def_beats() {
 	    var	i, s2, s3, tim,
+		nb,				// number of beats
+		npv = cfmt.playbeats.split(/\s+/),
 		beat = get_beat(),		// time between two beats
 		d = first.p_v.meter.wmeasure,	// duration of a measure
-		nb = d / beat | 0,		// number of beats in a measure
 		v = voice_tb.length,		// beat voice number
 		p_v = {				// voice for the beats
 			id: "_beats",
@@ -119,13 +120,18 @@ function ToAudio() {
 			}]
 		}
 
-		abc_time = -d			// start time of the beat ticks
+		i = Number(npv[0])		// number of measures
+		if (!isNaN(i))
+			d *= i
+		i = Number(npv[1])		// drum instrument
+		if (!isNaN(i))
+			s.notes[0].midi = i
 
 		// check for an anacrusis
 		for (s2 = first; s2; s2 = s2.ts_next) {
 			if (s2.bar_type && s2.time) {
-				nb = (2 * d - s2.time) / beat | 0
-				abc_time -= d - s2.time
+				nb = (d + first.p_v.meter.wmeasure - s2.time) / beat | 0
+				abc_time = -beat * nb	// start time of the beat ticks
 				break
 			}
 		}
@@ -219,11 +225,9 @@ function ToAudio() {
 		// and put the reverse pointers in the P: symbols
 		s.p_s = []			// pointers to the parts
 		while (1) {
-			if (!s.ts_next) {
-				s.part1 = first	// end of tune = end of part
-				break
-			}
 			s = s.ts_next
+			if (!s)
+				break
 			if (s.part) {
 				s.part1 = first		// reverse pointer
 				v = s.part.text[0]	// 1st letter only
@@ -237,39 +241,36 @@ function ToAudio() {
 
 	// update the time linkage when the start time has changed
 	function relink(s, dt) {
-	    var	s2 = s.ts_next
+	    var	s2
 
 		s.time += dt			// update time and duration
 		if (s.dur)
 			s.dur -= dt
 		s.seqst = 1 //true		// new time sequence
-		if (s.ts_next)
-			s.ts_next.seqst = 1 //true
 
-		s2 = s
 		if (dt < 0) {			// if move backwards the grace notes
+			s2 = s
 			do {
 				s2 = s2.prev
 			} while (s2 && !s2.dur)
 			if (s2) {
 				s2.dur += dt
 				s2.pdur = s2.dur / play_fac
-				s2 = s2.ts_next
-				if (s2 == s)
-					s2 = null	// no linkage change
+				while (s2 && s2.time >= s.time)
+					s2 = s2.prev
+				if (s2)
+					s2 = s2.next
 			}
 		} else {
-			if (!s.ts_next) {
-				s2 = null
-			} else {
+			s2 = s.ts_next
+			while (s2 && s2.time < s.time)
 				s2 = s2.ts_next
-				while (s2 && !s2.seqst)
-					s2 = s2.ts_next
-			}
 		}
 
 		// update the time linkage
-		if (s2) {
+		if (s2
+		 && s2 != s
+		 && s2 != s.ts_next) {
 			s.ts_prev.ts_next = s.ts_next	// remove from the time linkage
 			if (s.ts_next)
 				s.ts_next.ts_prev = s.ts_prev
@@ -288,9 +289,9 @@ function ToAudio() {
 	// generate the grace notes
 	function gen_grace(s) {
 		if (s.midgen)
-			return				// generation already done
+			return s			// generation already done
 		s.midgen = 1 //true
-	    var	g, i, n, t, d, prev,
+	    var	g, i, n, t, d, prev, s2,
 		next = s.next
 
 //fixme: assume the grace notes in the sequence have the same duration
@@ -313,6 +314,9 @@ function ToAudio() {
 			} else {
 				d = prev.dur / 2
 			}
+			if (s.fmt.gracedur != null)
+				d *= s.fmt.gracedur
+			s2 = s.ts_next			// (the grace note will move)
 			relink(s, -d)
 			s.ptim -= d / play_fac
 
@@ -330,9 +334,14 @@ function ToAudio() {
 			if (s.sappo		// (appogiatura at start of tune!)
 			 && d > C.BLEN / 16)
 				d = C.BLEN / 16
+			if (s.fmt.gracedur != null)
+				d *= s.fmt.gracedur
 			relink(next, d)
+			s2 = s.ts_next			// (the normal note moved)
 		}
 
+		s.dur = d
+		s.pdur = d / play_fac
 		d /= n * play_fac
 		t = 0
 		for (g = s.extra; g; g = g.next) {
@@ -340,6 +349,7 @@ function ToAudio() {
 			g.pdur = d
 			t += d
 		}
+		return s2.ts_prev
 	} // gen_grace()
 
 	// change the tempo
@@ -394,9 +404,17 @@ function ToAudio() {
 
 	// add() main
 
+	// if %%playswing, change the couples of 8th notes
+	if (abc2svg.swing)			// if the module is loaded
+		abc2svg.swing.swing(first, voice_tb, cfmt)
+
 	// if some chord stuff, set the accompaniment data
 	if (cfmt.chord)
-		abc2svg.chord(first, voice_tb, cfmt)
+		abc2svg.genchrd(first, voice_tb, cfmt)
+
+	// if some drum stuff, generate the drum sequences
+	if (cfmt.drum)
+		abc2svg.gendrum(s, voice_tb, cfmt)
 
 	// if %%playbeats, create the sounds
 	s_m = first.p_v.meter			// current meter
@@ -451,6 +469,7 @@ function ToAudio() {
 				s.rep_p = rst		// :| to |:
 				if (rst == rsk[0])
 					s.rep_v = rsk	// to know the number of variants
+			    if (!s.text)		// if no :|2
 				rst = s			// possible restart (..:|..:|)
 			}
 
@@ -460,6 +479,8 @@ function ToAudio() {
 				if (b_typ & 1)
 					break
 				b_typ |= 1
+				if (s.bar_type.slice(-1) == ':')
+					rst = s
 				s.rep_s = rsk = [rst]	// repeat skip
 							// and memorize the restart
 				if (rst.bar_type
@@ -486,10 +507,7 @@ function ToAudio() {
 			}
 			break
 		case C.GRACE:
-			d = s.ts_next			// the grace note may move
-			gen_grace(s)
-			if (d)
-				s = d.ts_prev
+			s = gen_grace(s)
 			break
 		case C.REST:
 		case C.NOTE:
@@ -535,6 +553,7 @@ function ToAudio() {
 //  - stim: start time
 //  - repn: don't repeat
 //  - repv: variant number
+//  - repp: current left repeat
 //  - timouts: array of the current timeouts
 //		this array may be used by the upper function in case of hard stop
 //  - p_v: voice table used for MIDI control
@@ -663,12 +682,6 @@ abc2svg.play_next = function(po) {
 		return s
 	} // var_end()
 
-	if (po.stop) {
-		if (po.onend)
-			po.onend(po.repv)
-		return
-	}
-
 	while (s.noplay) {
 		s = s.ts_next
 		if (!s || s == po.s_end) {
@@ -689,81 +702,56 @@ abc2svg.play_next = function(po) {
 
 	maxt = t + po.tgen		// max time = now + 'tgen' seconds
 	po.timouts = []
+	s2 = null			// used when time jump
+
 	while (1) {
-		switch (s.type) {
-		case C.BAR:
-			s2 = null
-			if (s.rep_p) {		// right repeat
-				po.repv++
-				if (!po.repn	// if repeat a first time
-				 && (!s.rep_v	// and no variant (anymore)
-				  || po.repv <= s.rep_v.length)) {
-					s2 = s.rep_p	// left repeat
-					po.repn = true
-				} else {
-					if (s.rep_v)
-						s2 = var_end(s)
-					po.repn = false
-					if (s.bar_type.slice(-1) == ':') // if ::
-						po.repv = 1
-				}
-			}
-			if (s.rep_s) {			// first variant
-				s2 = s.rep_s[po.repv]	// next variant
-				if (s2) {
-					po.repn = false
-					if (s2 == s)
-						s2 = null
-				} else {		// end of variants
-					s2 = var_end(s)
-					if (s2 == po.s_end)
-						break
-				}
-			}
-			if (s.bar_type.slice(-1) == ':' // left repeat
-			 && s.bar_type[0] != ':')	// but not ::
-				po.repv = 1
 
-			if (s2) {			// if skip
-				po.stim += (s.ptim - s2.ptim) / po.conf.speed
-				s = s2
-				while (s && !s.dur)
-					s = s.ts_next
-				if (!s)
-					break		// no ending variant
-				t = po.stim + s.ptim / po.conf.speed
-				break
-			}
-
-		    if (!s.part1) {
-			while (s.ts_next && !s.ts_next.seqst) {
-				s = s.ts_next
-				if (s.part1)
-					break
-			}
-			if (!s.part1)
-				break
-		    }
-			// fall thru
-		default:
-			if (s.part1				// if end of part
-			 && po.i_p != undefined) {
-				s2 = s.part1.p_s[++po.i_p]	// next part
-				if (s2) {
-					po.stim += (s.ptim - s2.ptim) / po.conf.speed
-					s = s2
-					t = po.stim + s.ptim / po.conf.speed
-				} else {
-					s = po.s_end
-				}
-				po.repv = 1
-			}
-			break
+		// check if end of part
+		if ((!s || s.part1)
+		 && po.i_p != undefined) {
+			s2 = po.ps[++po.i_p]
+			if (!s2)
+				s = s2 = null
 		}
-	    if (s && s != po.s_end && !s.noplay) {
+
+		// handle the time jumps
+		if (po.s_loop
+		 && (!s || s == po.s_end)
+		 && !po.stop) {
+			s2 = po.s_loop.ts_next
+			if (s2?.p_v.id == "_beats") {
+				while (s2?.p_v.id == "_beats")
+					s2 = s2.ts_next
+			}
+		}
+
+		if (s2) {
+			s = s2
+			s2 = null
+			po.stim = t - s.ptim / po.conf.speed
+			t = po.stim + s.ptim / po.conf.speed // next time
+			while (s && !s.dur)
+				s = s.ts_next
+		}
+
+		if (!s || s == po.s_end		// check if end of playback
+		 || po.stop) {
+			if (po.onend)
+				setTimeout(po.onend,
+					(t - now + d) * 1000,
+					po.repv)
+			po.s_cur = s
+			return
+		}
+		if (s.noplay) {
+			s = s.ts_next		// skip display only symbols
+			continue
+		}
+		if (t > maxt)
+			break			// let's sleep
+
+		// do the sounding stuff
 		switch (s.type) {
-		case C.BAR:
-			break
 		case C.BLOCK:
 			if (s.subtype == "midictl") {
 				po.midi_ctrl(po, s, t)
@@ -825,23 +813,60 @@ abc2svg.play_next = function(po) {
 			}
 			break
 		}
-	    }
-		while (1) {
-			if (!s || s == po.s_end || !s.ts_next) {
-				if (po.onend)
-					setTimeout(po.onend,
-						(t - now + d) * 1000,
-						po.repv)
-				po.s_cur = s
-				return
+		if (!s.bar_type) {
+			if (s.ts_next) {
+				s = s.ts_next
+				if (s.ptim != s.ts_prev.ptim)
+					t = po.stim + s.ptim / po.conf.speed
+			} else {
+			    if (s.p_dur)
+				t += s.pdur / po.conf.speed
+				s = null
 			}
-			s = s.ts_next
-			if (!s.noplay)
-				break
+			continue
 		}
-		t = po.stim + s.ptim / po.conf.speed // next time
-		if (t > maxt)
-			break
+		if (s.rep_p) {			// right repeat
+			if (s.rep_p != po.repp) {	// the left repeat changes
+				po.repv = 1
+				po.repp = s.rep_p
+			}
+			if (s.rep_v) {		// if variants
+				n = s.rep_v.length
+			} else {		// else number of ':'s
+				n = s.bar_type.match(/(:+)[|[\]]/)
+				n = (n ? n[1].length : 1) + 2
+			}
+			if (++po.repv < n) {
+				po.repn = true
+				s2 = s.rep_p	// left repeat
+				continue
+			}
+			po.repn = false
+			po.repv = 1
+		}
+		if (s.bar_type.slice(-1) == ':')	// left repeat
+			po.repv = 1
+		if (s.rep_s) {			// variant
+			s2 = s.rep_s[po.repv]	// next variant
+			if (s2) {
+				if (s2.rep_p			// same left repeat?
+				 && s2.rep_p != po.repp) {
+					po.repv = 1
+					po.repp = s2.rep_p	// no, update
+					s2 = s.rep_s[po.repv]
+				}
+				po.repn = false
+				if (s2 != s)
+					continue
+				s2 = null
+			} else {		// end of variants
+				s2 = var_end(s)
+				continue
+			}
+		}
+		do {
+			s = s.ts_next		// eat the next bars
+		} while (s && !s.seqst)
 	}
 	po.s_cur = s
 
@@ -858,6 +883,7 @@ abc2svg.play_next = function(po) {
 	for (s = po.s_cur; s; s = s.ts_prev) {
 		if (s.parts) {
 			po.i_p = -1
+			po.ps = s.p_s
 			return
 		}
 		s_p = s.part1
@@ -865,7 +891,9 @@ abc2svg.play_next = function(po) {
 			continue
 		for (i = 0; i < s_p.p_s.length; i++) {
 			if (s_p.p_s[i] == s) {
-				po.i_p = i	// index in the parts
+				po.i_p = i - (po.s_cur == s ? 1 : 0)
+						// index in the parts
+				po.ps = s_p.p_s	// array of pointers to P:
 				return
 			}
 		}
@@ -873,6 +901,12 @@ abc2svg.play_next = function(po) {
     } // get_part()
 
     // --- play_next ---
+	if (po.stop) {
+		if (po.onend)
+			po.onend(po.repv)
+		return
+	}
+
 	get_part(po)
 
 	po.stim = po.get_time(po) + .3	// start time + 0.3s

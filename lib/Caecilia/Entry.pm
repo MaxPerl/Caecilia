@@ -127,7 +127,7 @@ sub init_entry {
 	$en->markup_filter_append(\&tabs_to_whitespaces, $self);
 	
 	$en->event_callback_add(EVAS_CALLBACK_KEY_DOWN, \&on_key_down, $self);
-	$en->event_callback_add(EVAS_CALLBACK_MOUSE_DOWN, \&line_column_get_mouse, $self);
+	$en->event_callback_add(EVAS_CALLBACK_MOUSE_UP, \&line_column_get_mouse, $self);
 	#$en->smart_callback_add("selection,paste" => \&paste_selection, $self);
 	$en->smart_callback_add("changed,user" => \&changed, $self);
 	$en->smart_callback_add("text,set,done" => \&text_set_done, $self);
@@ -870,18 +870,20 @@ sub column_get {
 
 sub line_get {
 	my ($self) = @_;
-	
+
 	my $en = $self->elm_entry();
-	
+	my $lines = 1;
+
 	my $textblock = $en->textblock_get();
 	my $cp1 = pEFL::Evas::TextblockCursor->new($textblock);
 	$cp1->pos_set($en->cursor_pos_get);
-	
-	my ($lines, $x,$y,$w,$h,$dir) = $cp1->line_geometry_get();
-	$lines = $lines+1;
-	
+
+	while ($cp1->paragraph_prev()) {
+		$lines++;
+	}
+
 	$cp1->free();
-		
+
 	return $lines;
 }
 
@@ -1088,7 +1090,12 @@ sub select_deco {
 	$bx->pack_end($btn);
 
 	$win->resize_object_add($bx);
-	$win->resize(250,200);
+	if ($deco_type eq "dynamics" || $deco_type eq "articulations" || $deco_type eq "range decos") {
+		$win->resize(250,400);
+	}
+	else {
+		$win->resize(250,200);
+	}
 	
 	$win->show();
 	

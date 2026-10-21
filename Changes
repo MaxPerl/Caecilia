@@ -1,5 +1,14 @@
 Revision history for Perl extension Caecilia.
 
+0.28_01
+	- Minor fixes and Code cleaning
+	- Fix MIDI recording (give tempo (t) before mins and as integer to midish)
+	- Add pdf and svg Export by abc2svg / internal preview engine
+	- Mage topmargin and bottommargin possible in internal preview engine
+	- Fix line_get() in Entry.pm
+	- Update abc2svg to 1.23.6
+	- Refactor and fix MIDI playback code
+	- Fix overlapping note rect Problem
 0.27
 	- Fix background in Dialogs	
 	- Fix MIDI playback:
@@ -7,7 +16,7 @@ Revision history for Perl extension Caecilia.
 	    so no "autoplay" when generating a new MIDI file
 	  - save position when generating a new MIDI file
 	  - hide always voice pointers when pausing / finishing / generating new midi file
-	  - Fix Y-Scrolling (follow only one [user-selected] voice)
+	  - Fix Y-Scrolling (follow only one [user-selected] voice) 
 0.26
 	- Add Recorder / Import MIDI functionality
 	- some code cleaning

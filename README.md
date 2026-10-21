@@ -17,9 +17,11 @@ Therefore you need the following libraries and perl modules:
 
 * pEFL
 * Source::SyntaxHighlight
+* XML-LibXML
 * Image::Info
 * File::ShareDir
 * File::HomeDir
+* meta
 * Convert::Color
 * HTML::Entities
 * MIDI

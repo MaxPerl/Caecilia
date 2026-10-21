@@ -205,9 +205,9 @@ sub run_midish {
     
     print $child_in "dnew 0 \"".$device."\" rw\n";
     print $child_in "g 0\n";
+    print $child_in "t ".int($self->midi_tempo())."\n";
     print $child_in "tnew mytrack\n";
     print $child_in "mins ".$self->midi_bars()." {$measure}\n";
-    print $child_in "t ".$self->midi_tempo()."\n";
     print $child_in "m on\n";
     print $child_in "r\n";
     

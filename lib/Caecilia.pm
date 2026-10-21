@@ -614,9 +614,10 @@ sub on_exit {
 }
 
 sub file_cb {
-	my ($self) = @_;
+	my ($self, $save) = @_;
 	
-	my $fs_win = pEFL::Elm::Win->util_dialog_add($self->elm_mainwindow(), "Open a File", "Open a file");
+	my $title = $save ? "Save a File" : "Open a file";
+	my $fs_win = pEFL::Elm::Win->util_dialog_add($self->elm_mainwindow(), $title, $title);
 	$fs_win->autodel_set(1);
 	
 	my $vbox = pEFL::Elm::Box->add($fs_win);
@@ -676,7 +677,7 @@ sub _open_cb {
 sub save_as {
 	my ($self) = @_;
 	
-	my $fs = $self->file_cb;
+	my $fs = $self->file_cb("save");
 	
 	$fs->is_save_set(1);
 	$fs->smart_callback_add("done", \&_fs_save_done, $self);

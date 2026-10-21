@@ -191,7 +191,12 @@ sub generate_mid {
     
     my $notes = $self->to_notes();
     $self->generate_events($notes);
-    $self->to_midi($notes);
+    my ($success, $midi_errors) = $self->to_midi($notes);
+
+	if (!$success) {
+    	$self->app->_show_info("MIDI creation error:", join("<br>", @$midi_errors));
+		return;
+	}
 	
     my $opus = MIDI::Opus->new({'from_file' => $self->midi_file});
     
@@ -228,6 +233,10 @@ sub generate_mid {
     $emotion->smart_callback_add("open_done", \&_open_done_cb, $self);
 
     $emotion->file_set($self->midi_file);
+    
+    if (@$midi_errors) {
+    	$self->app->_show_info("MIDI creation error:", join("<br>", @$midi_errors));
+	}
 }
 
 sub change_pos {
@@ -393,34 +402,85 @@ sub to_notes {
     my $val = JavaScript::QuickJS->new()
         ->set_globals(path => $self->abc2svg_path(), abc_file => $self->abc_file)
         ->os()->std()->helpers()->eval(js());
-    return $val;
+    
+    # Save abc2svg Errors for the Show Errors button of Renderer
+    my @abc2svg_errors = @{ $val->{errors} };
+	my $abc2svg_errors = "";
+	foreach my $error (@abc2svg_errors) {
+		$error =~ s/.*\://;
+		$error =~ m/(\d+),\d+$/;
+		# The first Line is in Caecilia 1 (not 0 as in Elm_Entry)!! 
+		#So add 1 to the line_nr of abc2svg
+		my $line_nr = $1 + 1;
+		$error =~ s/\d+,(\d+)$/$line_nr,$1/;
+		$abc2svg_errors = $abc2svg_errors . "<br/>" . $error;
+	}
+	
+	print "ERROR MSG $abc2svg_errors\n";
+	$self->app->renderer->error_message($abc2svg_errors);
+	if ($abc2svg_errors) {
+		$self->app->renderer->elm_error_btn->text_set("Show Errors");
+	}
+	else {
+		$self->app->renderer->elm_error_btn->text_set("No Errors");
+	}
+    
+    return $val->{output};
+}
+
+# Parst eine Notenzeile der JS-Ausgabe (to_notes).
+# Spalten: time instr channel pitch duration voice istart
+# Liefert eine leere Liste, wenn die Zeile keine Note ist (Kommentare, "v:"-Zeilen
+# haben keine Tab-getrennten Felder und fallen ueber den voice-Check raus).
+# $istart kann undef sein (Note ohne Position im ABC-Quelltext).
+sub _parse_note_line {
+    my ($line) = @_;
+
+    return if $line =~ m/^\s*#/;
+
+    my ($time, $instr, $channel, $pitch, $duration, $voice, $istart) = split(/\t/, $line);
+    return unless defined($voice) && length($voice);
+
+    $time =~ s/^\s+//;    # Notenzeilen beginnen mit einem Leerzeichen
+    return unless length($time) && length($channel) && length($pitch) && length($duration);
+
+    # Unterstimmen (0.1, 1.1, ...) kommen in den Track ihrer Hauptstimme.
+    # Den Channel der Hauptstimme gibt abc2svg ihnen schon selbst.
+    $voice =~ s/\..*$//;
+
+    $istart =~ s/\s+$// if defined($istart);
+
+    return ($time, $instr, $channel, $pitch, $duration, $voice, $istart);
 }
 
 sub generate_events {
     my ($self, $notes) = @_;
-    
+
     my %events;
-    foreach my $line ( split(/\n/,$notes) ) {
-        $line =~ m/\s*(\d+)\t\d*\t\d*\t\d*\t(\d*)\t(\d*)/;
-        my $time = $1; 
-        $time = $time/100; $time = sprintf("%.1f",$time);
-        my $voice = $2;
-        my $istart = $3;
-        
+    my $offset = $self->app->renderer->preview_beginabc_length();
+
+    foreach my $line (split(/\n/, $notes)) {
+        my ($time, undef, undef, undef, undef, $voice, $istart) = _parse_note_line($line);
+        next unless defined($time);
+
+        # Ohne istart gibt es keine Position im Preview, also nichts zu verlinken
+        next unless defined($istart) && length($istart);
+
+        $time = $time / 100;
+        $time = sprintf("%.1f", $time);
+
         my %event = (voice => $voice, istart => $istart);
-        
-        next unless(defined($istart));
-        if (defined( $events{$time} ) ) {
+
+        if (defined($events{$time})) {
             push @{ $events{$time} }, \%event;
         }
         else {
             $events{$time} = [];
             push @{ $events{$time} }, \%event;
         }
-        
+
         # Add a link to midi position in the notes hash of PREVIEW
-        my $key_of_note = $istart + $self->app->renderer->preview_beginabc_length();
-        $self->app->preview->{notes}->{$key_of_note}->{"midi_position"} = $time;
+        $self->app->preview->{notes}->{ $istart + $offset }->{midi_position} = $time;
     }
     $self->{events} = \%events;
 }
@@ -428,81 +488,148 @@ sub generate_events {
 sub to_midi {
     my ($self, $notes) = @_;
     
-    my %tracks;
-    my @score;
-    my %instruments;
-    my $n;my $i;
-
+    my @midi_errors;     # Meldungen fuer "Show Errors"
+    my %voices_of_channel; # wichtig, um die stummen Stimmen anzuzeigen, falls mehr als 15
+    my @muted_voices; # hier werden für die Ausgabe dann alle stummen Stimmen gespeichert
 
     my @lines = split(/\n/, $notes);
-    
-    my %channels = ("0" => 0);
-    my $last_channel = 0;
-    my %voices = ();
-    
+
+    my %program_of_channel;
+
+    # 1. Programm pro Channel aus den "MIDI program"-Zeilen holen.
+    #    Der Channel kommt von abc2svg (0-basiert, Channel 9 = Drums wird dort
+    #    ausgelassen). Welche Stimme welchen Channel benutzt, steht in den
+    #    Notenzeilen. Channels ohne "MIDI program"-Zeile sind Klavier (0).
     foreach my $line (@lines) {
-    	if ($line =~ m/ v:\d+\s+MIDI program (\d+) (\d+)/ ) {
-            my $voice = $1-1; my $program = $2;
-            
-            $voice =~ s/\..\d//;
-            # Hack: Channel 10 ist for percussion only
-        	$voice = $voice+1 if ($voice == 9);
-            
-            foreach my $channel (keys %channels) {
-            	if ($program == $channels{$channel}) {
-            		$voices{$voice} = $channel;
-            		last;
-            	}
-            }
-            
-            if (!defined($voices{$voice})) {
-            
-            	# Hack: Channel 10 (=9) ist for percussion only
-            	$last_channel = $last_channel+1;
-            	$last_channel = 10 if ($last_channel == 9);
-            
-            	$voices{$voice} = $last_channel; 
-            	$channels{$last_channel} = $program;
-            }
-        }
-    }
-    
-    foreach my $channel (keys %channels) {
-        push @{ $tracks{"$n"} }, ['patch_change', 0, $channel, $channels{$channel}];
-    }
-    
-    foreach my $line (@lines) {
-        
-        next if $line =~ m/^#/;
-        next if $line =~ m/^ v:/;
-        my ($time, $instr, $pitch, $duration, $voice, $istart) = split(/\t/,$line);
-        next if (!defined($voice));
-        $voice =~ s/\..\d$//;
-        chomp($istart);
-        
-        # Hack: Channel 10 ist for percussion only
-        $voice = $voice+1 if ($voice == 9);
-        
-        if ( !defined($tracks{"$voice"} ) ) {
-            $tracks{"$voice"} = [];
-        }
-        
-        my $channel = $voices{$voice};
-        push @{ $tracks{"$voice"} }, ['text_event', $time, "T:$time V:$voice ISTART:$istart"];
-        push @{ $tracks{"$voice"} }, ['note', $time, $duration, $channel, $pitch, 64];
-        
+        next unless $line =~ m/^\s*v:\d+\s+MIDI program\s+(\d+)\s+(\d+)/;
+        my ($ch, $program) = ($1, $2);
+        $program_of_channel{$ch} = $program;
     }
 
-    my @tracks; $n = 1;
+	# 2. Notenzeilen einlesen
+    my @notes;
+    foreach my $line (@lines) {
+        my ($time, $instr, $channel, $pitch, $duration, $voice, $istart) = _parse_note_line($line);
+        next unless defined($time);
+ 
+        # Noten ohne istart gehoeren trotzdem in die MIDI-Datei
+        $istart = '' unless defined($istart);
+ 
+        # Absicherung, falls der Channel keine Zahl ist (z.B. "undefined")
+        $channel = 0 unless $channel =~ m/^\d+$/;
+ 
+        push @notes, [$time, $channel, $pitch, $duration, $voice, $istart];
+    }
+
+
+    # 3. MIDI kennt nur die Channels 0-15, abc2svg zaehlt aber einfach weiter
+    # (ab der 16. Stimme 16, 17, ...). Dann teilen sich Stimmen mit demselben
+    # Programm einen Channel. Bis Channel 15 bleibt alles unveraendert.
+
+    # Alle benutzten abc2svg-Channels sammeln (jeder nur einmal)
+    my %is_used;
+    foreach my $note (@notes) {
+        my $channel = $note->[1]; my $voice = $note->[4];
+        $is_used{$channel} = 1;
+        # Save voice for error messages, if it must be muted
+        $voices_of_channel{$channel}{$voice} = 1; 
+    }
+    my @used_channels = sort { $a <=> $b } keys %is_used;
+
+    # Normalfall: jeder Channel bleibt, wie abc2svg ihn vergeben hat
+    my %midi_channel;    # abc2svg-Channel => MIDI-Channel
+    foreach my $abc2svh_ch (@used_channels) {
+        $midi_channel{$abc2svh_ch} = $abc2svh_ch;
+    }
+
+    if (@used_channels && $used_channels[-1] > 15) {
+        %midi_channel = ();
+        my %channel_of_program;    # Programm => MIDI-Channel
+        my $next_free = 0;
+
+        foreach my $abc2svh_ch (@used_channels) {
+            # Channel 9 ist von abc2svg für Schlagzeug reserviert und wird daher nicht umgelegt
+            if ($abc2svh_ch == 9) {
+                $midi_channel{$abc2svh_ch} = 9;
+                next;
+            }
+
+            my $program = $program_of_channel{$abc2svh_ch};
+            $program = 0 unless defined($program);
+
+            if (!defined($channel_of_program{$program})) {
+                # Auf Channel 9 darf auch bei der Neuordnung kein anderes Instrument als Schlagzeug gelegt werden
+				$next_free++ if $next_free == 9;
+
+                if ($next_free > 15) {
+                    warn "MIDI: mehr als 15 verschiedene Instrumente, Manche Stimmen erklinen nicht\n";
+                    # Kein Channel mehr frei: die Stimmen dieses Channels bleiben stumm
+    				foreach my $voice (keys %{ $voices_of_channel{$abc2svh_ch} }) {
+        				push @muted_voices, $voice + 1;    # Anzeige ab 1, wie bei V: 1, V: 2, ...
+    				}
+                }
+                else {
+                    $channel_of_program{$program} = $next_free;
+                    $next_free++;
+                }
+            }
+            $midi_channel{$abc2svh_ch} = $channel_of_program{$program};
+        }
+    }
+
+	if (@muted_voices) {
+    push @midi_errors, "More different instruments than the possible 15 MIDI channels. "
+        . "These voices are muted: " . join(", ", sort { $a <=> $b } @muted_voices);
+	}
+	
+    my %program_of_midi_channel;
+    foreach my $ch (@used_channels) {
+        next unless defined($midi_channel{$ch});     # stumme Channel werden übersprungen
+        my $program = $program_of_channel{$ch};
+        next unless defined($program);    # keine "MIDI program"-Zeile: kein patch_change (Klavier)
+        $program_of_midi_channel{ $midi_channel{$ch} } = $program;
+    }
+
+    my %tracks;
+
+    # 4. Setup-Track (Schluessel "-1" => kommt beim Sortieren zuerst) mit den
+    #    Programmwechseln. Ein Track ist nur ein Container in der Datei und
+    #    verbraucht keinen Channel; Channels gelten global ueber alle Tracks.
+    foreach my $ch (keys %program_of_midi_channel) {
+        push @{ $tracks{"-1"} }, ['patch_change', 0, $ch, $program_of_midi_channel{$ch}];
+    }
+
+    # 5. Noten: ein Track pro Hauptstimme
+    foreach my $note (@notes) {
+        my ($time, $abc2svh_ch, $pitch, $duration, $voice, $istart) = @$note;
+
+        my $channel = $midi_channel{$abc2svh_ch};
+        next unless defined($channel); # stumme Channel werden übersprungen
+
+        if (!defined($tracks{$voice})) {
+            $tracks{$voice} = [];
+        }
+
+        push @{ $tracks{$voice} }, ['text_event', $time, "T:$time V:$voice ISTART:$istart"];
+        push @{ $tracks{$voice} }, ['note', $time, $duration, $channel, $pitch, 64];
+    }
+
+    my @tracks;
     foreach my $voice (sort { $a <=> $b } keys %tracks) {
-        my $events_r = MIDI::Score::score_r_to_events_r($tracks{"$voice"});
-        my $track = MIDI::Track->new({events => $events_r});
-        push @tracks, $track;
+        my $events_r = MIDI::Score::score_r_to_events_r($tracks{$voice});
+        push @tracks, MIDI::Track->new({ events => $events_r });
     }
-    my $opus = MIDI::Opus->new(
-        { 'format' => 1, 'ticks' => 50, 'tracks' => \@tracks});
 
+    my $opus = MIDI::Opus->new({ 'format' => 1, 'ticks' => 50, 'tracks' => \@tracks });
     $opus->write_to_file($self->midi_file);
+    
+    # Erfolg heisst: die Datei existiert
+	my $success = (-e $self->midi_file) ? 1 : 0;
+	if (!$success) {
+    	push @midi_errors, "Die MIDI-Datei konnte nicht geschrieben werden.";
+	}
+
+	return ($success, \@midi_errors);
 }
 
 sub AUTOLOAD {
@@ -529,6 +656,11 @@ return <<'EOF';
 function load(fn) {
 	return std.loadScript(fn)
 }
+
+let value = {
+    output: '',
+    errors: [],
+};
 
 var abc2svg = {
 	print: print,
@@ -559,6 +691,7 @@ var abc2svg = {
 } // abc2svg
 
 abc2svg.loadjs('abc2svg-1.js');
+abc2svg.loadjs('midigen.js');
 abc2svg.loadjs('util/sndgen.js');
 abc2svg.loadjs('util/chord.js');
 
@@ -609,10 +742,11 @@ var user = {
 		return file
 	},
 	errtxt: '',
-	errmsg:			// print or store the error messages
-		typeof abc2svg.printErr == 'function'
-			? function(msg, l, c) { abc2svg.printErr(msg) }
-			: function(msg, l, c) { user.errtxt += msg + '\n' }
+	errmsg: function(message, line_number, column_number) {
+        console.log("Error: " + message + " at "+ line_number + "," + column_number);
+        value.errors.push(message + " at "+ line_number + "," + column_number);
+        
+    },
 } // user
 
 // treat a file
@@ -653,22 +787,24 @@ abc2svg.abc_end = function() {
 		tgen: 3600, 	// generate by (for) 1 hour
 		get_time: function() { return -.3},	// (move the time origin)
 		midi_ctrl: function(po, s, t) {
-		output = output + '\n' + ' v:' + s.v + '  MIDI control ' + s.ctrl + ' ' + s.val;
+		value.output = value.output + '\n' + ' v:' + s.v + '  MIDI control ' + s.ctrl + ' ' + s.val;
 		}, // midi_ctrl()
 		midi_prog: function(po, s) {
+			//console.log("MIDI PROG EVENT VOICE" +s.v + "CHANEL " + (s.chn) + " INST" + s.instr + "\n");
 			if (s.instr != undefined)
-				output = output + '\n' + ' v:' + s.v + '  MIDI program '+ (s.chn + 1) + ' '
+				value.output = value.output + '\n' + ' v:' + s.v + '  MIDI program '+ s.chn + ' '
 					+ s.instr;
 			else
-				output = output + '\n' + ' v:' + s.v + '  MIDI channel ' + (s.chn + 1);
+				value.output = value.output + '\n' + ' v:' + s.v + '  MIDI channel ' + s.chn;
 		}, // midi_prog()
 		note_run: function(po, s, k, t, d) {
-			output = output + '\n' + ' ' + (t * 100).toFixed(0) +
-				'\t' + po.c_i[po.v_c[s.v]] +
-				'\t' + pit(k) +
-				'\t' + (d * 100).toFixed(0) +
-				'\t' + vn[s.p_v.id] +
-				'\t' + s.istart;
+	value.output = value.output + '\n' + ' ' + (t * 100).toFixed(0) +
+		'\t' + po.c_i[po.v_c[s.v]] +
+		'\t' + po.v_c[s.v] +             // neu: Channel
+		'\t' + pit(k) +
+		'\t' + (d * 100).toFixed(0) +
+		'\t' + vn[s.p_v.id] +
+		'\t' + s.istart;
 		}, // note_run()
 		v_c: [],		// voice to channel
 		c_i: []			// channel to instrument
@@ -707,7 +843,7 @@ abc2svg.abc_end = function() {
 	if (user.errtxt)
 		abc2svg.printErr('\n--- Errors ---\n' + user.errtxt)
 
-	output = output + '# MIDI flow (time and duration in 1/100s)\n\
+	value.output = value.output + '# MIDI flow (time and duration in 1/100s)\n\
 # time instr  pitch  duration voice istart';
 
 	// loop on the tunes and
@@ -720,7 +856,7 @@ abc2svg.abc_end = function() {
 		dvn(e[1])
 
 		t = (e[2].T || '(no title)').replace(/\n/g, ' / ')
-		output = output + '\n' + '# ------- tune ' +
+		value.output = value.output + '\n' + '# ------- tune ' +
 			e[2].X + '. ' +
 			t +
 			' -------';
@@ -743,7 +879,7 @@ abc2svg.abort = function(e) {
 }
 
 abc2svg.abc_end();
-output = output;
+value;
 EOF
 }
 

@@ -113,22 +113,25 @@ sub _settings_general_create {
 	
 	my $config = $self->config();
 	
-	my $scroller = pEFL::Elm::Scroller->add($parent);
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("General settings");
+	_expand_widget($frame);
+	$frame->show();
 	
-	my $box = pEFL::Elm::Box->add($parent);
+	my $scroller = pEFL::Elm::Scroller->add($frame);
+	$frame->part_content_set("default",$scroller);
+	
+	# Important: Box is necessary because otherwise
+	# $table->size_hint_padding_set(0, 20, 0, 0); doesn't work
+	my $box = pEFL::Elm::Box->add($scroller);
 	$box->horizontal_set(0);
 	_expand_widget($box);
 	$box->show();
 	
-	my $frame = pEFL::Elm::Frame->add($parent);
-	$frame->text_set("General settings");
-	$frame->part_content_set("default",$scroller);
-	_expand_widget($frame);
-	$frame->show();
-	
-	my $table = pEFL::Elm::Table->add($parent);
+	my $table = pEFL::Elm::Table->add($box);
 	_expand_widget($table);
 	$table->padding_set(10,10);
+	$table->size_hint_padding_set(0, 20, 0, 0);
 	$table->show(); $box->pack_end($table);
 	
 	_add_header($table,0,"Path to abcm2ps", 1);
@@ -184,22 +187,25 @@ sub _settings_preview_create {
 	
 	my $config = $self->config();
 	
-	my $scroller = pEFL::Elm::Scroller->add($parent);
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("Preview settings");
+	_expand_widget($frame);
+	$frame->show(); 
 	
-	my $box = pEFL::Elm::Box->add($parent);
+	my $scroller = pEFL::Elm::Scroller->add($frame);
+	$frame->part_content_set("default",$scroller);
+	
+	# Important: Box is necessary because otherwise
+	# $table->size_hint_padding_set(0, 20, 0, 0); doesn't work
+	my $box = pEFL::Elm::Box->add($scroller);
 	$box->horizontal_set(0);
 	_expand_widget($box);
 	$box->show();
 	
-	my $frame = pEFL::Elm::Frame->add($parent);
-	$frame->text_set("Preview settings");
-	$frame->part_content_set("default",$scroller);
-	_expand_widget($frame);
-	$frame->show();
-	
-	my $table = pEFL::Elm::Table->add($parent);
+	my $table = pEFL::Elm::Table->add($box);
 	_expand_widget($table);
 	$table->padding_set(10,10);
+	$table->size_hint_padding_set(0, 20, 0, 0);
 	$table->show(); $box->pack_end($table);
 	
 	_add_header($table,0,"Page format", 1);
@@ -242,10 +248,38 @@ sub _settings_preview_create {
 	_expand_widget_x($preview_scale_spinner);
 	$preview_scale_spinner->show(); $table->pack($preview_scale_spinner,1,4,1,1);
 	
+	_add_header($table,5,"Margin", 1);
+	
+	my $topmargin_label = pEFL::Elm::Label->new($table);
+	$topmargin_label->text_set("topmargin (cm)");
+	$topmargin_label->show(); $table->pack($topmargin_label,0,6,1,1);
+	
+	my $topmargin_spinner = pEFL::Elm::Spinner->add($table);
+	$topmargin_spinner->label_format_set("%1.1f");
+	$topmargin_spinner->min_max_set(0,100); $topmargin_spinner->interval_set(10);
+	$topmargin_spinner->editable_set(1);
+	$topmargin_spinner->value_set($config->{preview_topmargin} || 1.0);
+	_expand_widget_x($topmargin_spinner);
+	$topmargin_spinner->show(); $table->pack($topmargin_spinner,1,7,1,1);
+	
+	my $bottommargin_label = pEFL::Elm::Label->new($table);
+	$bottommargin_label->text_set("bottommargin (cm)");
+	$bottommargin_label->show(); $table->pack($bottommargin_label,0,8,1,1);
+	
+	my $bottommargin_spinner = pEFL::Elm::Spinner->add($table);
+	$bottommargin_spinner->label_format_set("%1.1f");
+	$bottommargin_spinner->min_max_set(0,100); $bottommargin_spinner->interval_set(10);
+	$bottommargin_spinner->editable_set(1);
+	$bottommargin_spinner->value_set($config->{preview_bottommargin} || 1.0);
+	_expand_widget_x($bottommargin_spinner);
+	$bottommargin_spinner->show(); $table->pack($bottommargin_spinner,1,9,1,1);
+	
 	# Save important widgets
 	$self->elm_pageheight_spinner($pageheight_spinner);
 	$self->elm_pagewidth_spinner($pagewidth_spinner);
 	$self->elm_preview_scale_spinner($preview_scale_spinner);
+	$self->elm_topmargin_spinner($topmargin_spinner);
+	$self->elm_bottommargin_spinner($bottommargin_spinner);
 	
 	
 	my ($ok_btn, $cancel_btn) = _add_buttons($table,"row" => 15);
@@ -264,22 +298,25 @@ sub _settings_midi_create {
 	
 	my $config = $self->config();
 	
-	my $scroller = pEFL::Elm::Scroller->add($parent);
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("MIDI settings");
+	_expand_widget($frame);
+	$frame->show();
 	
-	my $box = pEFL::Elm::Box->add($parent);
+	my $scroller = pEFL::Elm::Scroller->add($frame);
+	$frame->part_content_set("default",$scroller);
+	
+	# Important: Box is necessary because otherwise
+	# $table->size_hint_padding_set(0, 20, 0, 0); doesn't work
+	my $box = pEFL::Elm::Box->add($scroller);
 	$box->horizontal_set(0);
 	_expand_widget($box);
 	$box->show();
 	
-	my $frame = pEFL::Elm::Frame->add($parent);
-	$frame->text_set("Preview settings");
-	$frame->part_content_set("default",$scroller);
-	_expand_widget($frame);
-	$frame->show();
-	
-	my $table = pEFL::Elm::Table->add($parent);
+	my $table = pEFL::Elm::Table->add($box);
 	_expand_widget($table);
 	$table->padding_set(10,10);
+	$table->size_hint_padding_set(0, 20, 0, 0);
 	$table->show(); $box->pack_end($table);
 	
 	_add_header($table, 0, "MIDI tuning",1);
@@ -326,22 +363,25 @@ sub _settings_appearance_create {
 	
 	my $config = $self->config();
 	
-	my $scroller = pEFL::Elm::Scroller->add($parent);
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("Appearance settings");
+	_expand_widget($frame);
+	$frame->show();
 	
-	my $box = pEFL::Elm::Box->add($parent);
+	my $scroller = pEFL::Elm::Scroller->add($frame);
+	$frame->part_content_set("default",$scroller);
+	
+	# Important: Box is necessary because otherwise
+	# $table->size_hint_padding_set(0, 20, 0, 0); doesn't work
+	my $box = pEFL::Elm::Box->add($scroller);
 	$box->horizontal_set(0);
 	_expand_widget($box);
 	$box->show();
 	
-	my $frame = pEFL::Elm::Frame->add($parent);
-	$frame->text_set("Appearance settings");
-	$frame->part_content_set("default",$scroller);
-	_expand_widget($frame);
-	$frame->show();
-	
-	my $table = pEFL::Elm::Table->add($parent);
+	my $table = pEFL::Elm::Table->add($box);
 	_expand_widget($table);
 	$table->padding_set(10,10);
+	$table->size_hint_padding_set(0, 20, 0, 0);
 	$table->show(); $box->pack_end($table);
 	
 	_add_header($table,0,"Color Palette",1);
@@ -460,20 +500,24 @@ sub _settings_tabulator_create {
 	
 	my $config = $self->config();
 	
-	my $box = pEFL::Elm::Box->add($parent);
-	$box->horizontal_set(0);
-	_expand_widget($box);
-	$box->show();
-	
 	my $frame = pEFL::Elm::Frame->add($parent);
 	$frame->text_set("Tabulator settings");
-	$frame->part_content_set("default",$box);
 	_expand_widget($frame);
 	$frame->show();
 	
-	my $table = pEFL::Elm::Table->add($parent);
+	# Important: Box is necessary because otherwise
+	# $table->size_hint_padding_set(0, 20, 0, 0); doesn't work
+	my $box = pEFL::Elm::Box->add($frame);
+	$box->horizontal_set(0);
+	_expand_widget($box);
+	$frame->part_content_set("default",$box);
+	$box->show();
+	
+	my $table = pEFL::Elm::Table->add($box);
 	_expand_widget($table);
 	$table->padding_set(10,10);
+	# Solange wir hier keinen Scroller nutzen, nicht nötig
+	#$table->size_hint_padding_set(0, 20, 0, 0);
 	$table->show(); $box->pack_end($table);
 	
 	my $tabs_label = pEFL::Elm::Label->new($table);
@@ -536,24 +580,25 @@ sub _settings_abcm2ps_create {
 	
 	my $config = $self->config();
 	
-	my $scroller = pEFL::Elm::Scroller->add($parent);
+	my $frame = pEFL::Elm::Frame->add($parent);
+	$frame->text_set("abcm2ps settings");
+	_expand_widget($frame);
+	$frame->show();
 	
-	my $box = pEFL::Elm::Box->add($parent);
+	my $scroller = pEFL::Elm::Scroller->add($frame);
+	$frame->part_content_set("default",$scroller);
+	
+	# Important: Box is necessary because otherwise
+	# $table->size_hint_padding_set(0, 20, 0, 0); doesn't work
+	my $box = pEFL::Elm::Box->add($scroller);
 	$box->horizontal_set(0);
 	_expand_widget($box);
 	$box->show();
 	
-	my $frame = pEFL::Elm::Frame->add($parent);
-	$frame->text_set("abcm2ps settings");
-	#$frame->part_content_set("default",$box);
-	$frame->part_content_set("default",$scroller);
-	_expand_widget($frame);
-	$frame->show();
-	
-	
-	my $table = pEFL::Elm::Table->add($parent);
+	my $table = pEFL::Elm::Table->add($box);
 	_expand_widget($table);
 	$table->padding_set(10,10);
+	$table->size_hint_padding_set(0, 20, 0, 0);
 	$table->show(); $box->pack_end($table);
 	
 	_add_header($table,0,"Linebreak Options");
@@ -703,10 +748,14 @@ sub save_settings {
 	my $pageheight_spinner = $self->elm_pageheight_spinner();
 	my $pagewidth_spinner = $self->elm_pagewidth_spinner();
 	my $preview_scale_spinner = $self->elm_preview_scale_spinner();
+	my $topmargin_spinner = $self->elm_topmargin_spinner();
+	my $bottommargin_spinner = $self->elm_bottommargin_spinner();
 	
 	$config->{preview_pageheight} = sprintf("%.1f",$pageheight_spinner->value_get());
 	$config->{preview_pagewidth} = sprintf("%.1f",$pagewidth_spinner->value_get());
 	$config->{preview_scale} = sprintf("%.2f",$preview_scale_spinner->value_get());
+	$config->{preview_topmargin} = sprintf("%.1f",$topmargin_spinner->value_get());
+	$config->{preview_bottommargin} = sprintf("%.1f",$bottommargin_spinner->value_get());
 	
 	################
 	# MIDI
@@ -907,7 +956,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|config|elm_toolbar|elm_scores_path_en|elm_midi2abc_path_en|elm_midish_path_en|elm_aseqdump_path_en|elm_pageheight_spinner|elm_pagewidth_spinner|elm_preview_scale_spinner|elm_midi_ticks_slider|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
+		unless $AUTOLOAD =~m/app|config|elm_toolbar|elm_scores_path_en|elm_midi2abc_path_en|elm_midish_path_en|elm_aseqdump_path_en|elm_pageheight_spinner|elm_pagewidth_spinner|elm_preview_scale_spinner|elm_topmargin_spinner|elm_bottommargin_spinner|elm_midi_ticks_slider|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

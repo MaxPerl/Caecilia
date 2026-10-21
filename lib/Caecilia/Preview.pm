@@ -73,18 +73,24 @@ sub move_notes {
 	my @notes = @{$self->{notes_rect}};
 	
 	my ($vx,$vy,$vw,$vh) = $self->elm_viewer->geometry_get();
-	my ($sx,$sy,$sh) = $self->elm_scroller->geometry_get();
-	foreach my $note (@notes) { 
-		my $x = ($scale_factor * $note->{x}) + $vx;
-		my $y = ($scale_factor *$note->{y}) + $note->{svg_offset} +$vy;
+	my ($sx,$sy,$sw,$sh) = $self->elm_scroller->geometry_get();
+
+	foreach my $note (@notes) {
 		my $n = $note->{evas_object};
-		if ($x<$sx || $y < $sy) {
+		my $x = ($scale_factor * $note->{x}) + $vx;
+		my $y = ($scale_factor * $note->{y}) + $note->{svg_offset} + $vy;
+		my ($nx,$ny,$nw,$nh) = $n->geometry_get();
+
+		# komplett im sichtbaren Bereich des Scrollers?
+		if ($x < $sx || $y < $sy
+	    	|| ($x + $nw) > ($sx + $sw)
+	    	|| ($y + $nh) > ($sy + $sh)) {
 			$n->hide();
 		}
 		else {
-			$n->show();	
-			$n->move( ($scale_factor*$note->{x}) + $vx, ($scale_factor * $note->{y} ) + $note->{svg_offset} +$vy);
-		}	
+			$n->move($x, $y);
+			$n->show();
+		}
 	}
 	
 	return unless (ref($self->app->midi->{voice_pointers}) eq "ARRAY");
@@ -142,6 +148,10 @@ sub load_tune {
 		push @{$self->{notes_rect}},$note;
 		$self->{notes}->{$key}->{evas_object} = $n;
 	}
+	
+	# keine Sichtbarkeit über den Rand hinaus 
+	# Das muss bereits bei Erstellung geprüft werden, nicht erst beim ersten Scroll-/Resize-Event
+	move_notes($self, $self->elm_scroller, undef);
 }
 
 sub create_note_rect {
