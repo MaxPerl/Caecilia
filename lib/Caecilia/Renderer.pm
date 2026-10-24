@@ -560,12 +560,20 @@ sub svg2pdf {
     	# In einer PDF liegt der Nullpunkt unten links, und y wächst nach oben. Ein kleiner y-Wert heißt also „weiter unten auf der Seite“. 
     	# Deshalb ist $ph (die Seitenhöhe) die Oberkante der Seite
     	#my $y = $ph;
-		my $config = $self->app->settings->load_config();
-		my $topmargin = $config->{preview_topmargin} * 10 * 3.7795 || 10 * 3.7795;
+	my $config = $self->app->settings->load_config();
+	my $topmargin = $config->{preview_topmargin} * 10 * 3.7795 || 10 * 3.7795;
     	my $y = $ph - $topmargin * $PX2PT;    
 
 	    for my $block (@blocks) {
-    	    # Pro Block ein neues SVGPDF-Objekt (sonst sammelt es Ergebnisse an)
+
+		# Fix multiple hyphen bug (--)
+		# On long phrases abc2svg creates a text element with multiple coordinates
+		# SVGPDF is not compatible with multiple coordinates, so we must
+		# delete all X-coordinates starting from the first comma and shrinks 
+ 		# any number of consecutive hyphens (--, ---, etc.) to a single minus sign.
+		$block =~ s!(<text[^>]*\bx="[^",\s]+),[^"\s]+("[^>]*>)\s*-+\s*(<\/text>)!$1$2-$3!sg;
+
+    		# Pro Block ein neues SVGPDF-Objekt (sonst sammelt es Ergebnisse an)
         	my $svg  = SVGPDF->new( pdf => $pdf, fc => $fc );
         
         	# $xofs ist immer ein Skalar, der eine Referenz auf ein Array enthält.
