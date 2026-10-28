@@ -60,6 +60,27 @@ sub new {
 	return $renderer_object;
 }
 
+# Put abc directives in front of the text of the preview, that a necessary for a working preview
+# NEW: The directives are also put in front of the text for the MIDI (MIDI::generate_mid), so that
+# the offsets of the notes (istart in MIDI) are the same in preview and MIDI
+# IMPORTANT: If you change something here, the error line numbers (see render_preview) must be changed, too!
+sub preview_header {
+	my ($self) = @_;
+	
+	my $config = $self->app->settings->load_config();
+	my $pageheight_cm = $config->{preview_pageheight} || 29.7;
+	my $pagewidth_cm = $config->{preview_pagewidth} || 21.0;
+	my $preview_scale = $config->{preview_scale} || 1;
+	
+	my $header = "\%\%fullsvg 1\n\%\%musicfont abc2svg\n\%\%pageheight $pageheight_cm"."cm\n\%\%pagewidth $pagewidth_cm"."cm\n\%\%pagescale $preview_scale\n";
+	
+	# FIX HYPHEN IN LYRICS BUG IN abc2svg 1.23.6:
+	# see https://chiselapp.com/user/moinejf/repository/abc2svg/tktview/4129bd6558
+	$header = $header . "%%hyphencont 0\n";
+	
+	return $header;
+}
+
 sub render_preview {
 	my ($self, %opts) = @_;
 	
@@ -71,18 +92,26 @@ sub render_preview {
 	my $outfile = $opts{outfile};
 	my $pageheight_cm = $config->{preview_pageheight} || 29.7;
 	my $pagewidth_cm = $config->{preview_pagewidth} || 21.0;
-    my $pageheight = $pageheight_cm * 37.795;
-    my $pagewidth = $pagewidth_cm * 37.795;
-    my $topmargin = $config->{preview_topmargin} * 10 * 3.7795 || 10 * 3.7795;
-    my $bottommargin = $config->{preview_bottommargin} * 10 * 3.7795 || 10*3.7795;
-    my $bgcolor = "white";
-    my $preview_scale = $config->{preview_scale} || 1;
+	my $pageheight = $pageheight_cm * 37.795;
+	my $pagewidth = $pagewidth_cm * 37.795;
+	my $topmargin = $config->{preview_topmargin} * 10 * 3.7795 || 10 * 3.7795;
+	my $bottommargin = $config->{preview_bottommargin} * 10 * 3.7795 || 10*3.7795;
+	my $bgcolor = "white";
 	
 	# Get the text of the entry and add a white background to the preview.abc
-	my $text = $self->app->entry->elm_entry->entry_get();
-	# convert $text to utf8
-	$text = pEFL::Elm::Entry::markup_to_utf8($text);	
-	$text = Encode::decode("utf-8",$text);
+	# - Preview: in split mode the file header is put in front of the tune
+	# - Export (export => 1): the whole file. As in Caecilia::save the text 
+	# of the editor is stored in the tunebook first
+	# !!! There is no preview for file header!!!)
+	my $tunebook = $app->current_tunebook();
+	my $text = $app->entry->get_text();
+	if ($opts{export}) {
+		$tunebook->content_current_str($text);
+		$text = $tunebook->content_all_str();
+	}
+	else {
+		$text = $tunebook->create_preview_abc($text);
+	}
 	
 	# Scale stylesheet directives aren't supported in preview
 	warn "Directive \%\%scale is not supported in preview\n" if ($text =~ s/\%\%scale/%% ..../g);
@@ -95,12 +124,20 @@ sub render_preview {
 	print $fh "$text";
 	close $fh;
 	
-	my $header = "\%\%fullsvg 1\n\%\%musicfont abc2svg\n\%\%pageheight $pageheight_cm"."cm\n\%\%pagewidth $pagewidth_cm"."cm\n\%\%pagescale $preview_scale\n";
+	my $header = $self->preview_header();
 	
-	# FIX HYPHEN IN LYRICS BUG IN abc2svg 1.23.6:
-	# see https://chiselapp.com/user/moinejf/repository/abc2svg/tktview/4129bd6558
-	$header = $header . "%%hyphencont 0\n";
-	$self->preview_beginabc_length(length($header));
+
+	# The click to note functionality (Preview, Entry::insert_deco) must contain everything
+	# that is put in front of the editor text: the header above and the file header of the tunebook
+	# Not for an export, because there the whole file is rendered
+	my $prefix_lines = 0;
+	unless ($opts{export}) {
+		my $tunebook_header_length = $tunebook->preview_abc_offset();
+		$self->preview_beginabc_length(length($header) + $tunebook_header_length);
+		
+		# number of lines of the file header (needed for the error messages)
+		$prefix_lines = substr($text,0, $tunebook_header_length) =~ tr/\n//;
+	}
 	
 	my $val = JavaScript::QuickJS->new()
     ->set_globals(path => $self->abc2svg_path(), abc_file => "$dir/render.abc", pageheight => $pageheight, pagewidth => $pagewidth, bgcolor => $bgcolor, topmargin => $topmargin, bottommargin => $bottommargin, header => $header )
@@ -142,7 +179,10 @@ sub render_preview {
 			$notes{$1} = \%note;
 		}
 	}
-	#close $fh; 
+	#close $fh;
+
+	# An export don't need to overwrite the notes of the preview
+	return if ($opts{export}); 
 	
 	$self->app->preview->{notes} = \%notes;
 	
@@ -154,6 +194,13 @@ sub render_preview {
 		# We have to correct the added abc lines (see above)
 		# The first Line is in Caecilia 1 (not 0)!! TODO: Perhaps change the behaviour / same behaviour as abc2svg; I think changed (see above 6 newlines, here only 5)
 		my $line_nr = $1-5;
+		# In split mode, we need to add the lines of the fileheader of the tunebook, too (see above)
+		if ($line_nr > $prefix_lines) {
+			$line_nr = $line_nr - $prefix_lines;
+		}
+		else {
+			$error = "(file header) $error";
+		}
 		$error =~ s/\d+,(\d+)$/$line_nr,$1/;
 		$error_message = $error_message . "<br/>" . $error;
 	}
@@ -195,12 +242,12 @@ sub show_errors {
 # Parameter: Notenzeile (<abc .../>), oberer Seitenrand, Liste der Umbruch-Offsets
 sub correct_pages {
     my ($line, $topmargin, @offsets) = @_;
-    $line =~ m!<abc type="note" start_offset=".*" stop_offset=".*" x=".*" y=".*" width=".*" height=".*" svg_offset="(.*)" page_nr="(.*)"/>!;
+    return $line unless $line =~ m!<abc type="note" start_offset=".*" stop_offset=".*" x=".*" y=".*" width=".*" height=".*" svg_offset="(.*)" page_nr="(.*)"/>!;
     
     my $svg_offset=$1;
     my $page = $2;
     
-    if ($svg_offset == $offsets[$page-1]) {
+    if (defined($offsets[$page-1]) && $svg_offset == $offsets[$page-1]) {
         my $np = $page+1;
         $line =~ s/page_nr="$page"/page_nr="$np"/;
         $line =~ s/svg_offset="$svg_offset"/svg_offset="$topmargin"/;
@@ -218,23 +265,11 @@ sub render_abcm2ps {
 	
 	my @cmd;
 	push @cmd, '-c' if ($config->{abcm2ps_autolinebreak});
-	push @cmd, '-A' if ($opts{mode} eq 'preview');
-	push @cmd, '-q' if ($opts{mode} eq 'preview');
-	push @cmd, '-s' if ($opts{mode} eq 'preview');
-	push @cmd, '0.75' if ($opts{mode} eq 'preview');
 	
 	push @cmd, "-B".$config->{abcm2ps_breaknbars} if ($config->{abcm2ps_breaknbars});
 	push @cmd, "-e$opts{pattern}" if ($opts{pattern});
 	
-	# no scale in preview
-	if ($config->{abcm2ps_scalefactor}) {
-        if ($opts{mode} eq 'preview') {
-            warn "The option scalefactor (-s) is not supported in Preview. So preview and  rendered output may differ\n";
-        }
-        else {
-            push @cmd, "-s".$config->{abcm2ps_scalefactor};
-        }
-	}
+	push @cmd, "-s".$config->{abcm2ps_scalefactor} if ($config->{abcm2ps_scalefactor});
 	push @cmd, "-w".$config->{abcm2ps_staffwidth} if ($config->{abcm2ps_staffwidth});
 	push @cmd, "-m".$config->{abcm2ps_leftmargin} if ($config->{abcm2ps_leftmargin});
 	push @cmd, "-d".$config->{abcm2ps_staffseparation} if ($config->{abcm2ps_staffseparation});
@@ -261,12 +296,11 @@ sub render_abcm2ps {
 	push @cmd, "-b$opts{firstmeasure}" if ($opts{firstmeasure});
 	push @cmd, "-f" if ($config->{abcm2ps_flatbeams});
 	
-	# Get the text of the entry and add a white background to the preview.abc
-	my $text = "%%bgcolor \"white\"\n" . $self->app->entry->elm_entry->entry_get();
-	# convert $text to utf8
-	$text = pEFL::Elm::Entry::markup_to_utf8($text);	
-	$text = Encode::decode("utf-8",$text);
-	
+	# Get the text of the entry 
+	# As in Caecilia::save the text of the editor is stored in the tunebook before
+	my $tunebook = $app->current_tunebook();
+	$tunebook->content_current_str($app->entry->get_text());
+	my $text = "%%bgcolor \"white\"\n" . $tunebook->content_all_str();
 	
 	# Scale stylesheet directive isn't supported in preview
 	#$text =~ s/%%scale.*\n//g if ($opts{mode} eq 'preview');
@@ -387,7 +421,7 @@ sub show_dialog {
 	$out_label->show(); $table->pack($out_label, 0,0,1,1);
 	
 	my $out_en = pEFL::Elm::Entry->new($table);
-	my $filename = $app->current_tune->filename || "";
+	my $filename = $app->current_tunebook->filename || "";
 	$filename =~ s/\..*$//;
 	$out_en->entry_set($filename);
 	$out_en->scrollable_set(1);
@@ -445,7 +479,7 @@ sub render_cb {
 		$self->render_caecilia2svg($filename);
 	}
 	else {
-		$self->render_abcm2ps(outfile => $filename, outformat => $formatsvar, firstmeasure => $firstmeasure_spinvar, mode => '');
+		$self->render_abcm2ps(outfile => $filename, outformat => $formatsvar, firstmeasure => $firstmeasure_spinvar);
 	}
 	
 	$self->elm_render_win->del();
@@ -467,7 +501,7 @@ sub settings_cb {
 
 sub render_caecilia2svg {
 	my ($self, $outfile) = @_;
-	$self->render_preview(outfile => $outfile);
+	$self->render_preview(outfile => $outfile, export => 1);
 }
 
 sub render_caecilia2pdf {
@@ -477,7 +511,7 @@ sub render_caecilia2pdf {
 	make_path($self->app->tmpdir . "/print");
 	
 	# Make SVGs in temporary directory
-	$self->render_preview(outfile => $self->app->tmpdir . "/print/preview");
+	$self->render_preview(outfile => $self->app->tmpdir . "/print/preview", export => 1);
 	
 	# convert SVGs to pdf
 	$self->svg2pdf($outfile);
@@ -491,11 +525,11 @@ sub svg2pdf {
 	
 	my $dir = $self->app->tmpdir . "/print";
 	# --- Dateien einsammeln und natürlich sortieren ------------------------------
-	opendir( my $dh, $dir ) or die "Kann Verzeichnis '$dir' nicht öffnen: $!\n";
+	opendir( my $dh, $dir ) or die "Cannot open dir '$dir': $!\n";
 	my @files = grep { /^preview-\d+\.svg$/i } readdir($dh);
 	closedir($dh);
 
-	die "Keine passenden SVG-Dateien in '$dir' gefunden.\n" unless @files;
+	die "Cannot not find any .svg files in '$dir'.\n" unless @files;
 
 	@files = sort {
     	( $a =~ /(\d+)/ )[0] <=> ( $b =~ /(\d+)/ )[0]
@@ -508,7 +542,7 @@ sub svg2pdf {
 	# Gibt für die Notenschrift (abc2svg) die TTF zurück, sonst Times mit
 	# Fett/Kursiv. 
 	my $fontfile = $self->app->share_dir . "/abc2svg/abc2svg.ttf";
-	die "Schrift nicht gefunden: $fontfile\n" unless -f $fontfile;
+	die "Cannot find font: $fontfile\n" unless -f $fontfile;
 
 	my %fontcache;
 
@@ -535,16 +569,16 @@ sub svg2pdf {
 	# --- Seiten erzeugen ---------------------------------------------------------
 	for my $file (@files) {
     	my $path = "$dir/$file";
-    	print "Verarbeite $file ...\n";
+    	print "Process $file ...\n";
 
-    	open( my $in, '<:encoding(UTF-8)', $path ) or die "Kann $path nicht lesen: $!\n";
+    	open( my $in, '<:encoding(UTF-8)', $path ) or die "Cannot read $path: $!\n";
     	my $xml = do { local $/; <$in> };
     	close $in;
 
     	my ( $pw, $ph ) = page_size_pt($xml);
     	my @blocks = split_blocks($xml);
     	unless (@blocks) {
-        	warn "  -> Übersprungen ($file): keine Notenblöcke gefunden\n";
+        	warn "  -> block skipped ($file): Could not find a musical staff \n";
         	next;
     	}
 
@@ -565,14 +599,7 @@ sub svg2pdf {
     	my $y = $ph - $topmargin * $PX2PT;    
 
 	    for my $block (@blocks) {
-
-		# Fix multiple hyphen bug (--)
-		# On long phrases abc2svg creates a text element with multiple coordinates
-		# SVGPDF is not compatible with multiple coordinates, so we must
-		# delete all X-coordinates starting from the first comma and shrinks 
- 		# any number of consecutive hyphens (--, ---, etc.) to a single minus sign.
-		$block =~ s!(<text[^>]*\bx="[^",\s]+),[^"\s]+("[^>]*>)\s*-+\s*(<\/text>)!$1$2-$3!sg;
-
+	
     		# Pro Block ein neues SVGPDF-Objekt (sonst sammelt es Ergebnisse an)
         	my $svg  = SVGPDF->new( pdf => $pdf, fc => $fc );
         
@@ -584,13 +611,13 @@ sub svg2pdf {
 			# !$xofs: Ist $xofs leer oder undefiniert? SVGPDF gibt in manchen Fällen einfach nichts zurück.
 			# !@$xofs: Ist das Array leer? @$xofs macht aus der Referenz das Array, mit ! heißt es „keine Elemente“.
         	if ( $@ or !$xofs or !@$xofs ) {
-            	warn "  -> Block uebersprungen ($file): " . ( $@ || 'kein Inhalt' ) . "\n";
+            	warn "  -> Could not crete XOF ($file): " . ( $@ || 'No content' ) . "\n";
             	next;
         	}
 
-			# split_blocks liefert Stücke, die jeweils von einem <svg bis zum nächsten </svg> laufen. 
-			# In jeder temporären Datei steht damit genau ein <svg>, und SVGPDF gibt dafür ein Array mit genau einem Hash zurück. 
-			# Deshalb reicht $xofs->[0], ein weiteres Element gibt es nicht.
+		# split_blocks liefert Stücke, die jeweils von einem <svg bis zum nächsten </svg> laufen. 
+		# In jeder temporären Datei steht damit genau ein <svg>, und SVGPDF gibt dafür ein Array mit genau einem Hash zurück. 
+		# Deshalb reicht $xofs->[0], ein weiteres Element gibt es nicht.
         	my $e  = $xofs->[0];
         	# ->{xo} holt aus dem Hash den Eintrag xo, das eigentliche XObject, also das gezeichnete Bild des Blocks. 
         	# Steht dort nichts, springt or next zum nächsten Block.
@@ -600,7 +627,7 @@ sub svg2pdf {
         	my $h  = ( $e->{height} || $e->{vheight} || 0 ) * $PX2PT;
 
 	        # Argumente von $gfx->object: Objekt, x-pos, y-pos, x-skalierung, y-skalierung
-    	    #
+    	    	#
         	# 1. WARUM ypos = y?
         	# SVGPDF-XObjects haben ein gespiegeltes Y: sie hängen an ihrer
         	# Oberkante, also bei y = aktuelle Oberkante platzieren.

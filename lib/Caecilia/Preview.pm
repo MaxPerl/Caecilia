@@ -19,6 +19,8 @@ use Image::Info qw(image_info dim);
 
 use Text::Tabs;
 
+use Caecilia::MyElm ":all";
+
 our @ISA = qw(Exporter);
 
 our $AUTOLOAD;
@@ -46,9 +48,19 @@ sub new {
 }
 
 sub init_preview {
-	my ($self,$app,$box) = @_;
+	my ($self,$app,$panes) = @_;
 	
-	my $scroller = pEFL::Elm::Scroller->add($box);
+	############################
+	# ADD PREVIEW TOOLBAR
+	############################
+	my $left_box = pEFL::Elm::Box->add($panes);
+	_expand_widget($left_box);
+	
+	$self->add_preview_toolbar($app->elm_mainwindow,$left_box);
+	
+	my $scroller = pEFL::Elm::Scroller->add($left_box);
+	_expand_widget($scroller); $scroller->show();
+	$left_box->pack_end($scroller);
 	
 	my $viewer = pEFL::Elm::Image->add($scroller);
 	my $path = $app->share_dir . "/caecilia-logo.png";
@@ -59,8 +71,174 @@ sub init_preview {
 	$scroller->smart_callback_add("size,changed",\&move_notes, $self);
 	
 	$self->elm_scroller($scroller);
-	$box->part_content_set("right",$scroller);
-	$scroller->show();
+	$panes->part_content_set("right",$left_box);
+	
+	$self->app->preview($self);
+	
+}
+
+##################################
+# Add Preview Toolbar
+##################################
+sub add_preview_toolbar {
+	my ($self, $win, $box) = @_;
+	
+	my $bx = pEFL::Elm::Box->add($box);
+	$bx->horizontal_set(1);
+	$bx->size_hint_align_set(EVAS_HINT_FILL, 0);
+	$bx->size_hint_weight_set(EVAS_HINT_EXPAND, 0);
+	$bx->show();$box->pack_end($bx);
+	
+	my %tb;
+
+	my $preview_btn = pEFL::Elm::Button->add($bx);
+	my $icon = pEFL::Elm::Icon->add($bx);
+	# set the image file and the button as an icon
+	$icon->standard_set("view-restore");
+	$preview_btn->part_content_set("icon",$icon);
+	$preview_btn->text_set("Preview   ");
+	$preview_btn->size_hint_weight_set(0, EVAS_HINT_EXPAND);
+	$preview_btn->size_hint_align_set(0, EVAS_HINT_FILL);
+	$preview_btn->smart_callback_add("clicked", \&preview_cb, $self);
+	$bx->pack_end($preview_btn); $preview_btn->show();
+	$tb{preview_btn} = $preview_btn;
+
+
+	my $prev_btn = pEFL::Elm::Button->add($bx);
+	my $icon2 = pEFL::Elm::Icon->add($bx);
+	$icon2->standard_set("go-previous");
+	$prev_btn->part_content_set("icon",$icon2);
+	$prev_btn->size_hint_weight_set(0, EVAS_HINT_EXPAND);
+	$prev_btn->size_hint_align_set(0, EVAS_HINT_FILL);
+	$prev_btn->smart_callback_add("clicked", \&previous_page_cb, $self);
+	$bx->pack_end($prev_btn); $prev_btn->show();
+	$tb{prev_btn} = $prev_btn;
+	
+	my $next_btn = pEFL::Elm::Button->add($bx);
+	my $icon3 = pEFL::Elm::Icon->add($bx);
+	$icon3->standard_set("go-next");
+	$next_btn->part_content_set("icon",$icon3);
+	$next_btn->size_hint_weight_set(0, EVAS_HINT_EXPAND);
+	$next_btn->size_hint_align_set(0, EVAS_HINT_FILL);
+	$next_btn->smart_callback_add("clicked", \&next_page_cb, $self);
+	$bx->pack_end($next_btn); $next_btn->show();
+	$tb{next_btn} = $next_btn;
+	
+	my $select_page_combo = pEFL::Elm::Combobox->add($bx);
+	_expand_widget_x($select_page_combo);
+	$select_page_combo->text_set("");
+	
+	my $itc = pEFL::Elm::GenlistItemClass->new();
+	$itc->item_style("default");
+	$itc->text_get(sub {return pEFL::Elm::Entry::utf8_to_markup($_[0]);});
+	$select_page_combo->smart_callback_add("item,selected", \&_select_page_combo_item_selected_cb, $self);
+	$select_page_combo->smart_callback_add("item,pressed", \&_select_page_combo_item_pressed_cb, $self);
+	$select_page_combo->show(); $bx->pack_end($select_page_combo);
+	$tb{combo} = $select_page_combo;
+	$tb{itc} = $itc;
+
+	$self->{toolbar} = \%tb;
+}
+
+sub next_page_cb {
+	my ($preview) = @_;
+	$preview->next_page();
+	$preview->render_preview($preview->app->tmpdir . "/preview");
+}
+
+sub previous_page_cb {
+	my ($preview) = @_;
+	$preview->previous_page();
+	$preview->render_preview($preview->app->tmpdir . "/preview");
+}
+
+sub preview_cb {
+	my ($preview) = @_;
+
+	$preview->generate_preview();
+	
+	# Generate MIDI only if preview is succesful
+	# (generate_preview set $preview->up_to_date() to 1!!!)
+	$preview->app->midi->generate_mid() if ($preview->up_to_date());	
+}
+
+sub generate_preview {
+	my ($preview) = @_;
+	
+	my $app = $preview->app();
+	my $en = $app->entry->elm_entry();
+	my $text = $en->entry_get();
+	
+	# delete old created files	
+	my $tmpdir = $app->tmpdir();
+	my @filelist = <"$tmpdir/preview*">;
+	foreach my $file (@filelist) {
+		unlink $file;
+	}
+	
+	my $r = $app->renderer();
+	$r->render_preview(outfile => "$tmpdir/preview");
+
+	if (-e "$tmpdir/preview-1.svg") {
+		my @filelist = <"$tmpdir/preview*.svg">;
+		my $number_of_pages = @filelist;
+		$preview->page(1) unless $preview->page();
+		$preview->number_of_pages($number_of_pages);
+		$preview->render_preview("$tmpdir/preview");
+		
+		# For insert decoration functionality it is important, that preview is up-to-date
+		$preview->up_to_date(1);
+		
+		# Update Combobox
+		$preview->update_page_combo($number_of_pages);
+	}
+	else {
+		warn "$tmpdir/preview-1.svg doesn*t exist\n";
+	}	
+}
+
+sub update_page_combo {
+	my ($self, $number_of_pages) = @_;
+
+	my $tb = $self->{toolbar};
+	return unless ($tb);
+	
+	my $combo = $tb->{combo};
+	$combo->clear();
+	foreach my $i (1..$number_of_pages) {
+		$combo->item_append($tb->{itc}, "Page $i (#$i)", undef, ELM_GENLIST_ITEM_NONE, undef, undef);
+	}
+	$combo->text_set("Page ". $self->page() . "(#" . $self->page(). ")");
+}
+
+
+sub _select_page_combo_item_pressed_cb {
+	my ($self,$obj,$event_info) = @_;
+	
+	my $item = pEFL::ev_info2obj($event_info, "ElmGenlistItemPtr");
+	
+	my $text = $item->text_get();
+	$obj->text_set($text);
+	$item->selected_set(1);
+	$obj->hover_end();
+
+	my $index = $1 if (defined($text) && $text =~ /\(#(\d+)\)\s*$/);;
+	return unless (defined($index));
+
+	my $tmpdir = $self->app->tmpdir;
+	$self->page($index);
+	$self->render_preview("$tmpdir/preview");
+	$self->up_to_date(1)
+	#$self->update_toolbar();
+}
+
+# FIX SELECTION ISSUE!
+# Don't select item if it is clicked
+sub _select_page_combo_item_selected_cb {
+	my ($self,$obj,$event_info) = @_;
+	
+	my $item = pEFL::ev_info2obj($event_info, "ElmGenlistItemPtr");
+	$item->selected_set(0);
 }
 
 sub move_notes {
@@ -131,7 +309,7 @@ sub load_tune {
 		my $n = $self->create_note_rect($note,[24,68,91,0],$scale_factor);
 		
 		$n->event_callback_add(EVAS_CALLBACK_MOUSE_IN, sub {$_[0]->color_set(24,68,91,150)}, $n);
-	    $n->event_callback_add(EVAS_CALLBACK_MOUSE_OUT, sub {$_[0]->color_set(24,68,91,0)}, $n);
+	    $n->event_callback_add(EVAS_CALLBACK_MOUSE_OUT, sub {$_[0]->color_set(0,0,0,0)}, $n);
 	    
 	    # Dirty Workaround: On wheel event we hide, so that the scroller can retrieve the wheel event
 	    $n->event_callback_add(EVAS_CALLBACK_MOUSE_WHEEL, sub {$_[0]->hide()}, $n);
@@ -339,7 +517,10 @@ sub show_logo {
 	my $app = $self->app();
 	my $viewer = $self->elm_viewer();
 	my $path = $app->share_dir . "/caecilia-logo.png";
+	
+	$viewer->size_hint_min_set(0,0);
 	$viewer->file_set($path,"");
+	$self->elm_scroller->region_show(0,0,1,1);
 }
 
 sub clear_notes {
@@ -363,6 +544,23 @@ sub clear_viewer {
 		
 	my $viewer = $self->elm_viewer();
 	$viewer->file_set(undef,"");
+}
+
+sub reset_preview {
+	my ($self) = @_;
+
+	$self->page(0);
+	$self->number_of_pages(0);
+	$self->up_to_date(0);
+	
+	$self->clear_viewer();
+	$self->clear_notes();
+	
+	$self->show_logo();
+	# alternative: empty preview:
+	#$self->elm_viewer->size_hint_min_set(0,0);
+	#$self->elm_viewer->file_set(undef,"");
+	#$self->elm_scroller->region_show(0,0,1,1);	
 }
 
 sub render_preview {
@@ -393,7 +591,15 @@ sub next_page {
 	my ($self) = @_;
 	
 	my $old_page = $self->page();
-	return $self->page($old_page+1) unless ($old_page >= $self->number_of_pages());
+	my $new_page = $old_page + 1;
+	
+	unless ($old_page >= $self->number_of_pages()) {
+		my $tb = $self->{toolbar};
+		my $combo = $tb->{combo};
+		$combo->text_set("Page $new_page (#$new_page)");
+	
+		return $self->page($new_page);
+	}
 	
 }
 
@@ -401,8 +607,15 @@ sub previous_page {
 	my ($self) = @_;
 	
 	my $old_page = $self->page();
-	return $self->page($old_page-1) unless ($old_page <= 1);
+	my $new_page = $old_page - 1;
 	
+	unless ($old_page <= 1) {
+		my $tb = $self->{toolbar};
+		my $combo = $tb->{combo};
+		$combo->text_set("Page $new_page (#$new_page)");
+	
+		return $self->page($new_page);
+	}
 }
 
 ######################

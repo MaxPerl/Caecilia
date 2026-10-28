@@ -20,8 +20,8 @@ use Cwd qw(abs_path getcwd);
 use File::Path qw(make_path);
 use File::Copy;
 
-use Caecilia::Tune;
-use Caecilia::Tunes;
+use Caecilia::TuneBook;
+use Caecilia::Tabs;
 use Caecilia::Entry;
 #use Caecilia::Search;
 use Caecilia::Settings;
@@ -65,11 +65,11 @@ sub new {
 	our $share = dist_dir('Caecilia');
 	
 	my $obj = {
-		tunes => undef,
+		tabs => undef,
 		entry => undef,
 		preview => undef,
 		midi => undef,
-		current_tune => 0,
+		current_tunebook => 0,
 		settings => undef,
 		user_dir => File::HomeDir->my_home . "/.caecilia",
 		share_dir => $share,
@@ -128,8 +128,8 @@ sub init_ui {
 	
 	$self->add_toolbar($win,$box);
 	
-	my $tunes = Caecilia::Tunes->new($self,$box);
-	$self->tunes($tunes);
+	my $tabs = Caecilia::Tabs->new($self,$box);
+	$self->tabs($tabs);
 	
 	my $panes = pEFL::Elm::Panes->add($box);
 	$panes->size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
@@ -160,9 +160,9 @@ sub init_ui {
 		}
 	}
 	else {
-		my $tune = Caecilia::Tune->new(filename => "", id => 0);
-		$self->current_tune($tune);
-		$self->tunes()->push_tune($tune);
+		my $tunebook = Caecilia::TuneBook->new(filename => "", id => 0);
+		$self->current_tunebook($tunebook);
+		$self->tabs()->push_tab($tunebook);
 	}
 	
 	$win->resize_object_add($box);
@@ -377,12 +377,12 @@ sub add_menu {
 	
 	my $file_it = $menu->item_add(undef,undef,"File",undef, undef);
 	
-	$menu->item_add($file_it,"document-new","New",sub {$self->tunes->_new_tune},undef);
+	$menu->item_add($file_it,"document-new","New",sub {Caecilia::TuneBook::new_tune($self)},undef);
 	$menu->item_add($file_it,"document-open","Open",\&_open_cb,$self);
 	$menu->item_add($file_it,"document-save","Save",\&save,$self);
 	$menu->item_add($file_it,"document-save-as","Save as",\&save_as,$self);
 	$menu->item_add($file_it,"document-export","Export",sub {my $r = $self->renderer(); $r->show_dialog()},undef);
-	$menu->item_add($file_it,"document-close","Close",\&_close_tune_cb,$self->tunes());
+	$menu->item_add($file_it,"document-close","Close",\&_close_tab_cb,$self->tabs());
 	$menu->item_add($file_it,"window-close","Exit",\&on_exit,$self);
 	
 	
@@ -409,9 +409,9 @@ sub add_menu {
 	$src_highlight_it->content_set($src_highlight_check);
 	$self->elm_src_highlight_check($src_highlight_check);
 	
-	$menu->item_add($doc_it,"view-restore","Preview",\&preview_cb,$self);
-	$menu->item_add($doc_it,"go-next","Next Page",\&next_page_cb,$self);
-	$menu->item_add($doc_it,"go-previous","Previous Page",\&previous_page_cb,$self);
+	$menu->item_add($doc_it,"view-restore","Preview",\&Caecilia::Preview::preview_cb,$self->preview);
+	$menu->item_add($doc_it,"go-next","Next Page",\&Caecilia::Preview::next_page_cb,$self->preview);
+	$menu->item_add($doc_it,"go-previous","Previous Page",\&Caecilia::Preview::previous_page_cb,$self->preview);
 	
 	
 	my $help_it = $menu->item_add(undef,undef,"Help",undef, undef);
@@ -448,7 +448,7 @@ sub add_toolbar {
 	$tabsbar->icon_size_set(14);
 	$f->content_set($tabsbar);
 	
-	$tabsbar->item_append("document-new","New",sub {$self->tunes->_new_tune},undef);
+	$tabsbar->item_append("document-new","New",\&Caecilia::TuneBook::new_tune,$self);
 	$tabsbar->item_append("document-open","Open",\&_open_cb,$self);
 	$tabsbar->item_append("document-save","Save",\&save,$self);
 	$tabsbar->item_append("document-save-as","Save as",\&save_as,$self);
@@ -461,14 +461,14 @@ sub add_toolbar {
 	$tabsbar->item_append("document-import","Import MIDI",sub {my $r = $self->recorder(); $r->show_import_midi_dialog($self)},undef);
 	my $it_sep2 = $tabsbar->item_append(undef,undef,undef,undef);
 	$it_sep2->separator_set(1);
-	$tabsbar->item_append("view-restore","Preview",\&preview_cb,$self);
-	$self->{prev_btn} = $tabsbar->item_append("go-previous","Previous Page",\&previous_page_cb,$self);
-	$self->{next_btn} = $tabsbar->item_append("go-next","Next Page",\&next_page_cb,$self);
+	
+	$tabsbar->item_append("view-restore","Preview",sub {$self->preview->preview_cb()},undef);
 	#my $it_sep3 = $tabsbar->item_append(undef,undef,undef,undef);
 	#$it_sep3->separator_set(1);
 	#$tabsbar->item_append("media-playback-start","Show/Hide MIDI",\&midi_cb,$self);
 	my $it_sep4 = $tabsbar->item_append(undef,undef,undef,undef);
 	$it_sep4->separator_set(1);
+	
 	$tabsbar->item_append("preferences-other","Settings",sub {my $s = $self->settings(); $s->show_dialog($self)},undef);
 	
 	$self->elm_toolbar($tabsbar);
@@ -488,53 +488,6 @@ sub midi_cb {
     }
 }
 
-sub next_page_cb {
-	my ($self) = @_;
-	my $preview = $self->preview();
-	$preview->next_page();
-	$preview->render_preview($self->tmpdir . "/preview");
-}
-
-sub previous_page_cb {
-	my ($self) = @_;
-	my $preview = $self->preview();
-	$preview->previous_page();
-	$preview->render_preview($self->tmpdir . "/preview");
-}
-
-sub preview_cb {
-	my ($self) = @_;
-	
-	my $en = $self->entry->elm_entry();
-	my $text = $en->entry_get();
-	
-	
-	# delete old created files	
-	my $tmpdir = $self->tmpdir();
-	my @filelist = <"$tmpdir/preview*">;
-	foreach my $file (@filelist) {
-		unlink $file;
-	}
-	
-	my $r = $self->renderer();
-	$r->render_preview(outfile => "$tmpdir/preview");
-
-	if (-e "$tmpdir/preview-1.svg") {
-		my @filelist = <"$tmpdir/preview*.svg">;
-		my $number_of_pages = @filelist;
-		$self->preview->page(1) unless $self->preview->page();
-		$self->preview->number_of_pages($number_of_pages);
-		$self->preview->render_preview("$tmpdir/preview");
-		
-		# For insert decoration functionality it is important, that preview is up-to-date
-		$self->preview->up_to_date(1);
-	}
-	else {
-		warn "$tmpdir/preview-1.svg doesn*t exist\n";
-	}
-	
-}
-
 sub key_down {
 	my ($self, $type, $event) = @_;
 	my $e = pEFL::ev_info2obj($event, "pEFL::Ecore::Event::Key");
@@ -542,13 +495,13 @@ sub key_down {
 	my $modifiers = $e->modifiers();
 	
 	if ($modifiers == 2 && $keyname eq "n") {
-		$self->tunes->_new_tune();
+		Caecilia::TuneBook::new_tune($self);
 	}
 	elsif ($modifiers == 2 && $keyname eq "o") {
 		_open_cb($self);
 	}
 	elsif ($modifiers == 2 && $keyname eq "p") {
-		preview_cb($self);
+		$self->preview()->preview_cb();
 	}
 	elsif ($modifiers == 2 && $keyname eq "r") {
 		my $r = $self->renderer(); 
@@ -569,7 +522,7 @@ sub key_down {
 		save_as($self);
 	}
 	elsif ($modifiers == 2 && $keyname eq "w") {
-		_close_tune_cb($self->tunes);
+		_close_tab_cb($self->tabs);
 	}
 	elsif ($modifiers == 2 && $keyname eq "q") {
 		on_exit($self);
@@ -588,7 +541,7 @@ sub key_down {
 sub on_exit {
 	my ($self) = @_;
 	
-	my @unsaved = grep $_->changed() > 0, @{$self->tunes->tunes()};
+	my @unsaved = grep $_->changed() > 0, @{$self->tabs->tabs()};
 	
 	if (@unsaved) {
 		my $popup = pEFL::Elm::Popup->add($self->elm_mainwindow());
@@ -630,9 +583,9 @@ sub file_cb {
 	
 	my $path; my $filename;
 	my $config = $self->settings->load_config();
-	if ($self->current_tune->filename) { 
-		(undef, $path, undef) = fileparse( $self->current_tune->filename );
-		$filename = $self->current_tune->filename;
+	if ($self->current_tunebook->filename) { 
+		(undef, $path, undef) = fileparse( $self->current_tunebook->filename );
+		$filename = $self->current_tunebook->filename;
 	}
 	elsif ($config->{scores_path} ) {
 		$path = $config->{scores_path};
@@ -688,19 +641,19 @@ sub save_as {
 sub save {
 	my ($self) = @_;
 	
-	my $current_tune = $self->current_tune();
-	my $elm_it = $current_tune->elm_toolbar_item();
+	my $current_tunebook = $self->current_tunebook();
+	my $elm_it = $current_tunebook->elm_toolbar_item();
 	my $en = $self->entry->elm_entry();
-	my $filename = $current_tune->filename || "";
+	my $filename = $current_tunebook->filename || "";
 	
 	if ($filename) {
-		# get the content of the buffer, without hidden characters
-		my $content = $en->entry_get();
-		$content = pEFL::Elm::Entry::markup_to_utf8($content);
+		# Save the editor in the TuneBook first (plain text, without hidden characters,
+		# umlauts etc. are already converted, see Entry::get_text).
+		$current_tunebook->content_current_str($self->entry->get_text);
 		
-		# umlauts etc. must be converted
-		$content = Encode::decode("utf-8",$content);
-		
+		# Then take the WHOLE file (header + all tunes), also in split mode
+		my $content = $current_tunebook->content_all_str();
+
 		# Only for safety (I don't think, this is necessary):
 		# Entfernt alle Windows-Wagenrückläufe (Carriage Returns)
 		$content =~ s/\r//g; 
@@ -714,7 +667,7 @@ sub save {
 		print $fh "$content";
 		close $fh;
 		
-		$current_tune->changed(0);
+		$current_tunebook->changed(0);
 		my ($name,$dirs,$suffix) = fileparse($filename); 
 		$elm_it->part_text_set("default",$name);
 	}
@@ -740,8 +693,8 @@ sub _fs_save_done {
 	
 	return unless($selected);
 	
-	my $current_tune = $self->current_tune();
-	$current_tune->filename($selected);
+	my $current_tunebook = $self->current_tunebook();
+	$current_tunebook->filename($selected);
 	
 	$self->save();
 }
@@ -776,25 +729,28 @@ sub open_file {
 			$content = unexpand($content);
 		}
 		
-		$content = pEFL::Elm::Entry::utf8_to_markup($content);
-		
+		# $content stays PLAIN TEXT here. The conversion to markup is done by
+		# Entry::set_text (see below)
+		#$content = pEFL::Elm::Entry::utf8_to_markup($content);
+
 		# Change the filename variable and/or open a new tab
 		my ($name,$dirs,$suffix) = fileparse($selected); 
 		
-		my $tune = $self->current_tune();
+		my $tunebook = $self->current_tunebook();
 		
-		if ( (scalar(@{$self->tunes->tunes}) == 1) && (!$tune->filename) && ($tune->id == 0) && ($tune->changed() == 0)) { 
-			$tune->filename($selected);
+		if ( (scalar(@{$self->tabs->tabs}) == 1) && (!$tunebook->filename) && ($tunebook->id == 0) && ($tunebook->changed() == 0)) { 
+			$tunebook->filename($selected);
 		}
 		else {
-			if ($tune) {
-				$tune->content($en->entry_get);
-				$tune->cursor_pos($en->cursor_pos_get());
+			if ($tunebook) {
+				# Editor => TuneBook of the tab we are leaving (plain text)
+				$tunebook->content_current_str($self->entry->get_text);
+				$tunebook->cursor_pos($en->cursor_pos_get());
 			}
 			
-			my $new_tune = Caecilia::Tune->new(filename => $selected, id => scalar( @{$self->tunes->tunes} ) );
-			$self->current_tune($new_tune);
-			$self->tunes()->push_tune($new_tune);
+			my $new_tunebook = Caecilia::TuneBook->new(filename => $selected, id => scalar( @{$self->tabs->tabs} ) );
+			$self->current_tunebook($new_tunebook);
+			$self->tabs()->push_tab($new_tunebook);
 		}
 	
 		# change content of the entry
@@ -802,17 +758,26 @@ sub open_file {
 		# This seems to be already done by pEFL::Elm::Entry::utf8_to_markup
 		#$content =~ s/\t/<tab\/>/g;
 		#$content =~ s/\n/<br\/>/g;
-		$en->entry_set($content);
 
-		# Determ the input language 
+		my $current = $self->current_tunebook();
+		# Split the the plain text in header + tunes and save it in $tabbook->content 		
+		$current->content_all_str($content);
+		# start in split mode (with the first tune). 
+		$current->edit_mode("split");
+		# shows it in the editor
+		# in Entry::set_text utf8_to_markup and rehighlight_all is done! 
+		# so here it isn't needed anymore!!!)
+		$self->entry->set_text($current->content_current_str);
+		
+		# Update toolbar (fill Combobox, change text of mode button, disable buttons etc.);
+		$self->entry->update_toolbar();
+
+		# Determ the input language
 		#$self->entry->determ_source_lang($selected);
-		
-		#rehighlight all
-		$self->entry->rehighlight_all();
-		
+
 		# Workaround: Through inserting changed event is triggered
-		$self->current_tune->changed(0);
-		$self->current_tune->elm_toolbar_item->text_set($name);
+		$self->current_tunebook->changed(0);
+		$self->current_tunebook->elm_toolbar_item->text_set($name);
 		
 		$en->cursor_pos_set(0);
 	}
@@ -859,16 +824,16 @@ sub toggle_src_highlight {
 	my ($self, $obj, $ev) = @_;
 	my $check = $self->elm_src_highlight_check();
 	
-	my $current_tune = $self->current_tune();
+	my $current_tunebook = $self->current_tunebook();
 	
-	if ($current_tune->source_highlight() eq "yes") {
-		$current_tune->source_highlight("no");
+	if ($current_tunebook->source_highlight() eq "yes") {
+		$current_tunebook->source_highlight("no");
 		$self->entry->clear_highlight();
 		
 		$check->state_set(0);
 	}
 	else {
-		$current_tune->source_highlight("yes");
+		$current_tunebook->source_highlight("yes");
 		$self->entry->rehighlight_all();
 		
 		$check->state_set(1);
@@ -917,7 +882,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~ m/tunes|entry|settings|renderer|recorder|midi|user_dir|share_dir|tmpdir|mpv|current_tune|preview|elm_mainwindow|elm_menu|elm_toolbar|elm_src_highlight_check|elm_linewrap_check|elm_linecolumn_label/;
+		unless $AUTOLOAD =~ m/tabs|entry|settings|renderer|recorder|midi|user_dir|share_dir|tmpdir|mpv|current_tunebook|preview|elm_mainwindow|elm_menu|elm_toolbar|elm_src_highlight_check|elm_linewrap_check|elm_linecolumn_label/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

@@ -19,6 +19,8 @@ use Convert::Color;
 
 use Text::Tabs;
 
+use Caecilia::MyElm ":all";
+
 our @ISA = qw(Exporter);
 
 our $AUTOLOAD;
@@ -73,8 +75,19 @@ sub new {
 }
 
 sub init_entry {
-	my ($self,$app,$box) = @_;
+	my ($self,$app,$panes) = @_;
 	
+	############################
+	# ADD DOCUMENT TOOLBAR
+	############################
+	my $left_box = pEFL::Elm::Box->add($panes);
+	_expand_widget($left_box);
+	
+	$self->add_document_toolbar($app->elm_mainwindow,$left_box);
+	
+	############################
+	# ADD ENTRY
+	###########################
 	my $config = $app->settings->load_config();
 	$self->tabmode("whitespaces") if ($config->{tabmode} && $config->{tabmode} eq "Add whitespace");
 	
@@ -91,7 +104,7 @@ sub init_entry {
 	my $edj_path = $share . "/custom.edj";
 	pEFL::Elm::Theme::extension_add($edj_path);
 	
-	my $en = pEFL::Elm::Entry->add($box);
+	my $en = pEFL::Elm::Entry->add($left_box);
 	$en->style_set("custom");
 	$en->scrollable_set(1);
 	$en->autosave_set(0);
@@ -140,11 +153,346 @@ sub init_entry {
 	$en->context_menu_item_add("Insert repetitions", $self->app->share_dir()."/icons/decos/slashslashslash.png", ELM_ICON_FILE, \&select_deco,[$self,"repetitions"]);
 	$en->context_menu_item_add("Insert range decos", $self->app->share_dir()."/icons/decos/8vastart.png", ELM_ICON_FILE, \&select_deco,[$self,"range decos"]);
 	
-	$box->part_content_set("left",$en);
+	$left_box->pack_end($en);
 	$en->show();
+	
+	$left_box->show();
+	$panes->part_content_set("left",$left_box);
 	
 	$self->app->entry($self);
 }
+
+##################################
+# Document Toolbar
+##################################
+sub add_document_toolbar {
+	my ($self, $win, $box) = @_;
+	
+	my $bx = pEFL::Elm::Box->add($box);
+	$bx->horizontal_set(1);
+	$bx->size_hint_align_set(EVAS_HINT_FILL, 0);
+	$bx->size_hint_weight_set(EVAS_HINT_EXPAND, 0);
+	$bx->show();$box->pack_end($bx);
+	
+	my %tb;
+
+	my $mode_btn = pEFL::Elm::Button->add($bx);
+	$mode_btn->text_set("mode: raw");
+	$mode_btn->size_hint_weight_set(0, EVAS_HINT_EXPAND);
+	$mode_btn->size_hint_align_set(0, EVAS_HINT_FILL);
+	$mode_btn->smart_callback_add("clicked", \&_mode_btn_cb, $self);
+	$bx->pack_end($mode_btn); $mode_btn->show();
+	$tb{mode_btn} = $mode_btn;
+	
+	my $reload_btn = pEFL::Elm::Button->add($bx);
+	my $icon3 = pEFL::Elm::Icon->add($bx);
+	$icon3->standard_set("view-refresh");
+	$reload_btn->part_content_set("icon",$icon3);
+	$reload_btn->size_hint_weight_set(0, EVAS_HINT_EXPAND);
+	$reload_btn->size_hint_align_set(0, EVAS_HINT_FILL);
+	$reload_btn->smart_callback_add("clicked", \&_reload_cb, $self);
+	$bx->pack_end($reload_btn); $reload_btn->show();
+	$tb{reload_btn} = $reload_btn;
+	
+	my $select_X_combo = pEFL::Elm::Combobox->add($bx);
+	_expand_widget_x($select_X_combo);
+	$select_X_combo->text_set("");
+	#$select_X_combo->select_mode_set( ELM_OBJECT_SELECT_MODE_NONE);
+	
+	my $itc = pEFL::Elm::GenlistItemClass->new();
+	$itc->item_style("default");
+	$itc->text_get(sub {return pEFL::Elm::Entry::utf8_to_markup($_[0]);});
+	$select_X_combo->smart_callback_add("item,selected", \&_select_X_combo_item_selected_cb, $self);
+	$select_X_combo->smart_callback_add("item,pressed", \&_select_X_combo_item_pressed_cb, $self);
+	$select_X_combo->show(); $bx->pack_end($select_X_combo);
+	$tb{combo} = $select_X_combo;
+	$tb{itc} = $itc;
+	
+	my $add_tunebook_btn = pEFL::Elm::Button->add($bx);
+	my $icon4 = pEFL::Elm::Icon->add($bx);
+	$icon4->standard_set("document-new");
+	$add_tunebook_btn->part_content_set("icon",$icon4);
+	$add_tunebook_btn->size_hint_weight_set(0, EVAS_HINT_EXPAND);
+	$add_tunebook_btn->size_hint_align_set(0, EVAS_HINT_FILL);
+	$add_tunebook_btn->smart_callback_add("clicked", \&_add_tune_cb, $self);
+	$bx->pack_end($add_tunebook_btn); $add_tunebook_btn->show();
+	$tb{add_btn} = $add_tunebook_btn;
+
+	my $prev_btn = pEFL::Elm::Button->add($bx);
+	my $icon1 = pEFL::Elm::Icon->add($bx);
+	$icon1->standard_set("go-previous");
+	$prev_btn->part_content_set("icon",$icon1);
+	$prev_btn->size_hint_weight_set(0, EVAS_HINT_EXPAND);
+	$prev_btn->size_hint_align_set(0, EVAS_HINT_FILL);
+	$prev_btn->smart_callback_add("clicked", \&_step_btn_cb, [$self,-1]);
+	$bx->pack_end($prev_btn); $prev_btn->show();
+	$tb{prev_btn} = $prev_btn;
+	
+	my $next_btn = pEFL::Elm::Button->add($bx);
+	my $icon2 = pEFL::Elm::Icon->add($bx);
+	$icon2->standard_set("go-next");
+	$next_btn->part_content_set("icon",$icon2);
+	$next_btn->size_hint_weight_set(0, EVAS_HINT_EXPAND);
+	$next_btn->size_hint_align_set(0, EVAS_HINT_FILL);
+	$next_btn->smart_callback_add("clicked", \&_step_btn_cb, [$self,1]);
+	$bx->pack_end($next_btn); $next_btn->show();
+	$tb{next_btn} = $next_btn;
+
+	$self->{toolbar} = \%tb;
+}
+
+# Updates toolbar
+# Call it, whenever another tunebook / tune / mode is shown: Tabs::change_tab,
+# Tabs::_new_tab_cb, Caecilia::open_file (after set_text!) and the callbacks below
+sub update_toolbar {
+	my ($self) = @_;
+
+	my $tb = $self->{toolbar};
+	return unless ($tb);
+	my $tunebook = $self->app->current_tunebook();
+	return unless (ref($tunebook) eq "Caecilia::TuneBook");
+
+	my $i = $tunebook->current_tune();
+	my $split = ($i >= 0) ? 1 : 0;
+
+	$tb->{mode_btn}->text_set($split ? "mode: split" : "mode: raw");
+
+	my $combo = $tb->{combo};
+	$combo->clear();
+	if ($split) {
+		my @labels = $tunebook->tune_labels();
+		foreach my $label (@labels) {
+			$combo->item_append($tb->{itc}, $label, undef, ELM_GENLIST_ITEM_NONE, undef, undef);
+		}
+		$combo->text_set(pEFL::Elm::Entry::utf8_to_markup($labels[$i]));
+	}
+	else {
+		$combo->text_set("");
+	}
+}
+
+# 
+sub _mark_changed {
+	my ($self) = @_;
+	
+	my $tunebook = $self->app->current_tunebook();
+	$tunebook->changed($tunebook->changed()+1);
+	my $elm_it = $tunebook->elm_toolbar_item();
+	my $title = $elm_it->text_get();
+	$elm_it->text_set("$title*") unless ($title =~ /\*$/);
+}
+
+#
+sub _show_current_tune {
+	my ($self) = @_;
+
+	my $tunebook = $self->app->current_tunebook();
+	$self->set_text($tunebook->content_current_str());
+	$self->elm_entry->cursor_pos_set(0);
+}
+
+# Split mode: show the tune with this index (0 = file header)
+sub select_tune {
+	my ($self, $index) = @_;
+
+	my $tunebook = $self->app->current_tunebook();
+	return if ($index == $tunebook->current_tune());
+
+	# first store the text of entry in old tune	
+	$tunebook->content_current_str($self->get_text());
+
+	# change tune
+	# !!! current_tune() also resets the undo / redo stack and the cursor position
+	$tunebook->current_tune($index);
+
+	# Set the text of entry to the text of the current tune	and resets preview
+	$self->_show_current_tune();
+	$self->app->preview->reset_preview();
+	$self->app->midi->reset_midi();
+}
+
+# "raw" or "split"
+sub set_mode {
+	my ($self, $mode) = @_;
+
+	my $tunebook = $self->app->current_tunebook();
+	return if ($tunebook->edit_mode() eq $mode);
+	
+	# In raw mode the text is split anew when the editor text is taken over.
+	# So the parts are always sorted when one changes the mode.
+	$tunebook->content_current_str($self->get_text());
+	$tunebook->edit_mode($mode);
+	
+	# Set the text of entry to the text of the current tune	and resets preview
+	$self->_show_current_tune();
+	$self->app->preview->reset_preview();
+	$self->app->midi->reset_midi();
+}
+
+# Inserts a new tune into the Entry
+sub insert_tune {
+	my ($self, $new) = @_;
+	
+	my $tunebook = $self->app->current_tunebook();
+		
+	my $split = ($tunebook->current_tune() >= 0) ? 1 : 0;
+	
+	# Show the inserted tune
+	if ($split) {
+		# split mode: Set current_tune to the inserted tune and show it
+		$tunebook->current_tune($new);
+		
+		# Set the text of entry to the text of the current tune	and resets preview
+		$self->_show_current_tune();
+		$self->app->preview->reset_preview();
+		$self->app->midi->reset_midi();
+	}
+	else {
+		# raw mode: cursor jumps to the new X: line
+		$self->set_text($tunebook->content_current_str());
+		$self->elm_entry->cursor_pos_set($tunebook->offset_of_index($new));
+		$self->elm_entry->focus_set(1);
+		$self->set_linecolumn_label();
+		$self->_reset_preview();
+	}
+	
+	$self->_mark_changed();
+	$self->update_toolbar();
+}
+
+#
+sub reload_tunebook {
+	my ($self) = @_;
+
+	my $tunebook = $self->app->current_tunebook();
+	
+	# in raw mode there is nothing to split
+	return if ($tunebook->edit_mode() eq "raw");
+
+	$tunebook->content_current_str($self->get_text());
+	$tunebook->reload();
+	
+	$self->_show_current_tune();
+	$self->app->preview->reset_preview();
+	$self->app->midi->reset_midi();
+}
+
+sub _mode_btn_cb {
+	my ($self, $obj, $event_info) = @_;
+
+	my $mode = $self->app->current_tunebook->edit_mode() eq "raw" ? "split" : "raw";
+	$self->set_mode($mode);
+	$self->update_toolbar();
+}
+
+sub _step_btn_cb {
+	my ($data, $obj, $event_info) = @_;
+	my ($self, $step) = @$data;
+
+	my $tunebook = $self->app->current_tunebook();
+	
+	# raw mode: Jump to the "X: " line
+	if ($tunebook->edit_mode() eq "raw") {
+		$self->jump_to_next_tune($step);
+		return;
+	}
+
+	# split mode: select next tune
+	my $index = $tunebook->current_tune() + $step;
+	return if ($index < 0 || $index > $#{$tunebook->content()});
+	$self->select_tune($index);
+	
+	# Reset preview and midi!
+	$self->app->preview->reset_preview();
+	$self->app->midi->reset_midi();
+	
+	$self->update_toolbar();
+}
+
+# Raw mode: Puts the cursor at the beginning of the next ($step = 1) or previous
+# ($step = -1) "X: " line, i.e. the next / previous tune. 
+# The cursor position of the entry is the offset in the plain text (the same offsets are used
+# in insert_deco), so it is enough to search in the plain text (get_text). Highlight tags and 
+# entities (&ouml;) aren't counted there.
+sub jump_to_next_tune {
+	my ($self, $step) = @_;
+	
+	my $en = $self->elm_entry();
+	my $text = $self->get_text();
+	my $cursor_pos = $en->cursor_pos_get();
+	
+	# Collect the start offset of every X: line
+	my @positions;
+	# \m = ^ matches at the beginning of every line; 
+	# \g in a while condition: every pass continues after the previous matcj 
+	while ($text =~ /^X:/mg) {
+		# $-[0] ist eine Spezialvariable für die Anfangspositionen des letzten Treffers eines Regex
+		# gezählt wird von Beginn des Textes 
+		# => entspricht daher cursor_pos, weil Umlaute usw. nicht mitzählen!!!
+		# (see perldoc perlvar, @- ; = @LAST_MATCH_START, wenn das Module use Enlish geladen ist
+		push @positions, $-[0];
+	}
+
+	my $pos;
+	if ($step > 0) {
+		($pos) = grep { $_ > $cursor_pos } @positions;
+	}
+	else {
+		# grep filtert zuerst alle Elemente
+		# reverse dreht dann die Reihenfolge um (sonst würden wir immer nur die allererste Position bekommen
+		# $pos im Listenkontext (!) speichert nur das erste Element der so erzeugten Liste 
+		($pos) = reverse grep { $_ < $cursor_pos } @positions;
+	}
+	return unless (defined($pos));
+
+	$en->select_none();
+	$en->cursor_pos_set($pos);
+	$en->focus_set(1);
+	$self->set_linecolumn_label();
+}
+
+sub _add_tune_cb {
+	my ($self, $obj, $event_info) = @_;
+
+	Caecilia::TuneBook::new_tune($self->app(), into_tunebook => 1);
+}
+
+sub _reload_cb {
+	my ($self, $obj, $event_info) = @_;
+
+	$self->reload_tunebook();
+	$self->update_toolbar();
+}
+
+sub _select_X_combo_item_pressed_cb {
+	my ($self,$obj,$event_info) = @_;
+	
+	my $item = pEFL::ev_info2obj($event_info, "ElmGenlistItemPtr");
+	
+	my $text = $item->text_get();
+	$obj->text_set($text);
+	$item->selected_set(1);
+	$obj->hover_end();
+
+	my $index = $self->app->current_tunebook->tune_index_from_label($text);
+	return unless (defined($index));
+
+	$self->select_tune($index);
+	$self->update_toolbar();
+}
+
+# FIX SELECTION ISSUE!
+# Don't select item if it is clicked
+sub _select_X_combo_item_selected_cb {
+	my ($self,$obj,$event_info) = @_;
+	
+	my $item = pEFL::ev_info2obj($event_info, "ElmGenlistItemPtr");
+	$item->selected_set(0);
+}
+
+######################################
+# ENTRY PART
+#####################################
 
 sub _calc_em {
 	my ($self, $user_style) = @_;
@@ -225,14 +573,14 @@ sub changed {
 	
 	
 	########################
-	# Change Tune name, if changed status has changed
+	# Change TuneBook name, if changed status has changed
 	########################
-	my $current_tune = $self->app->current_tune();
-	$current_tune->changed($current_tune->changed()+1) if ($self->is_undo() eq "no" && $self->is_rehighlight() eq "no");
-	my $elm_it = $current_tune->elm_toolbar_item; 
+	my $current_tunebook = $self->app->current_tunebook();
+	$current_tunebook->changed($current_tunebook->changed()+1) if ($self->is_undo() eq "no" && $self->is_rehighlight() eq "no");
+	my $elm_it = $current_tunebook->elm_toolbar_item; 
 	my $title = $elm_it->text_get();
-	$elm_it->text_set("$title*") if ($current_tune->changed() && $title !~/\*$/);
-	$elm_it->text_set("$title") if ($current_tune->changed() == 0 && $title =~/\*$/);
+	$elm_it->text_set("$title*") if ($current_tunebook->changed() && $title !~/\*$/);
+	$elm_it->text_set("$title") if ($current_tunebook->changed() == 0 && $title =~/\*$/);
 	
 	# For insert decoration functionality it is important, that preview is up_to_date
 	$self->app->preview->up_to_date(0);
@@ -259,7 +607,7 @@ sub changed {
 	
 	my $text = $self->get_rehighlight_lines($cp1,$cp2);
 	
-	if ( $current_tune->source_highlight() eq "yes" ) {
+	if ( $current_tunebook->source_highlight() eq "yes" ) {
 		$text = $self->highlight_str($text);
 	}
 	
@@ -295,7 +643,7 @@ sub text_set_done {
 	my ($self, $entry) = @_;
 	
 	if ($self->is_change_tab() eq "yes") {
-		my $pos = $self->app->current_tune->cursor_pos;
+		my $pos = $self->app->current_tunebook->cursor_pos;
 		$entry->cursor_pos_set($pos);
 		$self->is_change_tab("no");
 	}
@@ -308,11 +656,11 @@ sub text_set_done {
 sub fill_undo_stack {
 	my ($self, $change_info, $change) = @_;
 	
-	my $current_tune = $self->app->current_tune();
+	my $current_tunebook = $self->app->current_tunebook();
 
 	#use Data::Dumper;
 	#print "CHANGE " . Dumper($change) . "\n";
-	my @undo_stack = @{$current_tune->undo_stack};
+	my @undo_stack = @{$current_tunebook->undo_stack};
 	my $last_undo = $undo_stack[$#undo_stack];
 	my $new_undo;
 	
@@ -329,7 +677,7 @@ sub fill_undo_stack {
 		# print "rehighlight found $insert_content\n";
 	}
 	else {
-		undef @{$current_tune->redo_stack};
+		undef @{$current_tunebook->redo_stack};
 		
 		if ($change_info->insert) {
 			
@@ -354,17 +702,17 @@ sub fill_undo_stack {
 			}
 			# Make a new undo record, only if a new word starts, a tab is inserted or a newline
 			elsif ($prev_pos == ($new_pos - $prev_plain_length) && $insert_content_plain =~ m/\S/ && $insert_content_plain ne "\n" && $insert_content_plain ne "\t" ) {
-				pop @{$current_tune->undo_stack};
+				pop @{$current_tunebook->undo_stack};
 				$new_undo->{pos} = $prev_pos;	
 				$new_undo->{plain_length} = $prev_plain_length + $new_plain_length;
 				$new_undo->{content} = $prev_content . $insert_content_plain;
-				push @{$current_tune->undo_stack}, $new_undo;
+				push @{$current_tunebook->undo_stack}, $new_undo;
 			}
 			elsif (defined($insert_content_plain)) {
 				$new_undo->{pos} = $new_pos;
 				$new_undo->{content} = $insert_content_plain if (defined($insert_content_plain));
 				$new_undo->{plain_length} = $new_plain_length;
-				push @{$current_tune->undo_stack}, $new_undo;
+				push @{$current_tunebook->undo_stack}, $new_undo;
 			}
 				
 		}
@@ -389,21 +737,21 @@ sub fill_undo_stack {
 			
 			# BackSlash key is pressed
 			if ($last_undo->{del} && $prev_start == ($start +1) ) {
-				pop @{$current_tune->undo_stack};
+				pop @{$current_tunebook->undo_stack};
 				$new_undo->{del} = 1;
 				$new_undo->{start} = $start;
 				$new_undo->{end} = $prev_end;
 				$new_undo->{content} = $content_plain . $prev_content;
-				push @{$current_tune->undo_stack}, $new_undo;
+				push @{$current_tunebook->undo_stack}, $new_undo;
 			}
 			# Delete key is pressed
 			elsif ($last_undo->{del} && $prev_start == $start && $prev_end == $end) {
-				pop @{$current_tune->undo_stack};
+				pop @{$current_tunebook->undo_stack};
 				$new_undo->{del} = 1;
 				$new_undo->{start} = $start;
 				$new_undo->{end} = $end;
 				$new_undo->{content} = $prev_content . $content_plain;
-				push @{$current_tune->undo_stack}, $new_undo;
+				push @{$current_tunebook->undo_stack}, $new_undo;
 			}
 			# a new area is deleted
 			else {
@@ -411,7 +759,7 @@ sub fill_undo_stack {
 				$new_undo->{start} = $start;
 				$new_undo->{end} = $end;
 				$new_undo->{content} = $content_plain;
-				push @{$current_tune->undo_stack}, $new_undo;
+				push @{$current_tunebook->undo_stack}, $new_undo;
 			}
 		
 		}
@@ -419,7 +767,7 @@ sub fill_undo_stack {
 	
 	# use Data::Dumper;
 	# print "NEW UNDO " . Dumper($new_undo) . "\n\n";
-	# print "UNDO STACK" . Dumper(@{$current_tune->undo_stack}) . "\n\n";
+	# print "UNDO STACK" . Dumper(@{$current_tunebook->undo_stack}) . "\n\n";
 	return $new_undo;
 }
 
@@ -427,18 +775,18 @@ sub undo {
 	my ($self) = @_;
 	my $entry = $self->elm_entry();
 	
-	my $current_tune = $self->app->current_tune();
+	my $current_tunebook = $self->app->current_tunebook();
 	
 	#use Data::Dumper;
-	#print "\n DO UNDO " . Dumper($current_tune->undo_stack) . "\n";
+	#print "\n DO UNDO " . Dumper($current_tunebook->undo_stack) . "\n";
 	
-	my $undo = pop @{$current_tune->undo_stack};
+	my $undo = pop @{$current_tunebook->undo_stack};
 	# print "CURSOR " . $entry->cursor_pos_get() . "\n";
 	
 	unless (defined($undo)) {
 		return;
 	}
-	push @{$current_tune->redo_stack}, $undo;
+	push @{$current_tunebook->redo_stack}, $undo;
 	if ($undo->{del}) {
 		# It seems that if one inserts withous selection
 		# the event changed,user is not triggered
@@ -478,15 +826,15 @@ sub redo {
 	my ($self) = @_;
 	
 	my $entry = $self->elm_entry();
-	my $current_tune = $self->app->current_tune();
+	my $current_tunebook = $self->app->current_tunebook();
 	
 	#use Data::Dumper;
-	#print "\n DO REDO " . Dumper($current_tune->redo_stack) . "\n";
+	#print "\n DO REDO " . Dumper($current_tunebook->redo_stack) . "\n";
 	
-	my $redo = pop @{$current_tune->redo_stack};
+	my $redo = pop @{$current_tunebook->redo_stack};
 	return unless( defined($redo) );
 	
-	push @{$current_tune->undo_stack}, $redo;
+	push @{$current_tunebook->undo_stack}, $redo;
 	
 	if ($redo->{del}) {
 		$self->is_undo("yes");
@@ -643,8 +991,8 @@ sub tabs_to_whitespaces {
 			pos => $en->cursor_pos_get(),
 			replaced_tab => 1,
 		};
-		my $current_tune = $entry->app->current_tune();
-		push @{$current_tune->undo_stack}, $replaced_char_undo;
+		my $current_tunebook = $entry->app->current_tunebook();
+		push @{$current_tunebook->undo_stack}, $replaced_char_undo;
 	}
 	
 	return $text;
@@ -713,6 +1061,71 @@ sub rehighlight_all {
 	$entry->select_none();
 	$entry->cursor_pos_set($cursor_pos);
 
+}
+
+###########################################################
+# get_text / set_text
+#
+# Conversion between the editor (markup + highlight tags) and the
+# PLAIN TEXT (decoded utf8, "\n" as newline) that is stored in
+# Caecilia::TuneBook (see content_current_str there).
+#
+# IMPORTANT: These are copies of code that already works:
+#   get_text = the conversion of Caecilia::save
+#   set_text = the way of Caecilia::open_file
+#              (utf8_to_markup, entry_set, rehighlight_all)
+# Don't "improve" them independently of these two places. In particular
+# encode_entities (see to_utf8) is NOT needed here: utf8_to_markup masks
+# <, > and & itself and source-highlight encodes the entities when
+# highlighting.
+#
+# Used by:
+#   Caecilia::Tabs::change_tab    get_text: save the leaving tab
+#                                 set_text: show the new tab
+#   Caecilia::Tabs::_new_tab_cb   set_text: show the new file
+#   Caecilia::open_file           set_text: show the opened file
+#   Caecilia::save                get_text: before content_all_str, so that
+#                                 the editor is saved in the TuneBook
+#   (later:) switching a tune in the combobox and switching between
+#   raw and split mode
+###########################################################
+
+# Editor => plain text
+sub get_text {
+	my ($self) = @_;
+
+	my $text = pEFL::Elm::Entry::markup_to_utf8($self->elm_entry->entry_get());
+	$text = Encode::decode("UTF-8",$text);
+
+	# Only for safety (see Caecilia::save)
+	$text =~ s/\r//g;
+
+	return $text;
+}
+
+# Plain text => editor (current tunebook is the one that is shown)
+sub set_text {
+	my ($self, $text) = @_;
+
+	my $en = $self->elm_entry();
+	my $tunebook = $self->app->current_tunebook();
+	my $elm_it = $tunebook->elm_toolbar_item();
+
+	# rehighlight_all triggers change events (see the workaround in
+	# Caecilia::open_file). They increase the changed counter, add a "*" to the
+	# tab title and fill the undo stack. Therefore remember the state and restore it
+	my $changed = $tunebook->changed();
+	my $title = $elm_it->text_get();
+	my @undo = @{$tunebook->undo_stack};
+	my @redo = @{$tunebook->redo_stack};
+
+	$en->entry_set(pEFL::Elm::Entry::utf8_to_markup($text));
+	$self->rehighlight_all();
+
+	$tunebook->changed($changed);
+	$elm_it->text_set($title);
+	$tunebook->undo_stack([@undo]);
+	$tunebook->redo_stack([@redo]);
 }
 
 # $undo ist the item of the undo stack
@@ -786,7 +1199,7 @@ sub rehighlight_and_retab_lines {
 	my ($self, $new_undo) = @_;
 	
 	my $entry = $self->elm_entry();
-	my $current_tune = $self->app->current_tune();
+	my $current_tunebook = $self->app->current_tunebook();
 	
 	my $textblock = $entry->textblock_get();
 	my $cp1 = pEFL::Evas::TextblockCursor->new($textblock);
@@ -797,7 +1210,7 @@ sub rehighlight_and_retab_lines {
 	my $text = $self->get_rehighlight_lines($cp1,$cp2, $new_undo);
 	my $mkp_text = $text;
 	
-	if ( $current_tune->source_highlight() eq "yes" ) {
+	if ( $current_tunebook->source_highlight() eq "yes" ) {
 		$mkp_text = $self->highlight_str($text);
 	}
 	
@@ -1013,21 +1426,21 @@ sub insert_deco {
 	$undo_record_insert->{pos} = $cursor_pos;
 	$undo_record_insert->{content} = $deco;
 	$undo_record_insert->{plain_length} = length($deco);
-	push @{$self->app->current_tune->undo_stack},$undo_record_insert;
+	push @{$self->app->current_tunebook->undo_stack},$undo_record_insert;
 	
 	# and we have to set §entry->changed counter
-	my $current_tune = $self->app->current_tune();
-	$current_tune->changed($current_tune->changed()+1) if ($self->is_undo() eq "no" && $self->is_rehighlight() eq "no");
-	my $elm_it = $current_tune->elm_toolbar_item; 
+	my $current_tunebook = $self->app->current_tunebook();
+	$current_tunebook->changed($current_tunebook->changed()+1) if ($self->is_undo() eq "no" && $self->is_rehighlight() eq "no");
+	my $elm_it = $current_tunebook->elm_toolbar_item; 
 	my $title = $elm_it->text_get();
-	$elm_it->text_set("$title*") if ($current_tune->changed() && $title !~/\*$/);
-	$elm_it->text_set("$title") if ($current_tune->changed() == 0 && $title =~/\*$/);
+	$elm_it->text_set("$title*") if ($current_tunebook->changed() && $title !~/\*$/);
+	$elm_it->text_set("$title") if ($current_tunebook->changed() == 0 && $title =~/\*$/);
 	
 	$win->del();
 	
 	# If decos are added in the preview it is important that the preview is reloaded
 	# doesn't harm, wenn decos are added in entry, so that we always refresh the preview :-)
-	$self->app->preview_cb();
+	$self->app->preview->preview_cb();
 }
 
 sub _genlist_content_get {
@@ -1109,9 +1522,9 @@ sub select_deco {
 
 sub AUTOLOAD {
 	my ($self, $newval) = @_;
-	
+
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/is_undo|is_rehighlight|is_change_tab|is_open|highlight|rehighlight|current_line|current_column|paste|linewrap|tabmode|sh_obj|sh_langmap|em|elm_entry|/;
+		unless $AUTOLOAD =~m/app|is_undo|is_rehighlight|is_change_tab|is_open|highlight|rehighlight|current_line|current_column|paste|linewrap|tabmode|sh_obj|sh_langmap|em|elm_entry/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

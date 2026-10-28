@@ -447,7 +447,7 @@ sub show_import_midi_dialog {
 	);
 	
 	my ($ok_btn, $cancel_btn) = _add_buttons($table, "row" => 16, "width" => 4,
-		"ok" => "Open in new tune", "cancel" => "Replace current tune");
+		"ok" => "Open in new tab", "cancel" => "Replace current tune(/book)");
 		
 	my $close_btn = pEFL::Elm::Button->new($table);
 	$close_btn->text_set("Close");
@@ -527,23 +527,23 @@ sub import_and_open {
 		# Open file
 		my $content = $self->get_abc_text();
 		
-		my $tune = $self->app->current_tune();
-		if ( (scalar(@{$self->app->tunes->tunes}) != 1) || ($tune->filename) || ($tune->id != 0) || ($tune->changed() != 0)) {
+		my $tunebook = $self->app->current_tunebook();
+		if ( (scalar(@{$self->app->tabs->tabs}) != 1) || ($tunebook->filename) || ($tunebook->id != 0) || ($tunebook->changed() != 0)) {
 		
-			# Add Tune
-			my @tunes = @{$self->app->tunes->tunes};
-			my $tune_id = $#tunes+1;
-			$tune = Caecilia::Tune->new(id => $tune_id, content => $content);
-			$self->app->tunes->push_tune($tune);
+			# Add TuneBook
+			my @tabs = @{$self->app->tabs->tabs};
+			my $tab_id = $#tabs+1;
+			$tunebook = Caecilia::TuneBook->new(id => $tab_id, content => $content);
+			$self->app->tabs->push_tab($tunebook);
 		}
 		
 		# Insert content
 		$self->app->entry->elm_entry->entry_set($content);
 		$self->app->entry->rehighlight_all();
 		
-		# Change the changed status of current tune here
+		# Change the changed status of current tunebook here
 		# otherwise it doesn't recognize that the tab was changed
-		$self->app->current_tune->changed(1);
+		$self->app->current_tunebook->changed(1);
 		
 		$message = "<b>Import succesful</b>";
 		_show_info($obj->top_widget_get, "DONE", $message);
@@ -578,7 +578,7 @@ sub import_and_replace {
 		$undo_record_insert->{pos} = $pos;
 		$undo_record_insert->{content} = $content;
 		$undo_record_insert->{plain_length} = length($content);
-		push @{$self->app->current_tune->undo_stack},$undo_record_insert;
+		push @{$self->app->current_tunebook->undo_stack},$undo_record_insert;
 		
 		$message = "<b>Import succesful</b>";
 		_show_info($obj->top_widget_get, "DONE", $message);

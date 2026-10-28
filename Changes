@@ -9,6 +9,8 @@ Revision history for Perl extension Caecilia.
 	- Update abc2svg to 1.23.6
 	- Refactor and fix MIDI playback code
 	- Fix overlapping note rect Problem
+	- Now exists two edit modes: Split mode (edit single tune) and raw mode (edit all tunes in file)
+	- Preview and Generate Midi buttons generate now both Preview and MIDI!
 0.27
 	- Fix background in Dialogs	
 	- Fix MIDI playback:

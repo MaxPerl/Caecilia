@@ -50,6 +50,36 @@ sub new {
 	return $obj;
 }
 
+sub reset_midi {
+	my ($self) = @_;
+	
+	my $video = $self->elm_video;
+    $video->stop();
+    $self->video_del($video);
+
+    # Here we create a new Elm_Video with no midi file
+    my $box = $self->elm_midibar();
+    my $video_new = pEFL::Elm::Video->add($box);
+    $self->elm_video($video_new);
+
+    my $emotion = $video_new->emotion_get();
+    $emotion->smart_callback_add("position_update", \&_pos_update, $self);
+    $emotion->smart_callback_add("playback_finished", \&_playback_finished_cb, $self);
+    $emotion->smart_callback_add("open_done", \&_open_done_cb, $self);
+
+    $emotion->file_set("");
+	
+	$self->is_finished(0);
+	$self->saved_pos(0);
+	$self->hide_voice_pointers();
+	
+	my $progress_spinner = $self->elm_progress_spinner();
+	
+	$progress_spinner->min_max_set(0,0);
+	$progress_spinner->value_set(0);
+	
+}
+
 sub init_ui {
     my ($self, $app, $main_box) = @_;
     
@@ -121,7 +151,7 @@ sub init_ui {
     $emotion->smart_callback_add("playback_finished",\&_playback_finished_cb,$self);
     $emotion->smart_callback_add("open_done",\&_open_done_cb,$self);
 
-    $mid_b->smart_callback_add("clicked" => \&generate_mid, $self);
+    $mid_b->smart_callback_add("clicked" => \&Caecilia::Preview::preview_cb, $self->app->preview);
     $play_b->smart_callback_add("clicked" => \&play, $self);
     $rewind_b->smart_callback_add("clicked" => \&rewind, $video);
     $forward_b->smart_callback_add("clicked" => \&forward, $video);
@@ -170,12 +200,22 @@ sub generate_mid {
     }
     undef @{ $self->voice_pointers };
     
-    # Get the text of the entry and add a white background to the preview.abc
-    my $text = $self->app->entry->elm_entry->entry_get();
-    # convert $text to utf8
-    $text = pEFL::Elm::Entry::markup_to_utf8($text);	
-    $text = Encode::decode("utf-8",$text);
-	
+    # Get the text of the entry and create the preview abc
+    # (get text already converts text to utf8!! so markup_to_utf8 and decode are
+    # not necessary here again
+    my $text = $self->app->current_tunebook->create_preview_abc($self->app->entry->get_text());
+    # if (!defined($text)) [e.g. Header is selected in splitmode !!!] 
+    # =>=> Don't create MIDI!!!
+    return unless (defined($text));
+    
+    # TODO: midi positions are links into the notes of the preview, so it must be up-to-date?
+    #$self->app->preview->preview_cb() unless ($self->app->preview->up_to_date());
+    # NICHT MEHR ERFORDERLICH, weil sowohl für preview als auch für midi nur noch eine
+    # Einstiegsfunktion existiert Preview::preview_cb()
+    
+    # same text as the preview = same offsets in Preview and MIDI (istart)
+    $text = $self->app->renderer->preview_header() . $text;
+    	
     # Scale stylesheet directive isn't supported in preview
     #$text =~ s/%%scale.*\n//g if ($opts{mode} eq 'preview');
     # create new files for preview	
@@ -213,14 +253,17 @@ sub generate_mid {
 
     # First save position    
     my $video = $self->elm_video;
-    my $pos = $video->play_position_get();
-    $video->stop();
-    $self->saved_pos($pos);
+    
+    if ($video) {
+    	my $pos = $video->play_position_get();
+    	$video->stop();
+    	$self->saved_pos($pos);
 
-    # IMPORTANT: We cannot delete video here (otherwise we get a segfault)
-    # So do it, when the new file was opened in the new (!) Elm_Video
-    # (see open_done_cb)
-    $self->video_del($video);
+    	# IMPORTANT: We cannot delete video here (otherwise we get a segfault)
+    	# So do it, when the new file was opened in the new (!) Elm_Video
+    	# (see open_done_cb)
+    	$self->video_del($video);
+    }
 
     # Here we create our new Elm_Video
     my $box = $self->elm_midibar();
@@ -230,7 +273,7 @@ sub generate_mid {
     my $emotion = $video_new->emotion_get();
     $emotion->smart_callback_add("position_update", \&_pos_update, $self);
     $emotion->smart_callback_add("playback_finished", \&_playback_finished_cb, $self);
-    $emotion->smart_callback_add("open_done", \&_open_done_cb, $self);
+    $emotion->smart_callback_add("open_done", \&_open_done_cb, $self) if ($video);
 
     $emotion->file_set($self->midi_file);
     
@@ -283,9 +326,11 @@ sub _pos_update {
 			my $follow_voice = $voice_spinner->value_get() || 1;
 	
 	        	# We added the ABC file some commands (e.g. %%fullsvg 1, %%musicfont etc)
-	        	# TODO: Save the added value as istart? DONE with preview_beginabc_length, istn't it?
-	        	my $renderer = $self->app->renderer();
-	        	my $istart = $event->{istart} + $renderer->preview_beginabc_length();
+	        	# Offset ist nun bereits in istart enthalten, weil MIDI und 
+				# PREVIEW nun denselben Text verwenden 
+				# (s.o. generate_mid: $text = $self->app->renderer->preview_header() . $text)
+				# => hier nicht mehr $istart = $event->{istart} + $renderer->preview_beginabc erforderlich!!!!
+	        	my $istart = $event->{istart};
 	        	my $voice = $event->{voice};
 	
 			if ($voice == $follow_voice-1) {
@@ -403,28 +448,37 @@ sub to_notes {
         ->set_globals(path => $self->abc2svg_path(), abc_file => $self->abc_file)
         ->os()->std()->helpers()->eval(js());
     
+    ###########################################################
+    # ERROR HANDLING IS HERE NOT NECESSARY ANY MORE, because everything is now only
+    # done in generate_preview (there is only one callback preview_cb() )
+    #
     # Save abc2svg Errors for the Show Errors button of Renderer
-    my @abc2svg_errors = @{ $val->{errors} };
-	my $abc2svg_errors = "";
-	foreach my $error (@abc2svg_errors) {
-		$error =~ s/.*\://;
-		$error =~ m/(\d+),\d+$/;
+    #my @abc2svg_errors = @{ $val->{errors} };
+	#my $abc2svg_errors = "";
+	#foreach my $error (@abc2svg_errors) {
+	#	$error =~ s/.*\://;
+	#	$error =~ m/(\d+),\d+$/;
 		# The first Line is in Caecilia 1 (not 0 as in Elm_Entry)!! 
-		#So add 1 to the line_nr of abc2svg
-		my $line_nr = $1 + 1;
-		$error =~ s/\d+,(\d+)$/$line_nr,$1/;
-		$abc2svg_errors = $abc2svg_errors . "<br/>" . $error;
-	}
+		# So add 1 to the line_nr of abc2svg
+		# MIDI verwendet jetzt den selben Text wie Preview, daher statt 
+		# $1 + 1 => $1-5 
+		# TODO: Split Modus => Fehlerzeilen sind hier noch zu hoch wegen File Header
+	#	my $line_nr = $1 -5;
+	#	$error =~ s/\d+,(\d+)$/$line_nr,$1/;
+	#	$abc2svg_errors = $abc2svg_errors . "<br/>" . $error;
+	#}
 	
-	print "ERROR MSG $abc2svg_errors\n";
-	$self->app->renderer->error_message($abc2svg_errors);
-	if ($abc2svg_errors) {
-		$self->app->renderer->elm_error_btn->text_set("Show Errors");
-	}
-	else {
-		$self->app->renderer->elm_error_btn->text_set("No Errors");
-	}
-    
+	#print "ERROR MSG $abc2svg_errors\n";
+	#$self->app->renderer->error_message($abc2svg_errors);
+	#if ($abc2svg_errors) {
+	#	$self->app->renderer->elm_error_btn->text_set("Show Errors");
+	#}
+	#else {
+	#	$self->app->renderer->elm_error_btn->text_set("No Errors");
+	#}
+	#
+	###########################################################
+	    
     return $val->{output};
 }
 
@@ -457,7 +511,9 @@ sub generate_events {
     my ($self, $notes) = @_;
 
     my %events;
-    my $offset = $self->app->renderer->preview_beginabc_length();
+    # Offset ist nun bereits in istart enthalten, weil MIDI und PREVIEW nun denselben
+    # Text verwenden (s.o. generate_mid: $text = $self->app->renderer->preview_header() . $text)
+    #my $offset = $self->app->renderer->preview_beginabc_length();
 
     foreach my $line (split(/\n/, $notes)) {
         my ($time, undef, undef, undef, undef, $voice, $istart) = _parse_note_line($line);
@@ -480,7 +536,7 @@ sub generate_events {
         }
 
         # Add a link to midi position in the notes hash of PREVIEW
-        $self->app->preview->{notes}->{ $istart + $offset }->{midi_position} = $time;
+        $self->app->preview->{notes}->{ $istart }->{midi_position} = $time;
     }
     $self->{events} = \%events;
 }
@@ -636,7 +692,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|abc_file|events|midi_file|abc2svg_path|preview_scale_factor|voice_pointers|elm_midibar|elm_video|elm_progress_spinner|is_finished|saved_pos|video_del|/;
+		unless $AUTOLOAD =~m/app|abc_file|events|midi_file|abc2svg_path|preview_scale_factor|voice_pointers|elm_midibar|elm_video|elm_progress_spinner|is_finished|saved_pos|video_del|elm_voice_spinner|ecore_timer/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

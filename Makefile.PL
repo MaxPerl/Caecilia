@@ -35,6 +35,8 @@ WriteMakefile(
 							Music::Tempo => 0,
 							JavaScript::QuickJS => 0,
 							YAML => 0,
+							SVGPDF => 1.001,
+							PDF::API2 => 0
 							}, # e.g., Module::Name => 1.1
     BUILD_REQUIRES	  => {'File::ShareDir::Install' => 0},
     ABSTRACT_FROM     => 'lib/Caecilia.pm', # retrieve abstract from module
