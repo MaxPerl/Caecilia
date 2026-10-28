@@ -224,7 +224,7 @@ sub add_document_toolbar {
 	$prev_btn->part_content_set("icon",$icon1);
 	$prev_btn->size_hint_weight_set(0, EVAS_HINT_EXPAND);
 	$prev_btn->size_hint_align_set(0, EVAS_HINT_FILL);
-	$prev_btn->smart_callback_add("clicked", \&_step_btn_cb, [$self,-1]);
+	$prev_btn->smart_callback_add("clicked", \&_prev_tune_cb, $self);
 	$bx->pack_end($prev_btn); $prev_btn->show();
 	$tb{prev_btn} = $prev_btn;
 	
@@ -234,7 +234,7 @@ sub add_document_toolbar {
 	$next_btn->part_content_set("icon",$icon2);
 	$next_btn->size_hint_weight_set(0, EVAS_HINT_EXPAND);
 	$next_btn->size_hint_align_set(0, EVAS_HINT_FILL);
-	$next_btn->smart_callback_add("clicked", \&_step_btn_cb, [$self,1]);
+	$next_btn->smart_callback_add("clicked", \&_next_tune_cb, $self);
 	$bx->pack_end($next_btn); $next_btn->show();
 	$tb{next_btn} = $next_btn;
 
@@ -385,21 +385,43 @@ sub _mode_btn_cb {
 	$self->update_toolbar();
 }
 
-sub _step_btn_cb {
-	my ($data, $obj, $event_info) = @_;
-	my ($self, $step) = @$data;
-
+sub _prev_tune_cb {
+	my ($self, $obj, $event_info) = @_;
+	
 	my $tunebook = $self->app->current_tunebook();
 	
 	# raw mode: Jump to the "X: " line
 	if ($tunebook->edit_mode() eq "raw") {
-		$self->jump_to_next_tune($step);
+		$self->jump_to_next_tune(-1);
 		return;
 	}
-
+	
 	# split mode: select next tune
-	my $index = $tunebook->current_tune() + $step;
-	return if ($index < 0 || $index > $#{$tunebook->content()});
+	my $index = $tunebook->current_tune() -1;
+	return if ($index < 0);
+	$self->select_tune($index);
+	
+	# Reset preview and midi!
+	$self->app->preview->reset_preview();
+	$self->app->midi->reset_midi();
+	
+	$self->update_toolbar();
+}
+
+sub _next_tune_cb {
+	my ($self, $obj, $event_info) = @_;
+	
+	my $tunebook = $self->app->current_tunebook();
+	
+	# raw mode: Jump to the "X: " line
+	if ($tunebook->edit_mode() eq "raw") {
+		$self->jump_to_next_tune(1);
+		return;
+	}
+	
+	# split mode: select next tune
+	my $index = $tunebook->current_tune() + 1;
+	return if ($index > $#{$tunebook->content()});
 	$self->select_tune($index);
 	
 	# Reset preview and midi!
@@ -424,7 +446,7 @@ sub jump_to_next_tune {
 	# Collect the start offset of every X: line
 	my @positions;
 	# \m = ^ matches at the beginning of every line; 
-	# \g in a while condition: every pass continues after the previous matcj 
+	# \g in a while condition: every pass continues after the previous match 
 	while ($text =~ /^X:/mg) {
 		# $-[0] ist eine Spezialvariable für die Anfangspositionen des letzten Treffers eines Regex
 		# gezählt wird von Beginn des Textes 

@@ -5,11 +5,12 @@ use strict;
 use warnings;
 
 use utf8;
-use File::ShareDir 'dist_dir';
 use Caecilia::Settings;
-use Caecilia::MyElm qw(_expand_widget _expand_widget_x _add_entry_with_check _add_spin_with_check _combobox_item_pressed);
-use Cwd;
+use Caecilia::MyElm qw(_expand_widget _expand_widget_x _add_checkoption);
 use IPC::Open3;
+
+use JavaScript::QuickJS;
+use File::Temp;
 
 use pEFL::Elm;
 use pEFL::Evas;
@@ -54,7 +55,8 @@ sub new {
 	    abc2svg_path => $app->share_dir . "/abc2svg/",
 	    notes => {},
 		error_message => "",
-		elm_error_btn => undef,};
+		elm_error_btn => undef,
+		elm_only_current_check => undef};
 	bless $renderer_object,$class;
 	
 	return $renderer_object;
@@ -105,7 +107,11 @@ sub render_preview {
 	# !!! There is no preview for file header!!!)
 	my $tunebook = $app->current_tunebook();
 	my $text = $app->entry->get_text();
-	if ($opts{export}) {
+	if ( $opts{export} && $opts{only_current}) {
+		$tunebook->content_current_str($text);
+		$text = $tunebook->content_current_str();
+	}
+	elsif ($opts{export}) {
 		$tunebook->content_current_str($text);
 		$text = $tunebook->content_all_str();
 	}
@@ -260,6 +266,7 @@ sub render_abcm2ps {
 	
 	my $app = $self->app();
 	my $dir = $app->tmpdir;
+	my $only_current = $self->elm_only_current_check->state_get();
 	
 	my $config = $app->settings->load_config();
 	
@@ -293,14 +300,21 @@ sub render_abcm2ps {
 	elsif ($config->{abcm2ps_numbernbars}) {
 		push @cmd, "-j".$config->{abcm2ps_numbernbars};
 	}
-	push @cmd, "-b$opts{firstmeasure}" if ($opts{firstmeasure});
+	
+	push @cmd, "-b". $config->{abcm2ps_firstmeasure} if ($config->{abcm2ps_firstmeasure});
 	push @cmd, "-f" if ($config->{abcm2ps_flatbeams});
 	
-	# Get the text of the entry 
-	# As in Caecilia::save the text of the editor is stored in the tunebook before
+	# As in Caecilia::save store the text of the editor first in the tunebook
 	my $tunebook = $app->current_tunebook();
 	$tunebook->content_current_str($app->entry->get_text());
-	my $text = "%%bgcolor \"white\"\n" . $tunebook->content_all_str();
+	# then get the text of the entry and add white background
+	my $text;
+	if ($only_current) {
+		$text = "%%bgcolor \"white\"\n" . $tunebook->content_current_str();
+	}
+	else {
+		$text = "%%bgcolor \"white\"\n" . $tunebook->content_all_str();
+	}
 	
 	# Scale stylesheet directive isn't supported in preview
 	#$text =~ s/%%scale.*\n//g if ($opts{mode} eq 'preview');
@@ -385,7 +399,6 @@ sub render_abcm2ps {
 	
 }
 
-
 sub show_dialog {
 	my ($self) = @_;
 	
@@ -431,10 +444,16 @@ sub show_dialog {
 	$out_en->show(); $table->pack($out_en,1,0,1,1);
 	
 	# output format combobox
+	my $format_label = pEFL::Elm::Label->new($table);
+	$format_label->text_set("Format");
+	$format_label->size_hint_align_set(0,0.5);
+	$format_label->show(); $table->pack($format_label, 0,1,1,1);
+	
+	# output format combobox
 	my @outformats = ('pdf (abc2svg/internal)', 'svg (abc2svg/internal)', '.ps', '.eps','.svg (one tune per file)','.svg (one page per file)','.xhtml','.xhtml (embedded abc)');
 	my $format_combo = pEFL::Elm::Combobox->add($table);
 	_expand_widget_x($format_combo);
-	$format_combo->size_hint_min_set(400,0);
+	#$format_combo->size_hint_min_set(400,0);
 	$format_combo->text_set('pdf (abc2svg/internal)');
 	my $itc = pEFL::Elm::GenlistItemClass->new();
 	$itc->item_style("default"); $itc->text_get(sub {return $_[0];});
@@ -442,27 +461,57 @@ sub show_dialog {
 		$format_combo->item_append($itc,$format,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
 	$format_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, $frame);
-	$format_combo->show(); $table->pack($format_combo,2,0,2,1);
+	$format_combo->show(); $table->pack($format_combo,1,1,1,1);
 	
-	my ($pattern_check, $pattern_en) = _add_entry_with_check($table,
-		value => "", label => "Tune selection", row => 1);
-		
-	my ($firstmeasure_check, $firstmeasure_spin) = _add_spin_with_check( $table,
-		value => "", label => "first measure number", 
-		min => 1, max => 1000, step => 1, fmt => "%1.0f", row => 2);
-	
+	my $only_current_check = _add_checkoption($table,label => "Render only current tune", value => 0, row => 2);
 	
 	# Save widgets
 	$self->elm_out_en($out_en);
 	$self->elm_fmt_combo($format_combo);
-	$self->elm_firstmeasure_spin($firstmeasure_spin);
-	$self->elm_pattern_en($pattern_en);
+	$self->elm_only_current_check($only_current_check);
 	
-	$self->_add_buttons($table, 4);
+	$self->_add_buttons($table, 3);
 	
-	$render_win->resize(600,250);
+	$render_win->resize(600,150);
 	$render_win->show();
 	return $render_win;
+}
+
+sub _add_buttons {
+	my ($self,$table,$row) = @_;
+	
+	my $btn_bx = pEFL::Elm::Box->add($table);
+	_expand_widget_x($btn_bx);
+	$btn_bx->horizontal_set(1);
+	$btn_bx->show(); $table->pack($btn_bx,0,$row,2,1);
+	
+	my $ok_btn = pEFL::Elm::Button->new($btn_bx);
+	$ok_btn->text_set("OK");
+	_expand_widget($ok_btn);
+	$ok_btn->show(); $btn_bx->pack_end($ok_btn);
+	
+	my $cancel_btn = pEFL::Elm::Button->new($btn_bx);
+	$cancel_btn->text_set("Cancel");
+	_expand_widget($cancel_btn);
+	$cancel_btn->show(); $btn_bx->pack_end($cancel_btn);
+	
+	my $settings_btn1 = pEFL::Elm::Button->new($btn_bx);
+	$settings_btn1->text_set("abc2svg Settings");
+	_expand_widget($settings_btn1);
+	$settings_btn1->show(); $btn_bx->pack_end($settings_btn1);
+	
+	my $settings_btn = pEFL::Elm::Button->new($btn_bx);
+	$settings_btn->text_set("abcm2ps Settings");
+	_expand_widget($settings_btn);
+	$settings_btn->show(); $btn_bx->pack_end($settings_btn);
+	
+	# Callbacks
+	$cancel_btn->smart_callback_add("clicked", sub { $self->elm_render_win()->del(); }, undef );
+	$ok_btn->smart_callback_add("clicked", \&render_cb, $self);
+	$settings_btn1->smart_callback_add("clicked", \&settings_cb, [$self, 'Preview']);
+	$settings_btn->smart_callback_add("clicked", \&settings_cb, [$self, 'abcm2ps Options']);
+	
+	return $btn_bx;
 }
 
 sub render_cb {
@@ -470,8 +519,7 @@ sub render_cb {
 	
 	my $filename = $self->elm_out_en->entry_get();
 	my $formatsvar = $self->elm_fmt_combo->text_get();
-	my $firstmeasure_spin = $self->elm_firstmeasure_spin();
-	my $firstmeasure_spinvar = $firstmeasure_spin->disabled_get ? "" : $firstmeasure_spin->value_get();
+	
 	if ($formatsvar eq 'pdf (abc2svg/internal)') {
 		$self->render_caecilia2pdf($filename);
 	} 
@@ -479,7 +527,7 @@ sub render_cb {
 		$self->render_caecilia2svg($filename);
 	}
 	else {
-		$self->render_abcm2ps(outfile => $filename, outformat => $formatsvar, firstmeasure => $firstmeasure_spinvar);
+		$self->render_abcm2ps(outfile => $filename, outformat => $formatsvar);
 	}
 	
 	$self->elm_render_win->del();
@@ -501,7 +549,8 @@ sub settings_cb {
 
 sub render_caecilia2svg {
 	my ($self, $outfile) = @_;
-	$self->render_preview(outfile => $outfile, export => 1);
+	my $only_current = $self->elm_only_current_check->state_get() ? 1 : 0;
+	$self->render_preview(outfile => $outfile, export => 1, only_current => $only_current);
 }
 
 sub render_caecilia2pdf {
@@ -511,7 +560,8 @@ sub render_caecilia2pdf {
 	make_path($self->app->tmpdir . "/print");
 	
 	# Make SVGs in temporary directory
-	$self->render_preview(outfile => $self->app->tmpdir . "/print/preview", export => 1);
+	my $only_current = $self->elm_only_current_check->state_get() ? 1 : 0;
+	$self->render_preview(outfile => $self->app->tmpdir . "/print/preview", export => 1, only_current => $only_current);
 	
 	# convert SVGs to pdf
 	$self->svg2pdf($outfile);
@@ -700,46 +750,6 @@ sub write_tmp {
     return $fh->filename; 
 }
 
-####################
-# UI helpers 
-########################
-
-sub _add_buttons {
-	my ($self,$table,$row) = @_;
-	
-	my $btn_bx = pEFL::Elm::Box->add($table);
-	_expand_widget_x($btn_bx);
-	$btn_bx->horizontal_set(1);
-	$btn_bx->show(); $table->pack($btn_bx,0,$row,2,1);
-	
-	my $ok_btn = pEFL::Elm::Button->new($btn_bx);
-	$ok_btn->text_set("OK");
-	_expand_widget($ok_btn);
-	$ok_btn->show(); $btn_bx->pack_end($ok_btn);
-	
-	my $cancel_btn = pEFL::Elm::Button->new($btn_bx);
-	$cancel_btn->text_set("Cancel");
-	_expand_widget($cancel_btn);
-	$cancel_btn->show(); $btn_bx->pack_end($cancel_btn);
-	
-	my $settings_btn1 = pEFL::Elm::Button->new($btn_bx);
-	$settings_btn1->text_set("abc2svg Settings");
-	_expand_widget($settings_btn1);
-	$settings_btn1->show(); $btn_bx->pack_end($settings_btn1);
-	
-	my $settings_btn = pEFL::Elm::Button->new($btn_bx);
-	$settings_btn->text_set("abcm2ps Settings");
-	_expand_widget($settings_btn);
-	$settings_btn->show(); $btn_bx->pack_end($settings_btn);
-	
-	# Callbacks
-	$cancel_btn->smart_callback_add("clicked", sub { $self->elm_render_win()->del(); }, undef );
-	$ok_btn->smart_callback_add("clicked", \&render_cb, $self);
-	$settings_btn1->smart_callback_add("clicked", \&settings_cb, [$self, 'Preview']);
-	$settings_btn->smart_callback_add("clicked", \&settings_cb, [$self, 'abcm2ps Options']);
-	
-	return $btn_bx;
-}
 
 ################
 # Getter / Setter
@@ -748,7 +758,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|elm_render_win|elm_out_en|elm_fmt_combo|elm_firstmeasure_spin|elm_pattern_en|preview_beginabc_length|preview_scale|error_message|elm_error_btn|/;
+		unless $AUTOLOAD =~m/app|elm_render_win|elm_out_en|elm_fmt_combo|preview_beginabc_length|preview_scale|error_message|elm_error_btn|elm_only_current_check|abc2svg_path/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;

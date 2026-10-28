@@ -684,17 +684,20 @@ sub _settings_abcm2ps_create {
 	my $nosluringrace_check = _add_checkoption($table,
 		value => $config->{abcm2ps_nosluringrace}, label => "no slur in grace notes", row => 19);
 	
-	
+	my ($firstmeasure_check, $firstmeasure_spin) = _add_spin_with_check( $table,
+		value => "", label => "first measure number", 
+		min => 1, max => 1000, step => 1, fmt => "%1.0f", row => 20);
+		
 	my ($numbernbars_check, $numbernbars_spin) =_add_spin_with_check($table,
-		value => $config->{abcm2ps_numbernbars}, label => "Number measures every n bars", row => 20,
+		value => $config->{abcm2ps_numbernbars}, label => "Number measures every n bars", row => 21,
 		min => 0, max => 100, step => 1, fmt => "%1.0f"); 
 		
 	# ggf. TODO: toggle numbernbarsboxed_check, too, if numbernbars_check is changed
 	my $numbernbarsboxed_check = _add_checkoption($table,
-		value => $config->{abcm2ps_numbernbarsboxed}, label => "Display measures in a box", row => 21);
+		value => $config->{abcm2ps_numbernbarsboxed}, label => "Display measures in a box", row => 22);
 	
 	my $flatbeams_check = _add_checkoption($table,
-		value => $config->{abcm2ps_flatbeams}, label => "have fleatbeams", row => 22);
+		value => $config->{abcm2ps_flatbeams}, label => "have fleatbeams", row => 23);
 	
 	# Save important widgets
 	$self->elm_autolinebreak_check($autolinebreak_check);
@@ -713,6 +716,7 @@ sub _settings_abcm2ps_create {
 	$self->elm_pagenumberig_combo($pagenumbering_combo);
 	$self->elm_onetuneperpage_check($onetuneperpage_check);
 	$self->elm_nosluringrace_check($nosluringrace_check);
+	$self->elm_firstmeasure_spin($firstmeasure_spin);
 	$self->elm_numbernbars_spin($numbernbars_spin);
 	$self->elm_numbernbarsboxed_check($numbernbarsboxed_check);
 	$self->elm_flatbeams_check($flatbeams_check);
@@ -849,6 +853,7 @@ sub save_settings {
 	$config->{abcm2ps_pagenumbering} = $self->elm_pagenumberig_combo->text_get();
 	$config->{abcm2ps_onetuneperpage} = $self->elm_onetuneperpage_check->state_get();
 	$config->{abcm2ps_nosluringrace} = $self->elm_nosluringrace_check->state_get();
+	$config->{abcm2ps_firstmeasure} = sprintf("%.0f",_spinner_get($self->elm_firstmeasure_spin));
 	$config->{abcm2ps_numbernbars} = sprintf("%.0f",_spinner_get($self->elm_numbernbars_spin));
 	$config->{abcm2ps_numbernbarsboxed} = $self->elm_numbernbarsboxed_check->state_get();
 	$config->{abcm2ps_flatbeams} = $self->elm_flatbeams_check->state_get();	
@@ -956,7 +961,7 @@ sub AUTOLOAD {
 	my ($self, $newval) = @_;
 	
 	die("No method $AUTOLOAD implemented\n")
-		unless $AUTOLOAD =~m/app|config|elm_toolbar|elm_scores_path_en|elm_midi2abc_path_en|elm_midish_path_en|elm_aseqdump_path_en|elm_pageheight_spinner|elm_pagewidth_spinner|elm_preview_scale_spinner|elm_topmargin_spinner|elm_bottommargin_spinner|elm_midi_ticks_slider|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|$/;
+		unless $AUTOLOAD =~m/app|config|elm_toolbar|elm_scores_path_en|elm_midi2abc_path_en|elm_midish_path_en|elm_aseqdump_path_en|elm_pageheight_spinner|elm_pagewidth_spinner|elm_preview_scale_spinner|elm_topmargin_spinner|elm_bottommargin_spinner|elm_midi_ticks_slider|elm_palette_combo|elm_tabs_spinner|elm_tabmode_combo|elm_unexpand_check|elm_expand_check|elm_font_size_slider|elm_font_combo|elm_settings_win|elm_abcm2ps_path_en|elm_autolinebreak_check|elm_breaknbars_spinner|elm_scalefactor_spinner|elm_staffwidth_en|elm_leftmargin_en|elm_staffseparation_en|elm_maxshrink_spinner|elm_fmtfile_en|elm_fmtdir_en|elm_landscape_check|elm_indentfirstline_en|elm_xrefnumbers_check|elm_nolyrics_check|elm_pagenumberig_combo|elm_onetuneperpage_check|elm_nosluringrace_check|elm_numbernbars_spin|elm_numbernbarsboxed_check|elm_flatbeams_check|elm_firstmeasure_spin/;
 	
 	my $attrib = $AUTOLOAD;
 	$attrib =~ s/.*://;
