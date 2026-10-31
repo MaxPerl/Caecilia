@@ -91,31 +91,25 @@ sub init_ui {
     $box->size_hint_align_set(EVAS_HINT_FILL, 0.5);
     $self->elm_midibar($box);
 
-    my $mid_b = pEFL::Elm::Button->add($box);
-    $mid_b->text_set("Generate Midi");
-    $box->pack_end($mid_b); $mid_b->show();
-
     my $video = pEFL::Elm::Video->add($box);
     $self->elm_video($video);
-
-    # basic tutorial code
-    # basic text button
+	
+	# Play Button
+	my $play_b = pEFL::Elm::Button->new($box);
+    $play_b->text_set("Play Preview");
+    my $icon_play = pEFL::Elm::Icon->add($play_b);
+    $icon_play->standard_set("media-playback-start");
+    $play_b->part_content_set("icon",$icon_play);
+    $box->pack_end($play_b);$play_b->show();
+    
+    # Backward Button
     my $rewind_b = pEFL::Elm::Button->new($box);
     my $icon_backward = pEFL::Elm::Icon->add($rewind_b);
 	$icon_backward->standard_set("media-seek-backward");
 	$rewind_b->part_content_set("icon",$icon_backward);
     $box->pack_end($rewind_b);$rewind_b->show();
 
-    # basic tutorial code
-    # basic text button
-    my $play_b = pEFL::Elm::Button->new($box);
-    my $icon_play = pEFL::Elm::Icon->add($play_b);
-    $icon_play->standard_set("media-playback-start");
-    $play_b->part_content_set("icon",$icon_play);
-    $box->pack_end($play_b);$play_b->show();
-
-    # basic tutorial code
-    # basic text button
+    # Forward Button
     my $forward_b = pEFL::Elm::Button->new($box);
     my $icon_forward = pEFL::Elm::Icon->add($forward_b);
     $icon_forward->standard_set("media-seek-forward");
@@ -151,7 +145,6 @@ sub init_ui {
     $emotion->smart_callback_add("playback_finished",\&_playback_finished_cb,$self);
     $emotion->smart_callback_add("open_done",\&_open_done_cb,$self);
 
-    $mid_b->smart_callback_add("clicked" => \&Caecilia::Preview::preview_cb, $self->app->preview);
     $play_b->smart_callback_add("clicked" => \&play, $self);
     $rewind_b->smart_callback_add("clicked" => \&rewind, $video);
     $forward_b->smart_callback_add("clicked" => \&forward, $video);

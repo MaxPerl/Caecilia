@@ -585,17 +585,17 @@ sub svg2pdf {
     	( $a =~ /(\d+)/ )[0] <=> ( $b =~ /(\d+)/ )[0]
 	} @files;
 
-	# --- PDF aufbauen ------------------------------------------------------------
+	
 	my $pdf = PDF::API2->new;
 
-	# --- Font-Callback für SVGPDF ------------------------------------------------
-	# Gibt für die Notenschrift (abc2svg) die TTF zurück, sonst Times mit
-	# Fett/Kursiv. 
 	my $fontfile = $self->app->share_dir . "/abc2svg/abc2svg.ttf";
 	die "Cannot find font: $fontfile\n" unless -f $fontfile;
 
 	my %fontcache;
 
+	# Font-Callback für SVGPDF
+	# Gibt für die Notenschrift (abc2svg) die TTF zurück, sonst Times mit
+	# Fett/Kursiv. 
 	my $fc = sub {
     	my ( $self, %args ) = @_;
     	my $style  = $args{style} || {};
@@ -641,12 +641,9 @@ sub svg2pdf {
     	$gfx->rect( 0, 0, $pw, $ph );
     	$gfx->fill;
 
-    	# In einer PDF liegt der Nullpunkt unten links, und y wächst nach oben. Ein kleiner y-Wert heißt also „weiter unten auf der Seite“. 
-    	# Deshalb ist $ph (die Seitenhöhe) die Oberkante der Seite
-    	#my $y = $ph;
-	my $config = $self->app->settings->load_config();
-	my $topmargin = $config->{preview_topmargin} * 10 * 3.7795 || 10 * 3.7795;
-    	my $y = $ph - $topmargin * $PX2PT;    
+		my $config = $self->app->settings->load_config();
+		my $topmargin = $config->{preview_topmargin} * 10 * 3.7795 || 10 * 3.7795;
+    	my $y =  - $topmargin * $PX2PT;    
 
 	    for my $block (@blocks) {
 	
@@ -665,34 +662,30 @@ sub svg2pdf {
             	next;
         	}
 
-		# split_blocks liefert Stücke, die jeweils von einem <svg bis zum nächsten </svg> laufen. 
-		# In jeder temporären Datei steht damit genau ein <svg>, und SVGPDF gibt dafür ein Array mit genau einem Hash zurück. 
-		# Deshalb reicht $xofs->[0], ein weiteres Element gibt es nicht.
+			# split_blocks liefert Stücke, die jeweils von einem <svg bis zum nächsten </svg> laufen. 
+			# In jeder temporären Datei steht damit genau ein <svg>, und SVGPDF gibt dafür ein Array mit genau einem Hash zurück. 
+			# Deshalb reicht $xofs->[0], ein weiteres Element gibt es nicht.
         	my $e  = $xofs->[0];
-        	# ->{xo} holt aus dem Hash den Eintrag xo, das eigentliche XObject, also das gezeichnete Bild des Blocks. 
-        	# Steht dort nichts, springt or next zum nächsten Block.
+        	# ->{xo} holt aus dem Hash den Eintrag xo, das eigentliche XObject, also das gezeichnete Bild des Blocks.
         	my $xo = $e->{xo} or next;
         	# height ist die Höhe in SVG-Pixeln. Fehlt sie, nimmt || die vheight, und fehlt auch die, dann 0. 
         	# Das Ergebnis wird mit 0,75 in Punkte umgerechnet. Mit diesem $h rückt später $y -= $h nach unten.
         	my $h  = ( $e->{height} || $e->{vheight} || 0 ) * $PX2PT;
 
 	        # Argumente von $gfx->object: Objekt, x-pos, y-pos, x-skalierung, y-skalierung
-    	    	#
+    	    #
         	# 1. WARUM ypos = y?
-        	# SVGPDF-XObjects haben ein gespiegeltes Y: sie hängen an ihrer
-        	# Oberkante, also bei y = aktuelle Oberkante platzieren.
-        	# d.h. Normalerweise setzt $gfx->object($xo, 0, $y, …) die linke untere Ecke eines Objekts auf y. 
-        	# SVGPDF-XObjects haben aber ein gespiegeltes Y. Ihr Inhalt liegt von y = 0 aus nach unten (negativ), d
-        	# Bei object(…, $y, …) hängt der Block deshalb an seiner Oberkante bei $y und wächst von dort nach unten. 
+        	# SVGPDF-XObjects haben ein gespiegeltes Y: sie hängen an ihrer Oberkante, also bei y = aktuelle Oberkante platzieren.
+        	# Ihr Inhalt wächst da aus nach unten (negativ)
         	#
         	# 2. WARUM SKALIERUNGEN PX2PT
         	# SVGPDF liefert die Maße in SVG-Pixeln, also 794 × 96 für einen Block. PDF zählt in Punkten, und 1 px sind 0,75 pt. 
-        	# Beide Richtungen müssen deshalb denselben Faktor bekommen, $PX2PT.
+        	# Beide Richtungen müssen den denselben Faktor $PX2PT bekommen
         	$gfx->object( $xo, 0, $y, $PX2PT, $PX2PT );
         
-        	# In einer PDF liegt der Nullpunkt unten links, und y wächst nach oben. Ein kleiner y-Wert heißt also „weiter unten auf der Seite“. 
-        	# Deshalb ist $ph (die Seitenhöhe) die Oberkante der Seite, und $y -= $h rückt die Position nach unten. 
-        	# Der Wert wird kleiner, die Position wandert aber auf der Seite abwärts.
+        	# In einer PDF liegt der Nullpunkt unten links, und y wächst nach oben 
+        	# =>  kleiner y-Wert = weiter unten auf der Seite 
+        	# $y -= $h rückt die Position daher nach unten
         	$y -= $h;
 	    }
 	}
@@ -703,8 +696,7 @@ sub svg2pdf {
 	print "Fertig: $outfile.pdf (" . scalar(@files) . " Dateien)\n";
 }
 
-# Seitengröße in pt aus width/height des äußeren Seiten-<svg> (px).
-# Bei der Standardkonfiguration (21 x 29,7 cm) ergibt das genau DIN A4.
+# Seitengröße in pt aus width/height des äußeren Seiten-<svg> (px) herausfiltern
 sub page_size_pt {
     my ($xml) = @_;
     my ( $pw, $ph ) = ( 595.276, 841.89 );    # Fallback: A4
@@ -714,17 +706,14 @@ sub page_size_pt {
     return ( $pw, $ph );
 }
 
-# Seiten-SVG in einzelne Notenblöcke zerlegen:
-#  - <abc .../> (Klickinfos) entfernen
-#  - äußeres <svg> samt weißem <rect> entfernen (damit keine verschachtelte svg)
-#  - übrig bleibt eine Folge nicht verschachtelter <svg>...</svg>
+# Seiten-SVG in einzelne Notenblöcke zerlegen
 sub split_blocks {
     my ($xml) = @_;
     # Lösche global alle von anno_stop hinzugefügten <abc> Elemente 
     $xml =~ s!<abc\b[^>]*/>!!g;
     # Lösche das ersten von img_out hinzugefügten <svg> Element bis zum <rect> Element
     # SVGPDF kann keine verschachtelten SVGs. Deswegen ist es hier wichtig, wieder zum Urzustand 
-    # von abc2svg zurückzukehren. Die Größe der Seite und der Hintergrund werden durch PDF::API2 gemanaged 
+    # von abc2svg zurückzukehren. Die Größe der Seite, der Hintergrund und Topmargin werden durch PDF::API2 gemanaged 
     $xml =~ s!\A\s*<svg\b[^>]*>(?:\s*<rect\b[^>]*/>)?!!;
     # Das letzte und abschließende <svg> Element muss natürlich auch gelöscht werden
     $xml =~ s!</svg>\s*\z!!;

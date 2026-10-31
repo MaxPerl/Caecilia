@@ -1,6 +1,6 @@
 Revision history for Perl extension Caecilia.
 
-0.28_02
+0.28
 	- Minor fixes and Code cleaning
 	- Fix MIDI recording (give tempo (t) before mins and as integer to midish)
 	- Add pdf and svg Export by abc2svg / internal preview engine

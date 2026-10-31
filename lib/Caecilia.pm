@@ -56,7 +56,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.28_02';
+our $VERSION = '0.27_90';
 
 our $SELF;
 

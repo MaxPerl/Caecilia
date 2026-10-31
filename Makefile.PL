@@ -21,7 +21,7 @@ WriteMakefile(
 							File::ShareDir => 0,
 							File::HomeDir => 0,
 							File::Basename => 0,
-							XML-LibXML => 0,
+							XML::LibXML => 0,
 							Image::Info => 0,
 							pEFL => 0.76,
 							Syntax::SourceHighlight => 0,
