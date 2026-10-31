@@ -739,9 +739,9 @@ sub fill_undo_stack {
 				
 		}
 		else {
-			my $prev_start = $last_undo->{start} || 1;
-			my $prev_content = $last_undo->{content} || "";
-			my $prev_end = $last_undo->{end} || 1;
+			my $prev_start = defined($last_undo->{start}) ? $last_undo->{start} : -1;
+			my $prev_content = defined($last_undo->{content}) ? $last_undo->{content} : "";
+			my $prev_end = defined($last_undo->{end}) ? $last_undo->{end} : -1;
 		
 			my $start = $change->{del}->{start};
 			my $end = $change->{del}->{end};
@@ -829,7 +829,7 @@ sub undo {
 		$entry->entry_insert($content);
 		$entry->select_none();
 		$self->rehighlight_and_retab_lines($undo);
-		$entry->cursor_pos_set($undo->{end});
+		$entry->cursor_pos_set($undo->{start} + length($undo->{content}));
 	}
 	elsif ($undo->{pos} >= 0) {
 		$self->is_undo("yes");
@@ -866,10 +866,12 @@ sub redo {
 		# the length of the deleted content.
 		# see https://github.com/MaxPerl/eSourceHighlight/issues/1
 		# and perhaps https://github.com/MaxPerl/eSourceHighlight/issues/2 ?
-		my $content_plain = pEFL::Elm::Entry::markup_to_utf8($redo->{content});
-		$content_plain = Encode::decode("UTF-8",$content_plain); 
 		
-		my $length = length($content_plain);
+		# This is already done in correct_change!!!
+		# my $content_plain = pEFL::Elm::Entry::markup_to_utf8($redo->{content});
+		# $content_plain = Encode::decode("UTF-8",$content_plain); 
+		
+		my $length = length($redo->{content});
 		
 		$entry->select_region_set($redo->{start},$redo->{start} + $length);
 		

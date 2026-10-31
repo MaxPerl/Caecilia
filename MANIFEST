@@ -12,6 +12,9 @@ lib/Caecilia/Tabs.pm
 lib/Caecilia/TuneBook.pm
 Makefile.PL
 MANIFEST
+LICENSE
+Artistic
+Copying
 README
 README.md
 screenshot.jpg

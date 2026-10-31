@@ -1,6 +1,6 @@
 Revision history for Perl extension Caecilia.
 
-0.28_01
+0.28_02
 	- Minor fixes and Code cleaning
 	- Fix MIDI recording (give tempo (t) before mins and as integer to midish)
 	- Add pdf and svg Export by abc2svg / internal preview engine
@@ -11,6 +11,8 @@ Revision history for Perl extension Caecilia.
 	- Fix overlapping note rect Problem
 	- Now exists two edit modes: Split mode (edit single tune) and raw mode (edit all tunes in file)
 	- Preview and Generate Midi buttons generate now both Preview and MIDI!
+	- Update README files and Add LICENSE informations
+	- Fix undo / redo problem
 0.27
 	- Fix background in Dialogs	
 	- Fix MIDI playback:
