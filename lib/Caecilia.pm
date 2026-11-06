@@ -56,7 +56,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.27_91';
+our $VERSION = '0.27_92';
 
 our $SELF;
 
@@ -394,7 +394,7 @@ sub add_menu {
 	$menu->item_add($edit_it,"edit-cut","Cut",sub {$self->entry->elm_entry->selection_cut()},undef);
 	$menu->item_add($edit_it,"edit-copy","Copy",sub {$self->entry->elm_entry->selection_copy()},undef);
 	$menu->item_add($edit_it,"edit-paste","Paste",sub {$self->entry->elm_entry->selection_paste()},undef);
-	$menu->item_add($edit_it,"preferences-other","Settings",sub {my $s = $self->settings(); $s->show_dialog($self)},undef);
+	$menu->item_add($edit_it,"preferences-other","Settings",sub {my $s = $self->settings(); $s->show_dialog()},undef);
 	$menu->item_add($edit_it,"preferences-desktop-font","Install Music Font",\&font_install,$self);
 	
 	
@@ -469,7 +469,7 @@ sub add_toolbar {
 	my $it_sep4 = $tabsbar->item_append(undef,undef,undef,undef);
 	$it_sep4->separator_set(1);
 	
-	$tabsbar->item_append("preferences-other","Settings",sub {my $s = $self->settings(); $s->show_dialog($self)},undef);
+	$tabsbar->item_append("preferences-other","Settings",sub {my $s = $self->settings(); $s->show_dialog()},undef);
 	
 	$self->elm_toolbar($tabsbar);
 	$tabsbar->show();

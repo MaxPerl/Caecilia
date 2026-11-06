@@ -13,6 +13,7 @@ Revision history for Perl extension Caecilia.
 	- Preview and Generate Midi buttons generate now both Preview and MIDI!
 	- Update README files and Add LICENSE informations
 	- Fix undo / redo problem
+	- Fix Focus problem in Settings Dialog
 0.27
 	- Fix background in Dialogs	
 	- Fix MIDI playback:

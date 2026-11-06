@@ -23,6 +23,8 @@ our @ISA = qw(Exporter);
 
 our $AUTOLOAD;
 
+my $no_fix_focus = 0;
+
 sub new {
 	my ($class, $app, %opts) = @_;
 	
@@ -38,8 +40,9 @@ sub new {
 }
 
 sub show_dialog {
-	my ($self) = @_;
-	
+	my ($self, $select_label) = @_;
+
+	$no_fix_focus=1;
 	my $app = $self->app();
 	
 	my $settings_win = pEFL::Elm::Win->util_dialog_add($app->elm_mainwindow(), "Settings", "Settings");
@@ -57,7 +60,7 @@ sub show_dialog {
 	my $tb = pEFL::Elm::Toolbar->add($container);
 	$tb->homogeneous_set(0);
 	$tb->shrink_mode_set(ELM_TOOLBAR_SHRINK_SCROLL);
-	$tb->select_mode_set(ELM_OBJECT_SELECT_MODE_ALWAYS);
+	#$tb->select_mode_set(ELM_OBJECT_SELECT_MODE_ALWAYS);
 	$tb->align_set(0.0);
 	$tb->horizontal_set(0);
 	$tb->size_hint_weight_set(0.0,EVAS_HINT_EXPAND);
@@ -90,14 +93,43 @@ sub show_dialog {
 	my $tab_item4 = $tb->item_append("applications-multimedia","abcm2ps Options",\&_settings_category_cb, $settings_abcm2ps_it);
 	my $tab_item5 = $tb->item_append("applications-development","Tabulator",\&_settings_category_cb, $settings_tabulator_it);
 
-	$tab_item0->selected_set(1);
-	
+	if ($select_label) {
+		my $tab_item = $tb->item_find_by_label($select_label);
+		$tab_item->selected_set(1);
+	}
+	else {
+		$tab_item0->selected_set(1);
+	}	
+
+	$naviframe->smart_callback_add("transition,finished" => \&_fix_focus, $tb);
 	$naviframe->show();
 	$settings_win->resize(600,400);
 	
 	$settings_win->show();
 	
 	return $settings_win;
+}
+
+# Woraround for fix focus problems (see https://git.enlightenment.org/enlightenment/efl/issues/17)
+# the problem sees to lie in the focus manager: After switching pages, the wrong item (the first one) 
+# receives focus and retains it, even though the focus should actually be on the new item. 
+# Because in the theme both - “focus” and “selected” - are rendered the same way, it looks as if both are selected
+# Fix: Give new selected item the focus, too
+sub _fix_focus {
+	my ($tb, $obj, $evinfo) = @_;
+
+	# The first transition happens while the dialog is being built
+	# At this time toolbar has no focus yet, and focus_set would focus the first item instead
+	# so skipt it!
+	if ($no_fix_focus) {
+		$no_fix_focus = 0;
+		return;
+	}
+
+	my $item = $tb->selected_item_get();
+	if ($item) {
+		$item->focus_set(1);
+	}
 }
 
 sub _settings_category_cb {
