@@ -14,11 +14,12 @@ Revision history for Perl extension Caecilia.
 	- Update README files and Add LICENSE informations
 	- Fix undo / redo problem
 	- Fix Focus problem in Settings Dialog
+	- Write conifgurations to ~/.config/caecilia
 0.27
-	- Fix background in Dialogs	
+	- Fix background in Dialogs 
 	- Fix MIDI playback:
 	  - always create a new Elm_Video (and so a new GStreamer Pipeline)
-	    so no "autoplay" when generating a new MIDI file
+		so no "autoplay" when generating a new MIDI file
 	  - save position when generating a new MIDI file
 	  - hide always voice pointers when pausing / finishing / generating new midi file
 	  - Fix Y-Scrolling (follow only one [user-selected] voice) 
@@ -50,8 +51,8 @@ Revision history for Perl extension Caecilia.
 0.20 Wed Dec 07 07:00:00
 	- complete rewrite wit pEFL (Einlightenment foundation library)
 0.19 Sun Jun 28 00:43:00
-    - Move from Image::LibRSVG to Image::Magick
-    - Minor design improvements in Breeze theme and settings dialog
+	- Move from Image::LibRSVG to Image::Magick
+	- Minor design improvements in Breeze theme and settings dialog
 0.18 Wed Aug 14 19:00:00
 	- Some adoptions for compatibility with Windows
 	- Caecilia::Preview improvement: Jump to note now also works with rests

@@ -888,7 +888,7 @@ sub save_settings {
 	$config->{abcm2ps_firstmeasure} = sprintf("%.0f",_spinner_get($self->elm_firstmeasure_spin));
 	$config->{abcm2ps_numbernbars} = sprintf("%.0f",_spinner_get($self->elm_numbernbars_spin));
 	$config->{abcm2ps_numbernbarsboxed} = $self->elm_numbernbarsboxed_check->state_get();
-	$config->{abcm2ps_flatbeams} = $self->elm_flatbeams_check->state_get();	
+	$config->{abcm2ps_flatbeams} = $self->elm_flatbeams_check->state_get(); 
 	
 	$self->save_config($config);
 	
@@ -899,8 +899,8 @@ sub save_settings {
 
 sub _write_style_file {
 	my ($self, $conf) = @_;
-	my $userdir = File::HomeDir->my_home . "/.caecilia"; 
-	my $path = File::HomeDir->my_home . "/.caecilia/source-highlight/mystyle.style";
+	my $userdir = $self->app->user_dir(); 
+	my $path = "$userdir/source-highlight/mystyle.style";
 	
 	# Convert Colors to HTML colors
 	my $c = Convert::Color->new("rgb8:" . join(",",@{$conf->{notes_color}})); my $notes = "#".$c->hex;
@@ -953,7 +953,7 @@ sub _spinner_get {
 sub load_config {
 	my $self = shift;
 	
-	my $path = File::HomeDir->my_home . "/.caecilia/config.yaml";
+	my $path = $self->app->user_dir() . "/config.yaml";
 	
 	if (-e $path) {
 		open my $fh, "<:encoding(utf-8)", $path or die "Could not open $path: $!\n";
@@ -972,7 +972,7 @@ sub load_config {
 sub save_config {
 	my ($self, $config) = @_;
 	
-	my $path = File::HomeDir->my_home . "/.caecilia";
+	my $path = $self->app->user_dir();;
 	
 	unless (-e $path) {
 		make_path $path or die "Could not create $path: $!";

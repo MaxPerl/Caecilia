@@ -16,7 +16,7 @@ use File::Path qw(make_path);
 use File::Copy;
 
 # Fist time setup
-my $userdir = File::HomeDir->my_home . "/.caecilia";
+my $userdir = File::HomeDir->my_home . "/.config/caecilia";
 my $share = dist_dir("Caecilia");
 
 if (! -e "$userdir/source-highlight") {

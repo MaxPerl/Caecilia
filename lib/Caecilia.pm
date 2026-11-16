@@ -71,7 +71,7 @@ sub new {
 		midi => undef,
 		current_tunebook => 0,
 		settings => undef,
-		user_dir => File::HomeDir->my_home . "/.caecilia",
+		user_dir => File::HomeDir->my_home . "/.config/caecilia",
 		share_dir => $share,
 		tmpdir => File::Temp->newdir(),
 		elm_mainwindow => undef,
@@ -476,16 +476,16 @@ sub add_toolbar {
 }
 
 sub midi_cb {
-    my ($self) = @_;
-    
-    my $midi = $self->midi();
-    my $midibar = $midi->elm_midibar();
-    if ($midibar->visible_get()) {
-        $midibar->hide();
-    }
-    else {
-        $midibar->show();
-    }
+	my ($self) = @_;
+	
+	my $midi = $self->midi();
+	my $midibar = $midi->elm_midibar();
+	if ($midibar->visible_get()) {
+		$midibar->hide();
+	}
+	else {
+		$midibar->show();
+	}
 }
 
 sub key_down {
@@ -760,7 +760,7 @@ sub open_file {
 		#$content =~ s/\n/<br\/>/g;
 
 		my $current = $self->current_tunebook();
-		# Split the the plain text in header + tunes and save it in $tabbook->content 		
+		# Split the the plain text in header + tunes and save it in $tabbook->content		
 		$current->content_all_str($content);
 		# start in split mode (with the first tune). 
 		$current->edit_mode("split");
