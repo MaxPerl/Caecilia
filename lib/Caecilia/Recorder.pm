@@ -46,9 +46,9 @@ sub new {
 	# TODO: abc2svg_path should be an option in app not in renderer or midi
 	my $recorder_object = {
 		app => $app, 
-	    midi_file => $app->tmpdir . "/recorder.mid",
+		midi_file => $app->tmpdir . "/recorder.mid",
 		splitted_midi_file => $app->tmpdir . "/recorder_splitted.mid",
-	    abc_file => $app->tmpdir . "/recorder.abc",
+		abc_file => $app->tmpdir . "/recorder.abc",
 		child_in => "",
 		pid => ""
 		};
@@ -85,7 +85,7 @@ sub show_record_dialog {
 	##########################
 	# Select Device 
 	##########################
-	_add_header($table, 0, "Select Device", 1);
+	_add_header($table, 0, "Select Input Device", 1);
 	my @devices = ();
 	my $config = $self->app->settings->load_config();
 	my $aseqdump = $config->{aseqdump_path} || "aseqdump";
@@ -99,14 +99,31 @@ sub show_record_dialog {
 	}
 	
 	my $devices_combo = _add_combo($table,
-		"row" => 2, "width" => 2,
+		"row" => 1, "width" => 2,
 		"text" => $self->midi_device() || "", "genlist" => \@devices, "frame" => $frame,
+		);
+		
+	_add_header($table, 2, "Select Output Device", 1);
+	my @out_devices = ();
+	my $aplaymidi = $config->{aplaymidi_path} || "aplaymidi";
+	foreach my $d (`$aplaymidi -l`) {
+		chomp($d);
+		$d =~ s/^\s*//;
+		$d =~ s/\s{2,}/###/g;
+		next if $d =~ /^Port/;
+		my $device = "$d";
+		push @out_devices, $device;
+	}
+	
+	my $out_devices_combo = _add_combo($table,
+		"row" => 3, "width" => 2,
+		"text" => $self->midi_out_device() || "", "genlist" => \@out_devices, "frame" => $frame,
 		);
 	
 	##########################
 	# Select measure
 	##########################
-	_add_header($table,3,"Measure (M:)",1);
+	_add_header($table,4,"Measure (M:)",1);
 	my $measure_combo = pEFL::Elm::Combobox->add($table);
 	_expand_widget_x($measure_combo);
 	$measure_combo->text_set($self->midi_measure() || "4/4");
@@ -119,12 +136,12 @@ sub show_record_dialog {
 		$measure_combo->item_append($itc,$m,undef,ELM_GENLIST_ITEM_NONE,undef,undef);
 	}
 	$measure_combo->smart_callback_add("item,pressed",\&Caecilia::MyElm::_combobox_item_pressed_cb, $frame);
-	$measure_combo->show(); $table->pack($measure_combo,0,4,2,1);
+	$measure_combo->show(); $table->pack($measure_combo,0,5,2,1);
 	
 	############################
 	# Select tempo
 	############################
-	my $tempo_slider = _add_slider($table, "row" => 5, "width" => 2, 
+	my $tempo_slider = _add_slider($table, "row" => 6, "width" => 2, 
 		"max" => 200, "value" => $self->midi_tempo() || 100, 
 		"label" => "Tempo");
 		
@@ -132,7 +149,7 @@ sub show_record_dialog {
 	# Number of bars
 	###########################
 	my $bars_spinner = _add_spinner($table,
-		"row" => 6, "width" => 2,
+		"row" => 7, "width" => 2,
 		"max" => 99, "value" => $self->midi_bars() || 10,
 		"label" => "Number of bars to record"
 	);
@@ -140,8 +157,8 @@ sub show_record_dialog {
 	my $ok_btn = pEFL::Elm::Button->new($table);
 	$ok_btn->text_set("Record Midi");
 	_expand_widget_x($ok_btn);
-	$ok_btn->show(); $table->pack($ok_btn,0,7,2,2);
-	$ok_btn->smart_callback_add("clicked", \&record_midi_cb, [$self,$devices_combo,$measure_combo,$tempo_slider,$bars_spinner]);
+	$ok_btn->show(); $table->pack($ok_btn,0,8,2,2);
+	$ok_btn->smart_callback_add("clicked", \&record_midi_cb, [$self,$devices_combo,$measure_combo,$tempo_slider,$bars_spinner, $out_devices_combo]);
 	
 	$new_win->resize(420,200);
 	$new_win->show();
@@ -157,6 +174,8 @@ sub record_midi_cb {
 		$self = $data->[0];
 		my $device = $data->[1]->text_get(); 
 		$self->midi_device($device);
+		my $out_device = $data->[5]->text_get(); 
+		$self->midi_out_device($out_device);
 		my $measure = $data->[2]->text_get(); 
 		$self->midi_measure($measure);
 		$self->midi_tempo($data->[3]->value_get()); 
@@ -167,10 +186,10 @@ sub record_midi_cb {
 	}
 	
 	$self->run_midish();
-    
-    $obj->top_widget_get()->del();
-    
-    my $popup = pEFL::Elm::Popup->add($self->app->elm_mainwindow);
+	
+	$obj->top_widget_get()->del();
+	
+	my $popup = pEFL::Elm::Popup->add($self->app->elm_mainwindow);
 	
 	$popup->part_text_set("title", "Recording MIDI");
 	$popup->text_set("Click finish to stop recording");
@@ -192,29 +211,40 @@ sub run_midish {
 	my ($self) = @_;
 	
 	my $config = $self->app->settings->load_config();
-    
-    my $child_out; my $child_in;
-    my $midish = $config->{midish_path} || "midish";
-    my $pid = open2($child_out, $child_in, $midish);
-    
-    my ($device) = split("###", $self->midi_device() ); 
-    my $measure = $self->midi_measure();
-    $measure =~ s!\/! !; 
+	
+	my $child_out; my $child_in;
+	my $midish = $config->{midish_path} || "midish";
+	my $pid = open2($child_out, $child_in, $midish);
+	
+	my ($device) = split("###", $self->midi_device() );
+	my ($out_device) = split("###", $self->midi_out_device() || "" );
+	 
+	my $measure = $self->midi_measure();
+	$measure =~ s!\/! !; 
 	$measure = "4 4" if ($measure eq "C");
 	$measure = "2 2" if ($measure eq "X|");
-    
-    print $child_in "dnew 0 \"".$device."\" rw\n";
-    print $child_in "g 0\n";
-    print $child_in "t ".int($self->midi_tempo())."\n";
-    print $child_in "tnew mytrack\n";
-    print $child_in "mins ".$self->midi_bars()." {$measure}\n";
-    print $child_in "m on\n";
-    print $child_in "r\n";
-    
-    $self->child_in($child_in);
-    $self->pid($pid);
-    
-    return;
+	
+	if ($out_device && $out_device ne $device) {
+		print $child_in "dnew 0 \"".$device."\" ro\n";
+		print $child_in "dnew 1 \"".$out_device."\" wo\n";
+		print $child_in "metrocf {non {1 9} 60 35} {non {1 9} 64 25}\n";
+		print $child_in "inew myin {0 0}\n";
+		print $child_in "onew myout {1 0}\n";
+	}
+	else {
+		print $child_in "dnew 0 \"".$device."\" rw\n";
+	}
+	print $child_in "g 0\n";
+	print $child_in "t ".int($self->midi_tempo())."\n";
+	print $child_in "tnew mytrack\n";
+	print $child_in "mins ".$self->midi_bars()." {$measure}\n";
+	print $child_in "m on\n";
+	print $child_in "r\n";
+	
+	$self->child_in($child_in);
+	$self->pid($pid);
+	
+	return;
 }
 
 sub stop_recording {

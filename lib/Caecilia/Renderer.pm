@@ -52,8 +52,8 @@ sub new {
 	
 	# TODO: abc2svg_path should be an option in app not in renderer or midi
 	my $renderer_object = {app => $app, 
-	    abc2svg_path => $app->share_dir . "/abc2svg/",
-	    notes => {},
+		abc2svg_path => $app->share_dir . "/abc2svg/",
+		notes => {},
 		error_message => "",
 		elm_error_btn => undef,
 		elm_only_current_check => undef};
@@ -75,10 +75,6 @@ sub preview_header {
 	my $preview_scale = $config->{preview_scale} || 1;
 	
 	my $header = "\%\%fullsvg 1\n\%\%musicfont abc2svg\n\%\%pageheight $pageheight_cm"."cm\n\%\%pagewidth $pagewidth_cm"."cm\n\%\%pagescale $preview_scale\n";
-	
-	# FIX HYPHEN IN LYRICS BUG IN abc2svg 1.23.6:
-	# see https://chiselapp.com/user/moinejf/repository/abc2svg/tktview/4129bd6558
-	$header = $header . "%%hyphencont 0\n";
 	
 	return $header;
 }
@@ -146,32 +142,32 @@ sub render_preview {
 	}
 	
 	my $val = JavaScript::QuickJS->new()
-    ->set_globals(path => $self->abc2svg_path(), abc_file => "$dir/render.abc", pageheight => $pageheight, pagewidth => $pagewidth, bgcolor => $bgcolor, topmargin => $topmargin, bottommargin => $bottommargin, header => $header )
-    ->os()->std()->helpers()->eval(js());
-    
-    my @pages = @{ $val->{pages} };
-    
-    # Print SVG
-    my $i = 1;
-    foreach my $svg (@pages) {
-        open my $fh, ">:utf8", "$outfile-$i.svg";
-        print $fh $svg;
-        close $fh;
-        $i++;
-    }
-    
-    # Print Notes
-    my @notes = @{ $val->{notes} };
-    my @offsets2correctpages = @{ $val->{lastoffsets2correct_pages} };
-    #open my $fh2, ">:utf8", "$outfile.notes";
-    
-    my %notes;
-    foreach my $line (@notes) {
-        $line= correct_pages($line, $topmargin, @offsets2correctpages);
-        #print $fh2 $line;
-        
-	    ### Fill note hash for MIDI play
-	    if ($line =~ m!<abc type=".*" start_offset="(.*)" stop_offset="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)" svg_offset="(.*)" page_nr="(.*)"/>!) {
+	->set_globals(path => $self->abc2svg_path(), abc_file => "$dir/render.abc", pageheight => $pageheight, pagewidth => $pagewidth, bgcolor => $bgcolor, topmargin => $topmargin, bottommargin => $bottommargin, header => $header )
+	->os()->std()->helpers()->eval(js());
+	
+	my @pages = @{ $val->{pages} };
+	
+	# Print SVG
+	my $i = 1;
+	foreach my $svg (@pages) {
+		open my $fh, ">:utf8", "$outfile-$i.svg";
+		print $fh $svg;
+		close $fh;
+		$i++;
+	}
+	
+	# Print Notes
+	my @notes = @{ $val->{notes} };
+	my @offsets2correctpages = @{ $val->{lastoffsets2correct_pages} };
+	#open my $fh2, ">:utf8", "$outfile.notes";
+	
+	my %notes;
+	foreach my $line (@notes) {
+		$line= correct_pages($line, $topmargin, @offsets2correctpages);
+		#print $fh2 $line;
+		
+		### Fill note hash for MIDI play
+		if ($line =~ m!<abc type=".*" start_offset="(.*)" stop_offset="(.*)" x="(.*)" y="(.*)" width="(.*)" height="(.*)" svg_offset="(.*)" page_nr="(.*)"/>!) {
 			my %note = (
 					'istart' => $1,
 					'iend' => $2,
@@ -199,7 +195,7 @@ sub render_preview {
 		$error =~ m/(\d+),\d+$/;
 		# We have to correct the added abc lines (see above)
 		# The first Line is in Caecilia 1 (not 0)!! TODO: Perhaps change the behaviour / same behaviour as abc2svg; I think changed (see above 6 newlines, here only 5)
-		my $line_nr = $1-5;
+		my $line_nr = $1-4;
 		# In split mode, we need to add the lines of the fileheader of the tunebook, too (see above)
 		if ($line_nr > $prefix_lines) {
 			$line_nr = $line_nr - $prefix_lines;
@@ -247,18 +243,18 @@ sub show_errors {
 #
 # Parameter: Notenzeile (<abc .../>), oberer Seitenrand, Liste der Umbruch-Offsets
 sub correct_pages {
-    my ($line, $topmargin, @offsets) = @_;
-    return $line unless $line =~ m!<abc type="note" start_offset=".*" stop_offset=".*" x=".*" y=".*" width=".*" height=".*" svg_offset="(.*)" page_nr="(.*)"/>!;
-    
-    my $svg_offset=$1;
-    my $page = $2;
-    
-    if (defined($offsets[$page-1]) && $svg_offset == $offsets[$page-1]) {
-        my $np = $page+1;
-        $line =~ s/page_nr="$page"/page_nr="$np"/;
-        $line =~ s/svg_offset="$svg_offset"/svg_offset="$topmargin"/;
-    }
-    return $line;
+	my ($line, $topmargin, @offsets) = @_;
+	return $line unless $line =~ m!<abc type="note" start_offset=".*" stop_offset=".*" x=".*" y=".*" width=".*" height=".*" svg_offset="(.*)" page_nr="(.*)"/>!;
+	
+	my $svg_offset=$1;
+	my $page = $2;
+	
+	if (defined($offsets[$page-1]) && $svg_offset == $offsets[$page-1]) {
+		my $np = $page+1;
+		$line =~ s/page_nr="$page"/page_nr="$np"/;
+		$line =~ s/svg_offset="$svg_offset"/svg_offset="$topmargin"/;
+	}
+	return $line;
 }
 
 sub render_abcm2ps {
@@ -582,7 +578,7 @@ sub svg2pdf {
 	die "Cannot not find any .svg files in '$dir'.\n" unless @files;
 
 	@files = sort {
-    	( $a =~ /(\d+)/ )[0] <=> ( $b =~ /(\d+)/ )[0]
+		( $a =~ /(\d+)/ )[0] <=> ( $b =~ /(\d+)/ )[0]
 	} @files;
 
 	
@@ -597,97 +593,96 @@ sub svg2pdf {
 	# Gibt für die Notenschrift (abc2svg) die TTF zurück, sonst Times mit
 	# Fett/Kursiv. 
 	my $fc = sub {
-    	my ( $self, %args ) = @_;
-    	my $style  = $args{style} || {};
-    	my $family = $style->{'font-family'} // '';
+		my ( $self, %args ) = @_;
+		my $style  = $args{style} || {};
+		my $family = $style->{'font-family'} // '';
 
-    	if ( $family =~ /abc2svg/i ) {
-        	return $fontcache{abc2svg} //= $args{pdf}->font($fontfile);
-    	}
+		if ( $family =~ /abc2svg/i ) {
+			return $fontcache{abc2svg} //= $args{pdf}->font($fontfile);
+		}
 
-    	my $bold   = ( $style->{'font-weight'} // '' ) =~ /^(bold|bolder|[6-9]00)$/i;
-    	my $italic = ( $style->{'font-style'}  // '' ) =~ /^(italic|oblique)$/i;
+		my $bold   = ( $style->{'font-weight'} // '' ) =~ /^(bold|bolder|[6-9]00)$/i;
+		my $italic = ( $style->{'font-style'}  // '' ) =~ /^(italic|oblique)$/i;
 
-    	my $name = $bold   && $italic ? 'Times-BoldItalic'
-             : $bold              ? 'Times-Bold'
-             : $italic            ? 'Times-Italic'
-             :                      'Times-Roman';
+		my $name = $bold   && $italic ? 'Times-BoldItalic'
+			 : $bold			  ? 'Times-Bold'
+			 : $italic			  ? 'Times-Italic'
+			 :						'Times-Roman';
 
-    	return $fontcache{$name} //= $args{pdf}->font($name);
+		return $fontcache{$name} //= $args{pdf}->font($name);
 	};
 	
 	# --- Seiten erzeugen ---------------------------------------------------------
 	for my $file (@files) {
-    	my $path = "$dir/$file";
-    	print "Process $file ...\n";
+		my $path = "$dir/$file";
+		print "Process $file ...\n";
 
-    	open( my $in, '<:encoding(UTF-8)', $path ) or die "Cannot read $path: $!\n";
-    	my $xml = do { local $/; <$in> };
-    	close $in;
+		open( my $in, '<:encoding(UTF-8)', $path ) or die "Cannot read $path: $!\n";
+		my $xml = do { local $/; <$in> };
+		close $in;
 
-    	my ( $pw, $ph ) = page_size_pt($xml);
-    	my @blocks = split_blocks($xml);
-    	unless (@blocks) {
-        	warn "  -> block skipped ($file): Could not find a musical staff \n";
-        	next;
-    	}
+		my ( $pw, $ph ) = page_size_pt($xml);
+		my @blocks = split_blocks($xml);
+		unless (@blocks) {
+			warn "	-> block skipped ($file): Could not find a musical staff \n";
+			next;
+		}
 
-    	my $page = $pdf->page;
-    	$page->mediabox( 0, 0, $pw, $ph );
+		my $page = $pdf->page;
+		$page->mediabox( 0, 0, $pw, $ph );
 
-    	my $gfx = $page->gfx;
-    	# weißer Hintergrund
-    	$gfx->fill_color('white');
-    	$gfx->rect( 0, 0, $pw, $ph );
-    	$gfx->fill;
+		my $gfx = $page->gfx;
+		# weißer Hintergrund
+		$gfx->fill_color('white');
+		$gfx->rect( 0, 0, $pw, $ph );
+		$gfx->fill;
 
 		my $config = $self->app->settings->load_config();
 		my $topmargin = $config->{preview_topmargin} * 10 * 3.7795 || 10 * 3.7795;
-    	my $y =  - $topmargin * $PX2PT;    
+		my $y = $ph - ($topmargin * $PX2PT);    
 
-	    for my $block (@blocks) {
-	
-    		# Pro Block ein neues SVGPDF-Objekt (sonst sammelt es Ergebnisse an)
-        	my $svg  = SVGPDF->new( pdf => $pdf, fc => $fc );
-        
-        	# $xofs ist immer ein Skalar, der eine Referenz auf ein Array enthält.
-        	my $xofs = eval { $svg->process( $self->write_tmp($block) ) };
-        
-        	# Rein defensive Sicherheitsabfragen:
-        	# $@: Gab es einen Fehler im eval?
+		for my $block (@blocks) {
+			# Pro Block ein neues SVGPDF-Objekt (sonst sammelt es Ergebnisse an)
+			my $svg  = SVGPDF->new( pdf => $pdf, fc => $fc );
+		
+			# $xofs ist immer ein Skalar, der eine Referenz auf ein Array enthält.
+			my $xofs = eval { $svg->process( $self->write_tmp($block) ) };
+		
+			# Rein defensive Sicherheitsabfragen:
+			# $@: Gab es einen Fehler im eval?
 			# !$xofs: Ist $xofs leer oder undefiniert? SVGPDF gibt in manchen Fällen einfach nichts zurück.
 			# !@$xofs: Ist das Array leer? @$xofs macht aus der Referenz das Array, mit ! heißt es „keine Elemente“.
-        	if ( $@ or !$xofs or !@$xofs ) {
-            	warn "  -> Could not crete XOF ($file): " . ( $@ || 'No content' ) . "\n";
-            	next;
-        	}
+			if ( $@ or !$xofs or !@$xofs ) {
+				warn "	-> Could not crete XOF ($file): " . ( $@ || 'No content' ) . "\n";
+				next;
+			}
 
 			# split_blocks liefert Stücke, die jeweils von einem <svg bis zum nächsten </svg> laufen. 
 			# In jeder temporären Datei steht damit genau ein <svg>, und SVGPDF gibt dafür ein Array mit genau einem Hash zurück. 
 			# Deshalb reicht $xofs->[0], ein weiteres Element gibt es nicht.
-        	my $e  = $xofs->[0];
-        	# ->{xo} holt aus dem Hash den Eintrag xo, das eigentliche XObject, also das gezeichnete Bild des Blocks.
-        	my $xo = $e->{xo} or next;
-        	# height ist die Höhe in SVG-Pixeln. Fehlt sie, nimmt || die vheight, und fehlt auch die, dann 0. 
-        	# Das Ergebnis wird mit 0,75 in Punkte umgerechnet. Mit diesem $h rückt später $y -= $h nach unten.
-        	my $h  = ( $e->{height} || $e->{vheight} || 0 ) * $PX2PT;
+			my $e  = $xofs->[0];
+			# ->{xo} holt aus dem Hash den Eintrag xo, das eigentliche XObject, also das gezeichnete Bild des Blocks.
+			my $xo = $e->{xo} or next;
+			# height ist die Höhe in SVG-Pixeln. Fehlt sie, nimmt || die vheight, und fehlt auch die, dann 0. 
+			# Das Ergebnis wird mit 0,75 in Punkte umgerechnet. Mit diesem $h rückt später $y -= $h nach unten.
+			my $h  = ( $e->{height} || $e->{vheight} || 0 ) * $PX2PT;
 
-	        # Argumente von $gfx->object: Objekt, x-pos, y-pos, x-skalierung, y-skalierung
-    	    #
-        	# 1. WARUM ypos = y?
-        	# SVGPDF-XObjects haben ein gespiegeltes Y: sie hängen an ihrer Oberkante, also bei y = aktuelle Oberkante platzieren.
-        	# Ihr Inhalt wächst da aus nach unten (negativ)
-        	#
-        	# 2. WARUM SKALIERUNGEN PX2PT
-        	# SVGPDF liefert die Maße in SVG-Pixeln, also 794 × 96 für einen Block. PDF zählt in Punkten, und 1 px sind 0,75 pt. 
-        	# Beide Richtungen müssen den denselben Faktor $PX2PT bekommen
-        	$gfx->object( $xo, 0, $y, $PX2PT, $PX2PT );
-        
-        	# In einer PDF liegt der Nullpunkt unten links, und y wächst nach oben 
-        	# =>  kleiner y-Wert = weiter unten auf der Seite 
-        	# $y -= $h rückt die Position daher nach unten
-        	$y -= $h;
-	    }
+			# Argumente von $gfx->object: Objekt, x-pos, y-pos, x-skalierung, y-skalierung
+			#
+			# 1. WARUM ypos = y?
+			# SVGPDF-XObjects haben ein gespiegeltes Y: sie hängen an ihrer Oberkante, also bei y = aktuelle Oberkante platzieren.
+			# Ihr Inhalt wächst da aus nach unten (negativ)
+			#
+			# 2. WARUM SKALIERUNGEN PX2PT
+			# SVGPDF liefert die Maße in SVG-Pixeln, also 794 × 96 für einen Block. PDF zählt in Punkten, und 1 px sind 0,75 pt. 
+			# Beide Richtungen müssen den denselben Faktor $PX2PT bekommen
+			$gfx->object( $xo, 0, $y, $PX2PT, $PX2PT );
+		
+			# In einer PDF liegt der Nullpunkt unten links, und y wächst nach oben 
+			# =>  kleiner y-Wert = weiter unten auf der Seite 
+			# $y -= $h rückt die Position daher nach unten
+			$y -= $h;
+		}
 	}
 
 	$pdf->save("$outfile.pdf");
@@ -698,45 +693,45 @@ sub svg2pdf {
 
 # Seitengröße in pt aus width/height des äußeren Seiten-<svg> (px) herausfiltern
 sub page_size_pt {
-    my ($xml) = @_;
-    my ( $pw, $ph ) = ( 595.276, 841.89 );    # Fallback: A4
-    if ( $xml =~ /\A\s*<svg\b[^>]*?\bwidth="([\d.]+)px"[^>]*?\bheight="([\d.]+)px"/s ) {
-        ( $pw, $ph ) = ( $1 * $PX2PT, $2 * $PX2PT );
-    }
-    return ( $pw, $ph );
+	my ($xml) = @_;
+	my ( $pw, $ph ) = ( 595.276, 841.89 );	  # Fallback: A4
+	if ( $xml =~ /\A\s*<svg\b[^>]*?\bwidth="([\d.]+)px"[^>]*?\bheight="([\d.]+)px"/s ) {
+		( $pw, $ph ) = ( $1 * $PX2PT, $2 * $PX2PT );
+	}
+	return ( $pw, $ph );
 }
 
 # Seiten-SVG in einzelne Notenblöcke zerlegen
 sub split_blocks {
-    my ($xml) = @_;
-    # Lösche global alle von anno_stop hinzugefügten <abc> Elemente 
-    $xml =~ s!<abc\b[^>]*/>!!g;
-    # Lösche das ersten von img_out hinzugefügten <svg> Element bis zum <rect> Element
-    # SVGPDF kann keine verschachtelten SVGs. Deswegen ist es hier wichtig, wieder zum Urzustand 
-    # von abc2svg zurückzukehren. Die Größe der Seite, der Hintergrund und Topmargin werden durch PDF::API2 gemanaged 
-    $xml =~ s!\A\s*<svg\b[^>]*>(?:\s*<rect\b[^>]*/>)?!!;
-    # Das letzte und abschließende <svg> Element muss natürlich auch gelöscht werden
-    $xml =~ s!</svg>\s*\z!!;
-    
-    # Alle passenden SVG-Blöcke in einem Array speichern und zurückgeben
-    my @blocks = ($xml =~ m!(<svg\b.*?</svg>)!gs);
-    return @blocks;
+	my ($xml) = @_;
+	# Lösche global alle von anno_stop hinzugefügten <abc> Elemente 
+	$xml =~ s!<abc\b[^>]*/>!!g;
+	# Lösche das ersten von img_out hinzugefügten <svg> Element bis zum <rect> Element
+	# SVGPDF kann keine verschachtelten SVGs. Deswegen ist es hier wichtig, wieder zum Urzustand 
+	# von abc2svg zurückzukehren. Die Größe der Seite, der Hintergrund und Topmargin werden durch PDF::API2 gemanaged 
+	$xml =~ s!\A\s*<svg\b[^>]*>(?:\s*<rect\b[^>]*/>)?!!;
+	# Das letzte und abschließende <svg> Element muss natürlich auch gelöscht werden
+	$xml =~ s!</svg>\s*\z!!;
+	
+	# Alle passenden SVG-Blöcke in einem Array speichern und zurückgeben
+	my @blocks = ($xml =~ m!(<svg\b.*?</svg>)!gs);
+	return @blocks;
 }
 
 sub write_tmp {
-    my ($self, $text) = @_;
-    
-    my $fh = File::Temp->new(
-        TEMPLATE => 'svg2pdf-XXXXXX',
-        SUFFIX   => '.svg',
-        DIR      => $self->app->tmpdir . "/print",
-        UNLINK   => 0,  
-    );
-    
-    binmode( $fh, ':encoding(UTF-8)' );
-    print $fh $text;
-    close $fh;  
-    return $fh->filename; 
+	my ($self, $text) = @_;
+	
+	my $fh = File::Temp->new(
+		TEMPLATE => 'svg2pdf-XXXXXX',
+		SUFFIX	 => '.svg',
+		DIR 	 => $self->app->tmpdir . "/print",
+		UNLINK	 => 0,	
+	);
+	
+	binmode( $fh, ':encoding(UTF-8)' );
+	print $fh $text;
+	close $fh;	
+	return $fh->filename; 
 }
 
 
@@ -765,7 +760,7 @@ return <<'EOF';
 
 var abc, core = "abc2svg-1.js",
 	out = [],			// output without SVG container
-	yo = topmargin,				// offset of the next SVG
+	yo = topmargin, 			// offset of the next SVG
 	w = pagewidth,				// max width
 	page_nr = 1;
 
@@ -779,7 +774,7 @@ let context = "";
 // fix the problem about the text coordinates in librsvg
 // stolen from abctopdf :-)
 function bug(p) {
-    var	i, t, r, x, y, c, o, j = 0;
+	var i, t, r, x, y, c, o, j = 0;
 
 	while (1) {
 		i = p.indexOf("<text x=", j);
@@ -805,111 +800,111 @@ function bug(p) {
 } //bug()
 
 let value = {
-    pages: [],
-    notes: [],
-    errors: [],
-    lastoffsets2correct_pages: [],
+	pages: [],
+	notes: [],
+	errors: [],
+	lastoffsets2correct_pages: [],
 };
 
 let user = {
 	// Wird von abc2svg für jedes Notenelement aufgerufen und merkt sich dessen
-    	// Position (x, y, Breite, Höhe) für die Klickflächen im Editor.
-    	//
-    	// WICHTIG: abc2svg ruft anno_stop auf, BEVOR es die zugehörige Notenzeile
-    	// per img_out ausgibt. Zu diesem Zeitpunkt wissen wir noch nicht, ob die
-    	// Zeile noch auf die aktuelle Seite passt. Deshalb tragen die Noten hier
-    	// immer die aktuelle Seite (page_nr) und den aktuellen Offset (yo).
-    	// Passt die Zeile dann in img_out nicht mehr auf die Seite, landet sie auf
-    	// der nächsten Seite und diese Angaben stimmen nicht mehr. Die Korrektur
-    	// erfolgt nachträglich in Perl (sie oben Perl function correct_pages).
-    anno_stop: function(music_type, start, stop_offset, x, y, w, h, s) {
-        if (music_type == "note" || music_type == "rest") {
-            let line = "<abc type=\"" + music_type + "\" start_offset=\"" + start + "\" stop_offset=\"" + stop_offset + "\" x=\"" + abc.sx(x) + "\" y=\"" + abc.sy(y) + "\" width=\"" + w + "\" height=\"" + h + "\" svg_offset=\"" + yo + "\" page_nr=\"" + page_nr + "\"/>\n";
-            value.notes.push(line);
-            out.push(line);
-        }
+		// Position (x, y, Breite, Höhe) für die Klickflächen im Editor.
+		//
+		// WICHTIG: abc2svg ruft anno_stop auf, BEVOR es die zugehörige Notenzeile
+		// per img_out ausgibt. Zu diesem Zeitpunkt wissen wir noch nicht, ob die
+		// Zeile noch auf die aktuelle Seite passt. Deshalb tragen die Noten hier
+		// immer die aktuelle Seite (page_nr) und den aktuellen Offset (yo).
+		// Passt die Zeile dann in img_out nicht mehr auf die Seite, landet sie auf
+		// der nächsten Seite und diese Angaben stimmen nicht mehr. Die Korrektur
+		// erfolgt nachträglich in Perl (sie oben Perl function correct_pages).
+	anno_stop: function(music_type, start, stop_offset, x, y, w, h, s) {
+		if (music_type == "note" || music_type == "rest") {
+			let line = "<abc type=\"" + music_type + "\" start_offset=\"" + start + "\" stop_offset=\"" + stop_offset + "\" x=\"" + abc.sx(x) + "\" y=\"" + abc.sy(y) + "\" width=\"" + w + "\" height=\"" + h + "\" svg_offset=\"" + yo + "\" page_nr=\"" + page_nr + "\"/>\n";
+			value.notes.push(line);
+			out.push(line);
+		}
 	},
-    img_out: function(p) {
-		    switch (p.slice(0, 4)) {
-		    case "<svg":
-			    // Seit abc2svg 1.22.29 wird die Höhe der SVG-Zeilen mit Nachkommastellen
-    			// ausgegeben (posy.toFixed(2), wegen %%fit2box), z.B. height="120.35px".
-    			// Der frühere Regex mit (\d+) matchte nur ganze Zahlen, lieferte dann null
-    			// und führte zu "TypeError: cannot read property '2' of null".
-    			// Daher hier auch Dezimalpunkte erlauben. Der Inhalt der von abc2svg
-    			// erzeugten SVGs ist nicht spezifiziert und kann sich zwischen Versionen
-    			// ändern, deshalb wird ein unerwarteter Header abgefangen.
-    			// Siehe https://chiselapp.com/user/moinejf/repository/abc2svg/tktview/5a01923787
+	img_out: function(p) {
+			switch (p.slice(0, 4)) {
+			case "<svg":
+				// Seit abc2svg 1.22.29 wird die Höhe der SVG-Zeilen mit Nachkommastellen
+				// ausgegeben (posy.toFixed(2), wegen %%fit2box), z.B. height="120.35px".
+				// Der frühere Regex mit (\d+) matchte nur ganze Zahlen, lieferte dann null
+				// und führte zu "TypeError: cannot read property '2' of null".
+				// Daher hier auch Dezimalpunkte erlauben. Der Inhalt der von abc2svg
+				// erzeugten SVGs ist nicht spezifiziert und kann sich zwischen Versionen
+				// ändern, deshalb wird ein unerwarteter Header abgefangen.
+				// Siehe https://chiselapp.com/user/moinejf/repository/abc2svg/tktview/5a01923787
 				let h = p.match(/width=\"([\d.]+)px\" height=\"([\d.]+)px\"/);
-			    // if (pagewidth > 0) {
-			    //    w = pagewidth;
-			    // } else if (w < h[1]) {
-				//    w = h[1];	// max width
-			    //}
+				// if (pagewidth > 0) {
+				//	  w = pagewidth;
+				// } else if (w < h[1]) {
+				//	  w = h[1]; // max width
+				//}
 				
-			    w = Number(pagewidth);
-			    let yoh = Number(yo) + Number(h[2]);
-			    p = bug(p);
-		        if (Number(yoh) > Number(pageheight) - Number(bottommargin)) {
-			        
-			        //std.printf("Offset %.4f !!! Page limit exceeded\n", yo);
-			        value.lastoffsets2correct_pages.push(yo);
-		            let page = "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\"\n\
-                            xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n\
-                            width=\"" + w + "px\" height=\"" + pageheight + "px\">\n"
-                            + "<rect width=\"100\%\" height=\"100\%\" fill=\"" +bgcolor + "\"/>\n"
-		                    + out.join("\n") 
-		                    + "\n</svg>";
-		            
-		            value.pages.push(page);
+				w = Number(pagewidth);
+				let yoh = Number(yo) + Number(h[2]);
+				p = bug(p);
+				if (Number(yoh) > Number(pageheight) - Number(bottommargin)) {
+					
+					//std.printf("Offset %.4f !!! Page limit exceeded\n", yo);
+					value.lastoffsets2correct_pages.push(yo);
+					let page = "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\"\n\
+							xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n\
+							width=\"" + w + "px\" height=\"" + pageheight + "px\">\n"
+							+ "<rect width=\"100\%\" height=\"100\%\" fill=\"" +bgcolor + "\"/>\n"
+							+ out.join("\n") 
+							+ "\n</svg>";
+					
+					value.pages.push(page);
 		
-	                if (user.errtxt)
-		                tm.printErr(user.errtxt);
-                    
-                    yo = topmargin; 
-                    
-                    page_nr = page_nr + 1;
-                    //std.printf("Start new page %d with offset %.4f and height %4.f\n",page_nr+1,yo, h[2]);
-                    out = [];
-                    var	i = p.indexOf(">");
-                    out.push(p.slice(0, i) + "\n y=\"" + yo + "\"" + p.slice(i));
-                    yo = Number(yo) + Number(h[2]);
-		            
-		        } else {
-		            //std.printf("New line in page %d with offset %.4f and height %4.f\n",page_nr, yo, h[2]);
-		            var	i = p.indexOf(">");
-			        out.push(p.slice(0, i) + "\n y=\"" + yo + "\"" + p.slice(i));
-			        yo = Number(yo) + Number(h[2]); // offset
-		        }
-		        
-			    break;
-		    }
-	    },
-    errmsg: function(message, line_number, column_number) {
-        console.log("Error: " + message + " at "+ line_number + "," + column_number);
-        value.errors.push(message + " at "+ line_number + "," + column_number);
-        
-    },
-    read_file: std.loadFile,
-    //page_format: true,
-    //imagesize: "width=\"794px\" height=\"1190px\"",
+					if (user.errtxt)
+						tm.printErr(user.errtxt);
+					
+					yo = topmargin; 
+					
+					page_nr = page_nr + 1;
+					//std.printf("Start new page %d with offset %.4f and height %4.f\n",page_nr+1,yo, h[2]);
+					out = [];
+					var i = p.indexOf(">");
+					out.push(p.slice(0, i) + "\n y=\"" + yo + "\"" + p.slice(i));
+					yo = Number(yo) + Number(h[2]);
+					
+				} else {
+					//std.printf("New line in page %d with offset %.4f and height %4.f\n",page_nr, yo, h[2]);
+					var i = p.indexOf(">");
+					out.push(p.slice(0, i) + "\n y=\"" + yo + "\"" + p.slice(i));
+					yo = Number(yo) + Number(h[2]); // offset
+				}
+				
+				break;
+			}
+		},
+	errmsg: function(message, line_number, column_number) {
+		console.log("Error: " + message + " at "+ line_number + "," + column_number);
+		value.errors.push(message + " at "+ line_number + "," + column_number);
+		
+	},
+	read_file: std.loadFile,
+	//page_format: true,
+	//imagesize: "width=\"794px\" height=\"1190px\"",
 };
 
 abc = new abc2svg.Abc(user);
 
 try {
-    abc.tosvg(abc_file,header+content);
+	abc.tosvg(abc_file,header+content);
 } catch (e) {
-    console.log("tosvg failed: " + e + "\n" + e.stack);
-    value.errors.push("abc2svg internal error: " + e.message + " at 4,0");
+	console.log("tosvg failed: " + e + "\n" + e.stack);
+	value.errors.push("abc2svg internal error: " + e.message + " at 4,0");
 }
 
 let page = "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\"\n\
-            xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n\
-            width=\"" + w + "px\" height=\"" + pageheight + "px\">\n" 
-            + "<rect width=\"100\%\" height=\"100\%\" fill=\"" + bgcolor +"\"/>" 
-            + out.join("\n")
-            + "\n</svg>";
+			xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n\
+			width=\"" + w + "px\" height=\"" + pageheight + "px\">\n" 
+			+ "<rect width=\"100\%\" height=\"100\%\" fill=\"" + bgcolor +"\"/>" 
+			+ out.join("\n")
+			+ "\n</svg>";
 
 value.pages.push(page);
 

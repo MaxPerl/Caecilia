@@ -32,10 +32,10 @@ sub new {
 	
 	my $obj = {
 		app => $app,
-		config => load_config(undef),
+		config => {},
 		};
 	bless($obj,$class);
-	
+	$obj->{config} = $obj->load_config();
 	return $obj;
 }
 

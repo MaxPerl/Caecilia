@@ -1,14 +1,3 @@
-// abc2svg - ABC to SVG translator
-// @source: https://chiselapp.com/user/moinejf/repository/abc2svg
-// Copyright (C) 2014-2026 Jean-François Moine - LGPL3+
-// snd-1.js - file to include in html pages with abc2svg-1.js for playing
-// sndgen.js - sound generation
-// sndaud.js - audio output using HTML5 audio
-/*! JavaScript SoundFont 2 Parser. Copyright 2013-2015 imaya/GREE Inc and Colin Clark. Licensed under the MIT License. */
-// sndmid.js - audio output using HTML5 MIDI
-// follow-1.js - file included in snd-1.js
-// chord.js - generation of accompaniment
-// drum.js - generation of drum sequences
 
 function AbcPlay(i_conf){var conf=i_conf,init={},audio=ToAudio(),audio5,midi5,current,abcplay={clear:audio.clear,add:audio.add,set_sfu:function(v){if(v==undefined)
 return conf.sfu
@@ -340,7 +329,7 @@ po.c_i[i]=0
 while(p_v.voice_down){p_v=p_v.voice_down
 po.v_c[p_v.v]=i}
 po.p_v[s2.v]=true}
-function play_cont(po){var d,i,st,m,note,g,s2,t,maxt,now,p_v,C=abc2svg.C,s=po.s_cur
+function play_cont(po){var d,i,st,m,n,note,g,s2,t,maxt,now,p_v,C=abc2svg.C,s=po.s_cur
 function var_end(s){var i,s2,s3,a=s.rep_v||s.rep_s
 ti=0
 for(i=1;i<a.length;i++){s2=a[i]
@@ -364,12 +353,17 @@ po.conf.new_speed=0}
 maxt=t+po.tgen
 po.timouts=[]
 s2=null
-while(1){if((!s||s.part1)&&po.i_p!=undefined){s2=po.ps[++po.i_p]
+while(1){if((!s||s.part1)&&po.ps){s2=po.ps[++po.i_p]
 if(!s2)
-s=s2=null}
-if(po.s_loop&&(!s||s==po.s_end)&&!po.stop){s2=po.s_loop.ts_next
-if(s2?.p_v.id=="_beats"){while(s2?.p_v.id=="_beats")
-s2=s2.ts_next}}
+s=s2=null
+po.repv=1}
+if(!s2&&po.s_loop&&(!s||s==po.s_end)&&!po.stop){po.i_p=0
+s2=po.ps?po.ps[0]:po.s_loop.ts_next
+if(s2.p_v.id=="_beats"){while(s2?.p_v.id=="_beats")
+s2=s2.ts_next}
+po.repn=0
+po.repv=1
+po.repp=null}
 if(s2){s=s2
 s2=null
 po.stim=t-s.ptim/po.conf.speed
@@ -447,6 +441,11 @@ function get_part(po){var s,i,s_p
 for(s=po.s_cur;s;s=s.ts_prev){if(s.parts){po.i_p=-1
 po.ps=s.p_s
 return}
+if(s.bar_type){if(s.text&&po.repv==1){i=parseInt(s.text)
+if(i)
+po.repv=i}
+if(s.rep_p)
+po.repp??=s.rep_p}
 s_p=s.part1
 if(!s_p||!s_p.p_s)
 continue
@@ -456,12 +455,12 @@ return}}}}
 if(po.stop){if(po.onend)
 po.onend(po.repv)
 return}
+if(!po.repv)
+po.repv=1
 get_part(po)
 po.stim=po.get_time(po)+.3
 -po.s_cur.ptim/po.conf.speed
 po.p_v=[]
-if(!po.repv)
-po.repv=1
 play_cont(po)}
 if(typeof module=='object'&&typeof exports=='object')
 exports.ToAudio=ToAudio
@@ -502,7 +501,7 @@ while(j<jl){generator=sf2par.createInstrumentGenerator_(zone,j)
 info.push({generator:generator.generator,})
 j++}
 return{info:info}}
-var i,j,k,sid,gen,parm,sample,infos,sample_hdr,scale,tune,gparm={attack:.01,hold:.01,decay:.01,},b=instr>>7,p=instr%128,pr=sf2pre
+var i,j,k,sid,gen,parm,sample,infos,sample_hdr,scale,tune,gparm={attack:.01,hold:.01,decay:.01,release:.01,},b=instr>>7,p=instr%128,pr=sf2pre
 rates[instr]=[]
 for(i=0;i<pr.length;i++){gen=pr[i].header
 if(gen.preset==p&&gen.bank==b)
@@ -510,11 +509,10 @@ break}
 pr=pr[i]
 if(!pr){errmsg('unknown instrument '+b+':'+p)
 return}
-pr=pr.info
+pr=pr.info.sort((a,b)=>{(a.generator.velRange?.lo||0)
+-(b.generator.velRange?.lo||0)})
 for(k=0;k<pr.length;k++){gen=pr[k].generator
 if(!gen.instrument)
-continue
-if(gen.velRange?.lo>1)
 continue
 infos=get_instr(gen.instrument.amount).info
 for(i=0;i<infos.length;i++){gen=infos[i].generator
@@ -525,9 +523,11 @@ parm.attack=Math.pow(2,gen.attackVolEnv.amount/1200)
 if(gen.holdVolEnv)
 parm.hold=Math.pow(2,gen.holdVolEnv.amount/1200)
 if(gen.decayVolEnv)
-parm.decay=Math.pow(2,gen.decayVolEnv.amount/1200)/4
+parm.decay=Math.pow(2,gen.decayVolEnv.amount/1200)
 if(gen.sustainVolEnv)
 parm.sustain=gen.sustainVolEnv.amount/10
+if(gen.releaseVolEnv)
+parm.release=Math.pow(2,gen.releaseVolEnv.amount/1200)
 if(gen.initialAttenuation)
 parm.atte=gen.initialAttenuation/10
 if(gen.sampleID){sid=gen.sampleID.amount
@@ -654,7 +654,7 @@ i=po.v_b[s.v]?0:128*128}
 if(po.v_b[s.v])
 i+=po.v_b[s.v]
 po.c_i[s.chn]=i}
-function note_run(po,s,key,t,d){var g,st,t2=t,c=po.v_c[s.v],instr=po.c_i[c],k=key|0,parm=params[instr][k],o=po.ac.createBufferSource(),v=s.p_v.vol==undefined?1:s.p_v.vol
+function note_run(po,s,key,t,d){var g,st,t2=t,c=po.v_c[s.v],instr=po.c_i[c],k=key|0,parm=params[instr][k],o=po.ac.createBufferSource(),v=s.p_v.vol==undefined?.7:s.p_v.vol
 if(!v||!parm)
 return
 o.buffer=parm.buffer
@@ -675,13 +675,15 @@ t2+=parm.hold
 g.gain.setValueAtTime(v,t2)}
 if(parm.sustain&&parm.decay>.01){v=parm.sustain==100?.01:v/Math.pow(10,parm.sustain/20)
 g.gain.exponentialRampToValueAtTime(v,t2+parm.decay)}
+g.gain.setValueAtTime(v,t+d)
+g.gain.linearRampToValueAtTime(0,t+d+parm.release)
 if(s.p_v.pan!=undefined){var p=po.ac.createStereoPanner()
 p.pan.value=s.p_v.pan
 o.connect(p)
 p.connect(g)}else{o.connect(g)}
 g.connect(po.gain)
 o.start(t)
-o.stop(t+d)}
+o.stop(t+d+parm.release)}
 function play_start(){if(po.stop){po.onend(repv)
 return}
 gain.connect(ac.destination)
@@ -704,7 +706,7 @@ if(ac.state==="suspended")
 ac.resume()
 play_unlock()}
 gain=ac.createGain()
-gain.gain.value=conf.gain}
+gain.gain.value=conf.gain??.7}
 while(i_start.noplay)
 i_start=i_start.ts_next
 po={conf:conf,onend:conf.onend||empty,onnote:conf.onnote||empty,s_end:i_end,s_cur:i_start,repv:i_lvl||0,tgen:2,get_time:get_time,midi_ctrl:midi_ctrl,midi_prog:midi_prog,note_run:note_run,timouts:[],v_c:[],c_i:[],v_b:[],ac:ac,gain:gain,rates:rates}
@@ -777,7 +779,7 @@ k|=0
 t*=1000
 d*=1000
 mutone(k,a,t)
-po.op.send(new Uint8Array([0x90+c,k,80]),t)
+po.op.send(new Uint8Array([0x90+c,k,(po.conf.gain??.7)*127]),t)
 po.op.send(new Uint8Array([0x80+c,k,0]),t+d-20)}
 function midi_ctrl(po,s,t){po.op.send(new Uint8Array([0xb0+po.v_c[s.v],s.ctrl,s.val]),t*1000)}
 function midi_prog(po,s){var i,c=s.chn

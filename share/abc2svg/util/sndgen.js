@@ -655,7 +655,7 @@ abc2svg.play_next = function(po) {
 
     // start and continue to play
     function play_cont(po) {
-    var	d, i, st, m, note, g, s2, t, maxt, now, p_v,
+    var	d, i, st, m, n, note, g, s2, t, maxt, now, p_v,
 	C = abc2svg.C,
 	s = po.s_cur
 
@@ -708,21 +708,27 @@ abc2svg.play_next = function(po) {
 
 		// check if end of part
 		if ((!s || s.part1)
-		 && po.i_p != undefined) {
+		 && po.ps) {
 			s2 = po.ps[++po.i_p]
 			if (!s2)
 				s = s2 = null
+			po.repv = 1
 		}
 
 		// handle the time jumps
-		if (po.s_loop
+		if (!s2
+		 && po.s_loop
 		 && (!s || s == po.s_end)
 		 && !po.stop) {
-			s2 = po.s_loop.ts_next
-			if (s2?.p_v.id == "_beats") {
+			po.i_p = 0
+			s2 = po.ps ? po.ps[0] : po.s_loop.ts_next
+			if (s2.p_v.id == "_beats") {
 				while (s2?.p_v.id == "_beats")
 					s2 = s2.ts_next
 			}
+			po.repn = 0 //false
+			po.repv = 1
+			po.repp = null
 		}
 
 		if (s2) {
@@ -886,6 +892,18 @@ abc2svg.play_next = function(po) {
 			po.ps = s.p_s
 			return
 		}
+
+		// if a variant, set the repeat number and repeat start
+		if (s.bar_type) {
+			if (s.text && po.repv == 1) {
+				i = parseInt(s.text)
+				if (i)
+					po.repv = i
+			}
+			if (s.rep_p)
+				po.repp ??= s.rep_p
+		}
+
 		s_p = s.part1
 		if (!s_p || !s_p.p_s)
 			continue
@@ -907,13 +925,13 @@ abc2svg.play_next = function(po) {
 		return
 	}
 
+	if (!po.repv)
+		po.repv = 1
 	get_part(po)
 
 	po.stim = po.get_time(po) + .3	// start time + 0.3s
 			- po.s_cur.ptim / po.conf.speed
 	po.p_v = []			// voice table for the MIDI controls
-	if (!po.repv)
-		po.repv = 1
 
 	play_cont(po)			// start playing
 } // play_next()
