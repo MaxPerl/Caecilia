@@ -7,5 +7,5 @@ Comment=Editor for the abc notation format written with perl/pEFL
 Categories=AudioVideo;Music;
 
 Icon=io.github.MaxPerl.Caecilia
-Exec=caecilia.pl
+Exec=env EINA_LOG_BACKTRACE=0 caecilia.pl
 Terminal=false
