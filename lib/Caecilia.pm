@@ -198,7 +198,7 @@ sub show_first_run_dialog {
 	_add_header($table,2,"Path to abcm2ps",4);
 	
 	my $abcm2ps_path_en = pEFL::Elm::Entry->add($table);
-	$abcm2ps_path_en->entry_set("/usr/bin/abcm2ps");
+	$abcm2ps_path_en->entry_set("abcm2ps");
 	$abcm2ps_path_en->scrollable_set(1);
 	$abcm2ps_path_en->single_line_set(1);
 	$abcm2ps_path_en->cnp_mode_set(ELM_CNP_MODE_PLAINTEXT());
